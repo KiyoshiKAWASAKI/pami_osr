@@ -1,3 +1,19 @@
+# Added by Jin on 07/20/2020
+.DS_Store
+.ipynb_checkpoints/
+*.npy
+.idea
+__pycache__
+.DS_Store
+*/.DS_Store
+.idea
+*/.idea
+*.egg-info/
+*/__pycache__/
+*.pyc
+*/*.pyc
+
+
 # shell script
 *.sh
 
