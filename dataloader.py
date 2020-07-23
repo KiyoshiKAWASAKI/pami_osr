@@ -41,8 +41,10 @@ def get_dataloaders(args):
         # ImageNet
         traindir = os.path.join(args.data_root, 'train')
         valdir = os.path.join(args.data_root, 'val')
+
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
+
         train_set = datasets.ImageFolder(traindir, transforms.Compose([
             transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
@@ -55,6 +57,8 @@ def get_dataloaders(args):
             transforms.ToTensor(),
             normalize
         ]))
+
+
     if args.use_valid:
         train_set_index = torch.randperm(len(train_set))
         if os.path.exists(os.path.join(args.save, 'index.pth')):
@@ -63,11 +67,13 @@ def get_dataloaders(args):
         else:
             print('!!!!!! Save train_set_index !!!!!!')
             torch.save(train_set_index, os.path.join(args.save, 'index.pth'))
+
         if args.data.startswith('cifar'):
             num_sample_valid = 5000
         else:
             num_sample_valid = 50000
 
+        # TODO (JH): Are they using training data for training&validation...?? 0_0
         if 'train' in args.splits:
             train_loader = torch.utils.data.DataLoader(
                 train_set, batch_size=args.batch_size,

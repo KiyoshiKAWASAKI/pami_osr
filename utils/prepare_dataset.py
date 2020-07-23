@@ -30,7 +30,10 @@ valid_csv_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/
 test_csv_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/" \
                      "object_recognition/image_net/derivatives/sail_on_csv/msd_test_0720"
 
-def gen_training_valid_csv(data_dir, csv_path):
+
+
+
+def generate_csv(data_dir, csv_path):
     """
 
     :return:
@@ -50,21 +53,28 @@ def gen_training_valid_csv(data_dir, csv_path):
 
 
 
-
-def gen_test_csv():
+def gen_test_csv(data_dir,
+                 csv_path,
+                 mapping_file_path):
     """
+    Use this to generate the test set for ObjectNet
 
+    :param data_dir:
+    :param csv_path:
+    :param mapping_file_path:
     :return:
     """
-    pass
 
 
 
 
 if __name__ == "__main__":
-    # gen_training_valid_csv(data_dir=training_data_path,
-    #                        csv_path=training_csv_save_path)
-    # gen_training_valid_csv(data_dir=validation_data_path,
-    #                        csv_path=valid_csv_save_path)
-    gen_training_valid_csv(data_dir=test_data_path,
+    # Generate training and validation csvs
+    generate_csv(data_dir=training_data_path,
+                           csv_path=training_csv_save_path)
+    generate_csv(data_dir=validation_data_path,
+                           csv_path=valid_csv_save_path)
+
+    # Generate test csv
+    generate_csv(data_dir=test_data_path,
                            csv_path=test_csv_save_path)

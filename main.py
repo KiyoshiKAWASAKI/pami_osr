@@ -35,7 +35,7 @@ if args.data == 'cifar10':
 elif args.data == 'cifar100':
     args.num_classes = 100
 else:
-    args.num_classes = 1000
+    args.num_classes = 413
 
 import torch
 import torch.nn as nn

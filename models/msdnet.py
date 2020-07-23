@@ -235,7 +235,7 @@ class MSDNet(nn.Module):
                     self._build_classifier_cifar(nIn * args.grFactor[-1], 10))
             elif args.data == 'ImageNet':
                 self.classifier.append(
-                    self._build_classifier_imagenet(nIn * args.grFactor[-1], 1000))
+                    self._build_classifier_imagenet(nIn * args.grFactor[-1], 413))
             else:
                 raise NotImplementedError
 
