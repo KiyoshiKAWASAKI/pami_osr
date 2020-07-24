@@ -107,7 +107,7 @@ def main():
 
         train_loss, train_prec1, train_prec5, lr = train(train_loader, model, criterion, optimizer, epoch)
 
-        val_loss, val_prec1, val_prec5 = validate(val_loader, model, criterion)
+        val_loss, val_prec1, val_prec5 = validate(val_loader, model, criterion, epoch)
 
         scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 6)
                       .format(epoch, lr, train_loss, val_loss,
@@ -152,77 +152,20 @@ def train(train_loader, model, criterion, optimizer, epoch):
     end = time.time()
 
     running_lr = None
-    for i, (input, target) in enumerate(train_loader):
-        lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                  nBatch=len(train_loader), method=args.lr_type)
 
-        if running_lr is None:
-            running_lr = lr
+    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
+        for i, (input, target) in enumerate(train_loader):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader), method=args.lr_type)
 
-        data_time.update(time.time() - end)
-
-        target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input)
-        target_var = torch.autograd.Variable(target)
-
-        output = model(input_var)
-        if not isinstance(output, list):
-            output = [output]
-
-        loss = 0.0
-        for j in range(len(output)):
-            loss += criterion(output[j], target_var)
-
-        losses.update(loss.item(), input.size(0))
-
-        for j in range(len(output)):
-            prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-            top1[j].update(prec1.item(), input.size(0))
-            top5[j].update(prec5.item(), input.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.avg:.3f}\t'
-                  'Data {data_time.avg:.3f}\t'
-                  'Loss {loss.val:.4f}\t'
-                  'Acc@1 {top1.val:.4f}\t'
-                  'Acc@5 {top5.val:.4f}'.format(
-                    epoch, i + 1, len(train_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
-
-def validate(val_loader, model, criterion):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-    top1, top5 = [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        for i, (input, target) in enumerate(val_loader):
-            target = target.cuda(async=True)
-            input = input.cuda()
-
-            input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
+            if running_lr is None:
+                running_lr = lr
 
             data_time.update(time.time() - end)
+
+            target = target.cuda(async=True)
+            input_var = torch.autograd.Variable(input)
+            target_var = torch.autograd.Variable(target)
 
             output = model(input_var)
             if not isinstance(output, list):
@@ -239,20 +182,101 @@ def validate(val_loader, model, criterion):
                 top1[j].update(prec1.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
 
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
             if i % args.print_freq == 0:
-                print('Epoch: [{0}/{1}]\t'
+                print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.avg:.3f}\t'
                       'Data {data_time.avg:.3f}\t'
                       'Loss {loss.val:.4f}\t'
                       'Acc@1 {top1.val:.4f}\t'
                       'Acc@5 {top5.val:.4f}'.format(
-                        i + 1, len(val_loader),
+                        epoch, i + 1, len(train_loader),
                         batch_time=batch_time, data_time=data_time,
                         loss=losses, top1=top1[-1], top5=top5[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc@1 {top1.val:.4f}\t'
+                      'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
+
+def validate(val_loader, model, criterion, epoch=None):
+    batch_time = AverageMeter()
+    losses = AverageMeter()
+    data_time = AverageMeter()
+    top1, top5 = [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.eval()
+
+    end = time.time()
+    with torch.no_grad():
+        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
+            for i, (input, target) in enumerate(val_loader):
+                target = target.cuda(async=True)
+                input = input.cuda()
+
+                input_var = torch.autograd.Variable(input)
+                target_var = torch.autograd.Variable(target)
+
+                data_time.update(time.time() - end)
+
+                output = model(input_var)
+                if not isinstance(output, list):
+                    output = [output]
+
+                loss = 0.0
+                for j in range(len(output)):
+                    loss += criterion(output[j], target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+                for j in range(len(output)):
+                    prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                    top1[j].update(prec1.item(), input.size(0))
+                    top5[j].update(prec5.item(), input.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+                if i % args.print_freq == 0:
+                    print('Epoch: [{0}/{1}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}'.format(
+                            i + 1, len(val_loader),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1[-1], top5=top5[-1]))
+
+                    valid_f.write('Epoch: [{0}/{1}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}\n'.format(
+                            i + 1, len(val_loader),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1[-1], top5=top5[-1]))
+
     for j in range(args.nBlocks):
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
