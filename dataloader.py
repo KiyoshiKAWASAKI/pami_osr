@@ -40,7 +40,7 @@ def get_dataloaders(args):
     else:
         # ImageNet
         traindir = os.path.join(args.data_root, 'train')
-        valdir = os.path.join(args.data_root, 'val')
+        valdir = os.path.join(args.data_root, args.test_folder_name)
 
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
@@ -71,9 +71,9 @@ def get_dataloaders(args):
         if args.data.startswith('cifar'):
             num_sample_valid = 5000
         else:
-            num_sample_valid = 50000
+            num_sample_valid = int(len(train_set)/3)
 
-        # TODO (JH): Are they using training data for training&validation...?? 0_0
+
         if 'train' in args.splits:
             train_loader = torch.utils.data.DataLoader(
                 train_set, batch_size=args.batch_size,

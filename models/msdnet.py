@@ -205,6 +205,7 @@ class MSDNet(nn.Module):
         self.blocks = nn.ModuleList()
         self.classifier = nn.ModuleList()
         self.nBlocks = args.nBlocks
+        self.nb_training_classes = args.nb_training_classes
         self.steps = [args.base]
         self.args = args
         
@@ -235,7 +236,7 @@ class MSDNet(nn.Module):
                     self._build_classifier_cifar(nIn * args.grFactor[-1], 10))
             elif args.data == 'ImageNet':
                 self.classifier.append(
-                    self._build_classifier_imagenet(nIn * args.grFactor[-1], 413))
+                    self._build_classifier_imagenet(nIn * args.grFactor[-1], self.nb_training_classes ))
             else:
                 raise NotImplementedError
 
