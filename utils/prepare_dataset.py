@@ -36,6 +36,9 @@ test_csv_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/"
 sub_training_set_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/" \
                         "object_recognition/image_net/derivatives/dataset_v1_for_threshold/train"
 
+small_test_413_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/" \
+                        "object_recognition/image_net/derivatives/dataset_v1_for_threshold/small_valid_413"
+
 
 
 
@@ -72,8 +75,10 @@ def generate_sub_training_set(source_data_path,
     """
 
     for dir, _, _ in os.walk(source_data_path):
-        if os.path.basename(os.path.normpath(dir)) == "train":
+        if (os.path.basename(os.path.normpath(dir)) == "train") or \
+                (os.path.basename(os.path.normpath(dir)) == "val"):
             continue
+
         else:
             folder_name = os.path.basename(os.path.normpath(dir))
 
@@ -95,10 +100,13 @@ def generate_sub_training_set(source_data_path,
 
 
 if __name__ == "__main__":
-    #
-    generate_sub_training_set(source_data_path=training_data_path,
-                              target_data_path=sub_training_set_path,
-                              extract_ratio=0.2)
+    generate_sub_training_set(source_data_path=validation_data_path,
+                              target_data_path=small_test_413_path,
+                              extract_ratio=0.01)
+    # generate the subset for calculating threshold
+    # generate_sub_training_set(source_data_path=training_data_path,
+    #                           target_data_path=sub_training_set_path,
+    #                           extract_ratio=0.2)
 
     # Generate training and validation csvs
     # generate_csv(data_dir=training_data_path,
