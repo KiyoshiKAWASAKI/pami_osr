@@ -9,6 +9,8 @@ import sys
 import math
 import time
 import shutil
+import numpy as np
+import csv
 
 from dataloader import get_dataloaders
 from args import arg_parser
@@ -90,10 +92,16 @@ def main():
 
     train_loader, val_loader, test_loader = get_dataloaders(args)
 
+    # This is for test only
     if args.evalmode is not None:
+        print("@" * 30)
+        print("Doing testing only...")
+        print("@" * 30)
+
         state_dict = torch.load(args.evaluate_from)['state_dict']
         model.load_state_dict(state_dict)
 
+        # "anytime" is the one with early exits and the one we want
         if args.evalmode == 'anytime':
             validate(test_loader, model, criterion)
         else:
@@ -103,6 +111,7 @@ def main():
     scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1'
               '\tval_prec1\ttrain_prec5\tval_prec5']
 
+    # Here is for training and validation
     for epoch in range(args.start_epoch, args.epochs):
 
         train_loss, train_prec1, train_prec5, lr = train(train_loader, model, criterion, optimizer, epoch)
@@ -155,6 +164,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
         for i, (input, target) in enumerate(train_loader):
+            # print("@"*30)
+            # print("Here is the targets for training data")
+            # print(target)
             lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
                                       nBatch=len(train_loader), method=args.lr_type)
 
@@ -225,57 +237,193 @@ def validate(val_loader, model, criterion, epoch=None):
 
     model.eval()
 
+
+    sm = torch.nn.Softmax()
+
+    full_prob_list = []
+    full_target_list = []
+
+    # f = open(os.path.join(args.save, "pred_results_369_44_0731.csv"), 'w')
+
     end = time.time()
     with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
+        # with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
+        with open(os.path.join(args.save, "pred_results_369_44_0731.csv"), 'w') as f:
+            writer = csv.writer(f, delimiter=',')
+
             for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
+                print("*" * 50)
+
                 input = input.cuda()
+                target = target.cuda(async=True)
+
+                # TODO (novelty-rej): check the target labels: keep or change - done 0730
+                if args.test_with_novel:
+                    for k in range(len(target)):
+                        if target[k] >= args.nb_training_classes:
+                            target[k] = -1
 
                 input_var = torch.autograd.Variable(input)
                 target_var = torch.autograd.Variable(target)
 
+
+                # TODO (RT): check details about the RT...?
                 data_time.update(time.time() - end)
 
                 output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
+                # print(len(output))
 
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
+                # TODO (novelty-rej): extract the probability and apply our threshold
+                if args.test_with_novel or args.save_probs:
+                    prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+                    prob_list = np.array(prob.cpu().tolist())
 
-                losses.update(loss.item(), input.size(0))
+                    max_prob = np.max(prob_list)
 
-                for j in range(len(output)):
-                    prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-                    top1[j].update(prec1.item(), input.size(0))
-                    top5[j].update(prec5.item(), input.size(0))
+                    # TODO (novelty-rej): decide whether to do classification or reject
+                    # When the probability is larger than our threshold
+                    if max_prob >= args.thresh_top_1:
+                        print("Max top-1 probability is %f, larger than threshold %f" %
+                              (max_prob, args.thresh_top_1))
+
+                        # Get top-5 predictions from 5 classifiers
+                        pred_label_list = []
+
+                        for j in range(len(output)):
+                            _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
+
+                            pred_label_list.append(pred.tolist())
+
+                        # print(pred_label_list)
+
+                        # Update the evaluation metrics for one sample
+                        # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
+                        # top_5_list = pred_label_list
+                        top_1_list = []
+
+                        for l in pred_label_list:
+                            # print("l") #
+                            # print(l)
+                            top_1_list.append(l[0][0])
+
+                        # print("top-1s")
+                        # print(top_1_list)
+
+                        if target.tolist()[0] in top_1_list:
+                            # print("Right pred!")
+                            pred_label = target.tolist()[0]
+                        else:
+                            pred_label = top_1_list[-1]
+                            # print("Wrong pred!")
+                            # print(pred_label)
+
+
+                        # TODO (novelty-rej): need to change this part in the future
+                        # for j in range(len(output)):
+                        #     prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                        #     top1[j].update(prec1.item(), input.size(0))
+                        #     top5[j].update(prec5.item(), input.size(0))
+
+                    # When the probability is smaller than our threshold
+                    else:
+                        pred_label = -1
+
+                        # TODO (novelty-rej): need to change this part in the future
+                        # for j in range(len(output)):
+                        #     prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
+                        #     top1[j].update(prec1.item(), input.size(0))
+                        #     top5[j].update(prec5.item(), input.size(0))
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
 
-                if i % args.print_freq == 0:
-                    print('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top5=top5[-1]))
+                # print((target.tolist()[0], pred_label, batch_time.avg))
+                print("Ground Truth: %d, Prediction top-1: %d, RT: %f" %
+                      (target.tolist()[0], pred_label, batch_time.avg))
 
-                    valid_f.write('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}\n'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top5=top5[-1]))
+                writer.writerow([target.tolist()[0], pred_label, batch_time.avg])
+
+
+                if args.save_probs:
+                    # Reshape it into [batch, block, class]
+                    prob_list = np.reshape(prob_list,
+                                            (prob_list.shape[1],
+                                             prob_list.shape[0],
+                                             prob_list.shape[2]))
+
+                    target_list = np.array(target.cpu().tolist())
+
+                    for one_prob in prob_list.tolist():
+                        full_prob_list.append(one_prob)
+                    for one_target in target_list.tolist():
+                        full_target_list.append(one_target)
+
+                if not isinstance(output, list):
+                    output = [output]
+
+
+                # TODO (novelty-rejection): runtime error when label is -1
+                if not args.test_with_novel:
+                    loss = 0.0
+                    for j in range(len(output)):
+                        loss += criterion(output[j], target_var)
+
+                    losses.update(loss.item(), input.size(0))
+
+
+
+                # TODO (novelty-rej): print for both for known and unknown
+                if args.test_with_novel:
+                    pass
+                    # if i % args.print_freq == 0:
+                    #     print('Epoch: [{0}/{1}]\t'
+                    #           'Time {batch_time.avg:.3f}\t'
+                    #           'Acc@1 {top1.val:.4f}\t'
+                    #           'Acc@5 {top5.val:.4f}'.format(
+                    #         i + 1, len(val_loader),
+                    #         batch_time=batch_time,
+                    #         top1=top1[-1], top5=top5[-1]))
+                    #
+                    #     valid_f.write('Epoch: [{0}/{1}]\t'
+                    #                   'Time {batch_time.avg:.3f}\t'
+                    #                   'Acc@1 {top1.val:.4f}\t'
+                    #                   'Acc@5 {top5.val:.4f}\n'.format(
+                    #         i + 1, len(val_loader),
+                    #         batch_time=batch_time,
+                    #         top1=top1[-1], top5=top5[-1]))
+                else:
+                    pass
+                    # if i % args.print_freq == 0:
+                    #     print('Epoch: [{0}/{1}]\t'
+                    #           'Time {batch_time.avg:.3f}\t'
+                    #           'Data {data_time.avg:.3f}\t'
+                    #           'Loss {loss.val:.4f}\t'
+                    #           'Acc@1 {top1.val:.4f}\t'
+                    #           'Acc@5 {top5.val:.4f}'.format(
+                    #             i + 1, len(val_loader),
+                    #             batch_time=batch_time, data_time=data_time,
+                    #             loss=losses, top1=top1[-1], top5=top5[-1]))
+                    #
+                    #     valid_f.write('Epoch: [{0}/{1}]\t'
+                    #           'Time {batch_time.avg:.3f}\t'
+                    #           'Data {data_time.avg:.3f}\t'
+                    #           'Loss {loss.val:.4f}\t'
+                    #           'Acc@1 {top1.val:.4f}\t'
+                    #           'Acc@5 {top5.val:.4f}\n'.format(
+                    #             i + 1, len(val_loader),
+                    #             batch_time=batch_time, data_time=data_time,
+                    #             loss=losses, top1=top1[-1], top5=top5[-1]))
+
+            if args.save_probs == True:
+                full_prob_list_np = np.array(full_prob_list)
+                full_target_list_np = np.array(full_target_list)
+
+                print("Saving probabilities to %s" % args.save_probs_path)
+                np.save(args.save_probs_path, full_prob_list_np)
+                print("Saving labels to %s" % args.save_targets_path)
+                np.save(args.save_targets_path, full_target_list_np)
+
 
     for j in range(args.nBlocks):
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
@@ -343,6 +491,8 @@ def accuracy(output, target, topk=(1,)):
     batch_size = target.size(0)
 
     _, pred = output.topk(maxk, 1, True, True)
+    print("Here is the pred in accuracy function")
+    print(pred)
     pred = pred.t()
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 

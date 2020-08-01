@@ -131,6 +131,7 @@ class MSDNLayer(nn.Module):
         self.offset = self.nScales - self.outScales
         self.layers = nn.ModuleList()
 
+
         if self.discard > 0:
             nIn1 = nIn * args.grFactor[self.offset - 1]
             nIn2 = nIn * args.grFactor[self.offset]
@@ -219,6 +220,7 @@ class MSDNet(nn.Module):
         print(self.steps, n_layers_all)
 
         nIn = args.nChannels
+        # How many blocks are used for the MSDN
         for i in range(self.nBlocks):
             print(' ********************** Block {} '
                   ' **********************'.format(i + 1))
@@ -234,9 +236,9 @@ class MSDNet(nn.Module):
             elif args.data.startswith('cifar10'):
                 self.classifier.append(
                     self._build_classifier_cifar(nIn * args.grFactor[-1], 10))
+            # There is a classifier (early exit) at the end of each block
             elif args.data == 'ImageNet':
-                self.classifier.append(
-                    self._build_classifier_imagenet(nIn * args.grFactor[-1], self.nb_training_classes ))
+                self.classifier.append(self._build_classifier_imagenet(nIn * args.grFactor[-1], self.nb_training_classes ))
             else:
                 raise NotImplementedError
 

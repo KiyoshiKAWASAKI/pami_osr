@@ -9,6 +9,7 @@ arg_parser = argparse.ArgumentParser(
                 description='Image classification PK main script')
 
 exp_group = arg_parser.add_argument_group('exp', 'experiment setting')
+exp_group.add_argument('--test_with_novel', default=False, type=bool)
 exp_group.add_argument('--save', default='save/default-{}'.format(time.time()),
                        type=str, metavar='SAVE',
                        help='path to the experiment logging directory'
@@ -51,6 +52,10 @@ arch_group.add_argument('--reduction', default=0.5, type=float,
                         metavar='C', help='compression ratio of DenseNet'
                         ' (1 means dot\'t use compression) (default: 0.5)')
 
+arch_group.add_argument('--save_probs', default=False, type=bool)
+arch_group.add_argument('--save_probs_path', default=None, type=str)
+arch_group.add_argument('--save_targets_path', default=None, type=str)
+
 # msdnet config
 arch_group.add_argument('--nb_training_classes', type=int)
 arch_group.add_argument('--nBlocks', type=int, default=1)
@@ -66,9 +71,11 @@ arch_group.add_argument('--bottleneck', default=True, type=bool)
 
 
 # training related
+
 optim_group = arg_parser.add_argument_group('optimization',
                                             'optimization setting')
-
+optim_group.add_argument('--thresh_top_1',type=float)
+optim_group.add_argument('--thresh_top_5',type=float)
 optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
                          help='number of total epochs to run (default: 164)')
 optim_group.add_argument('--start-epoch', default=0, type=int, metavar='N',

@@ -3,6 +3,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import os
+import sys
 
 
 def get_dataloaders(args):
@@ -42,6 +43,9 @@ def get_dataloaders(args):
         traindir = os.path.join(args.data_root, 'train')
         valdir = os.path.join(args.data_root, args.test_folder_name)
 
+        print("Validation directory")
+        print(valdir)
+
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
 
@@ -51,12 +55,15 @@ def get_dataloaders(args):
             transforms.ToTensor(),
             normalize
         ]))
+        # print(train_set.class_to_idx)
+
         val_set = datasets.ImageFolder(valdir, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize
         ]))
+        # print(val_set.class_to_idx)
 
 
     if args.use_valid:
@@ -80,17 +87,22 @@ def get_dataloaders(args):
                 sampler=torch.utils.data.sampler.SubsetRandomSampler(
                     train_set_index[:-num_sample_valid]),
                 num_workers=args.workers, pin_memory=True)
+
         if 'val' in args.splits:
             val_loader = torch.utils.data.DataLoader(
-                train_set, batch_size=args.batch_size,
+                train_set,
+                batch_size=args.batch_size,
                 sampler=torch.utils.data.sampler.SubsetRandomSampler(
                     train_set_index[-num_sample_valid:]),
                 num_workers=args.workers, pin_memory=True)
+
+
         if 'test' in args.splits:
             test_loader = torch.utils.data.DataLoader(
                 val_set,
                 batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True)
+
     else:
         if 'train' in args.splits:
             train_loader = torch.utils.data.DataLoader(
