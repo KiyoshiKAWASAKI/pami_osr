@@ -63,6 +63,10 @@ def get_novelty_thresh(prob_file_path,
 
 
 
+
+
+
+
 if __name__ == "__main__":
     get_novelty_thresh(prob_file_path=prob_npy_path,
                        label_file_path=label_npy_path,
