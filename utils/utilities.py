@@ -63,6 +63,12 @@ def get_novelty_thresh(prob_file_path,
 
 
 
+def get_eval_from_csv(result_csv_path):
+    """
+
+    :param result_csv_path:
+    :return:
+    """
 
 
 
