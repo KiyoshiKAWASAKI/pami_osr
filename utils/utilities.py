@@ -15,8 +15,7 @@ label_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sai
 
 def get_novelty_thresh(prob_file_path,
                        label_file_path,
-                       top_k,
-                       nb_block):
+                       top_k):
 
     """
 
@@ -76,5 +75,4 @@ def get_eval_from_csv(result_csv_path):
 if __name__ == "__main__":
     get_novelty_thresh(prob_file_path=prob_npy_path,
                        label_file_path=label_npy_path,
-                       top_k=5,
-                       nb_block=5)
+                       top_k=3)

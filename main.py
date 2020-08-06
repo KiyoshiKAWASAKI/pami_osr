@@ -665,28 +665,37 @@ def validate(val_loader, model, criterion, epoch=None):
 
 
 
-def test_with_novelty(val_loader, model, criterion, epoch=None):
+def test_with_novelty(val_loader, model, criterion):
+    """
+    1. Using threshold for novelty rejection.
+    2. Implementing the early exits
+
+    :param val_loader:
+    :param model:
+    :param criterion:
+    :return:
+    """
     batch_time = AverageMeter()
     losses = AverageMeter()
     data_time = AverageMeter()
-    top1, top5 = [], []
+
+    top1, top3, top5 = [], [], []
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
+        top3.append(AverageMeter())
         top5.append(AverageMeter())
 
+    # Set the model to evaluation mode
     model.eval()
-
 
     sm = torch.nn.Softmax()
 
     full_prob_list = []
     full_target_list = []
 
-    # f = open(os.path.join(args.save, "pred_results_369_44_0731.csv"), 'w')
 
     end = time.time()
     with torch.no_grad():
-        # with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
         with open(os.path.join(args.save, "pred_results_369_44_0731.csv"), 'w') as f:
             writer = csv.writer(f, delimiter=',')
 
