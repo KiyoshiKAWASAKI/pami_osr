@@ -40,9 +40,11 @@ def get_dataloaders(args):
                                     ]))
     else:
         # ImageNet
-        traindir = os.path.join(args.data_root, 'train')
+        traindir = os.path.join(args.data_root, args.train_folder_name)
         valdir = os.path.join(args.data_root, args.test_folder_name)
 
+        print("Training directory")
+        print(traindir)
         print("Validation directory")
         print(valdir)
 
@@ -79,7 +81,7 @@ def get_dataloaders(args):
             num_sample_valid = 5000
         else:
             num_sample_valid = int(len(train_set)/3)
-
+            # num_sample_valid = 100
 
         if 'train' in args.splits:
             train_loader = torch.utils.data.DataLoader(

@@ -216,14 +216,14 @@ class MSDNet(nn.Module):
                              else args.step * i + 1)
             n_layers_all += self.steps[-1]
 
-        print("building network of steps: ")
-        print(self.steps, n_layers_all)
+        # print("building network of steps: ")
+        # print(self.steps, n_layers_all)
 
         nIn = args.nChannels
         # How many blocks are used for the MSDN
         for i in range(self.nBlocks):
-            print(' ********************** Block {} '
-                  ' **********************'.format(i + 1))
+            # print(' ********************** Block {} '
+            #       ' **********************'.format(i + 1))
             m, nIn = \
                 self._build_block(nIn, args, self.steps[i],
                                   n_layers_all, n_layer_curr)
@@ -285,7 +285,7 @@ class MSDNet(nn.Module):
                 raise ValueError
 
             layers.append(MSDNLayer(nIn, args.growthRate, args, inScales, outScales))
-            print('|\t\tinScales {} outScales {} inChannels {} outChannels {}\t\t|'.format(inScales, outScales, nIn, args.growthRate))
+            # print('|\t\tinScales {} outScales {} inChannels {} outChannels {}\t\t|'.format(inScales, outScales, nIn, args.growthRate))
 
             nIn += args.growthRate
             if args.prune == 'max' and inScales > outScales and \
@@ -296,7 +296,7 @@ class MSDNet(nn.Module):
                                            outScales, offset, args))
                 _t = nIn
                 nIn = math.floor(1.0 * args.reduction * nIn)
-                print('|\t\tTransition layer inserted! (max), inChannels {}, outChannels {}\t|'.format(_t, math.floor(1.0 * args.reduction * _t)))
+                # print('|\t\tTransition layer inserted! (max), inChannels {}, outChannels {}\t|'.format(_t, math.floor(1.0 * args.reduction * _t)))
             elif args.prune == 'min' and args.reduction > 0 and \
                     ((n_layer_curr == math.floor(1.0 * n_layer_all / 3)) or
                      n_layer_curr == math.floor(2.0 * n_layer_all / 3)):
@@ -305,8 +305,8 @@ class MSDNet(nn.Module):
                                                      outScales, offset, args))
 
                 nIn = math.floor(1.0 * args.reduction * nIn)
-                print('|\t\tTransition layer inserted! (min)\t|')
-            print("")
+                # print('|\t\tTransition layer inserted! (min)\t|')
+            # print("")
 
         return nn.Sequential(*layers), nIn
 

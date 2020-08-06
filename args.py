@@ -35,6 +35,7 @@ data_group.add_argument('--data', metavar='D', default='cifar10',
 data_group.add_argument('--data-root', metavar='DIR', default='data',
                         help='path to dataset (default: data)')
 data_group.add_argument('--test_folder_name', type=str, default="test")
+data_group.add_argument('--train_folder_name', type=str, default="train")
 data_group.add_argument('--use-valid', action='store_true',
                         help='use validation set or not')
 data_group.add_argument('-j', '--workers', default=4, type=int, metavar='N',
@@ -76,6 +77,7 @@ optim_group = arg_parser.add_argument_group('optimization',
                                             'optimization setting')
 optim_group.add_argument('--thresh_top_1',type=float)
 optim_group.add_argument('--thresh_top_5',type=float)
+optim_group.add_argument('--train_k_plus_1', default=False, type=bool)
 optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
                          help='number of total epochs to run (default: 164)')
 optim_group.add_argument('--start-epoch', default=0, type=int, metavar='N',
