@@ -17,6 +17,7 @@ from args import arg_parser
 from adaptive_inference import dynamic_evaluate
 import models
 from op_counter import measure_model
+from itertools import islice
 
 args = arg_parser.parse_args()
 
@@ -47,29 +48,35 @@ import torch.optim
 
 torch.manual_seed(args.seed)
 
+def take(n, iterable):
+    "Return first n items of the iterable as a list"
+    return list(islice(iterable, n))
 
 
 
 def main():
-
     global args
     best_prec1, best_epoch = 0.0, 0
 
     if not os.path.exists(args.save):
         os.makedirs(args.save)
 
-    # if args.data.startswith('cifar'):
-    #     IM_SIZE = 32
-    # else:
-    #     IM_SIZE = 224
-    #
-    # model = getattr(models, args.arch)(args)
-    # n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)
-    # torch.save(n_flops, os.path.join(args.save, 'flops.pth'))
-    # del(model)
 
-        
-    model = getattr(models, args.arch)(args)
+    # Initialize a model with 1 block
+    model_clf_1 = getattr(models, args.arch)(args, nb_blocks=1)
+    # print(model_clf_1)
+    # sys.exit()
+    # Initialize a model with 2 blocks
+    model_clf_2 = getattr(models, args.arch)(args, nb_blocks=2)
+    # Initialize a model with 3 blocks
+    model_clf_3 = getattr(models, args.arch)(args, nb_blocks=3)
+    # Initialize a model with 4 blocks
+    model_clf_4 = getattr(models, args.arch)(args, nb_blocks=4)
+    # Initialize a model with 5 blocks (original)
+    model = getattr(models, args.arch)(args, nb_blocks=5)
+    # print(model)
+
+
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -97,16 +104,85 @@ def main():
 
     # This is for test only
     if args.evalmode is not None:
-        print("@" * 30)
-        print("Doing testing only...")
-
+        print("****************Doing testing only****************")
         state_dict = torch.load(args.evaluate_from)['state_dict']
+        # with open(os.path.join(args.save, "state_dict_info.csv"), 'w') as f:
+        #     writer = csv.writer(f, delimiter=',')
+        #
+        #     for key, value in state_dict.items():
+        #         print(key)
+        #         print(value.size())
+        #         # writer.writerow([key, value.size()])
+
+        # sys.exit()
+        # Original weights has 1127 layers with 5 blocks
+        # print(block_1+block_2+block_3+block_4+block_5+clfs)
+        # 361 294 216 138 48 70
+
+        # Get the weight keys for each block
+        block_1, block_2, block_3, block_4 = [], [], [], []
+        clf_1, clf_2, clf_3, clf_4 = [], [], [], []
+
+        for key in state_dict.keys():
+            if key.startswith("module.blocks.0"):
+                block_1.append(key)
+            elif key.startswith("module.blocks.1"):
+                block_2.append(key)
+            elif key.startswith("module.blocks.2"):
+                block_3.append(key)
+            elif key.startswith("module.blocks.3"):
+                block_4.append(key)
+
+            elif key.startswith("module.classifier.0"):
+                clf_1.append(key)
+            elif key.startswith("module.classifier.1"):
+                clf_2.append(key)
+            elif key.startswith("module.classifier.2"):
+                clf_3.append(key)
+            elif key.startswith("module.classifier.3"):
+                clf_4.append(key)
+
+
+        # Get different weights for 5 models perspectively
+        state_dict_1_key = block_1 + clf_1
+        state_dict_2_key = state_dict_1_key + block_2 + clf_2
+        state_dict_3_key = state_dict_2_key + block_3 + clf_4
+        state_dict_4_key = state_dict_3_key + block_4 + clf_4
+
+        print(state_dict_1_key)
+
+        # Get the weights according to keys
+        state_dict_1 = {k: state_dict[k] for k in state_dict_1_key}
+        state_dict_2 = {k: state_dict[k] for k in state_dict_2_key}
+        state_dict_3 = {k: state_dict[k] for k in state_dict_3_key}
+        state_dict_4 = {k: state_dict[k] for k in state_dict_4_key}
+
+        state_dict_1_new = {key[7:]: value for key, value in state_dict_1.items()}
+        state_dict_2_new = {key[7:]: value for key, value in state_dict_2.items()}
+        state_dict_3_new = {key[7:]: value for key, value in state_dict_3.items()}
+        state_dict_4_new = {key[7:]: value for key, value in state_dict_4.items()}
+
+
+        # Load weights
+        model_clf_1.load_state_dict(state_dict_1_new)
+        model_clf_2.load_state_dict(state_dict_2_new)
+        model_clf_3.load_state_dict(state_dict_3_new)
+        model_clf_4.load_state_dict(state_dict_4_new)
         model.load_state_dict(state_dict)
+
+        print("Finished loading weights for all 5 models.")
+
 
         # "anytime" is the one with early exits and the one we want
         if args.evalmode == 'anytime':
             if args.test_with_novel:
-                test_with_novelty(test_loader, model, criterion)
+                test_with_novelty(val_loader=test_loader,
+                                  model_1=model_clf_1,
+                                  model_2=model_clf_2,
+                                  model_3=model_clf_3,
+                                  model_4=model_clf_4,
+                                  model=model,
+                                  criterion=criterion)
             else:
                 validate(test_loader, model, criterion)
 
@@ -665,28 +741,40 @@ def validate(val_loader, model, criterion, epoch=None):
 
 
 
-def test_with_novelty(val_loader, model, criterion):
+def test_with_novelty(val_loader,
+                      model_1,
+                      model_2,
+                      model_3,
+                      model_4,
+                      model,
+                      criterion):
     """
     1. Using threshold for novelty rejection.
-    2. Implementing the early exits
+    2. Implementing the early exits.
 
     :param val_loader:
     :param model:
     :param criterion:
     :return:
     """
-    batch_time = AverageMeter()
+    # batch_time = AverageMeter()
     losses = AverageMeter()
-    data_time = AverageMeter()
+    # data_time = AverageMeter()
 
     top1, top3, top5 = [], [], []
+
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
         top3.append(AverageMeter())
         top5.append(AverageMeter())
 
     # Set the model to evaluation mode
+    model_1.eval()
+    model_2.eval()
+    model_3.eval()
+    model_4.eval()
     model.eval()
+
 
     sm = torch.nn.Softmax()
 
@@ -694,9 +782,8 @@ def test_with_novelty(val_loader, model, criterion):
     full_target_list = []
 
 
-    end = time.time()
     with torch.no_grad():
-        with open(os.path.join(args.save, "pred_results_369_44_0731.csv"), 'w') as f:
+        with open(os.path.join(args.save, "pred_results_369_44_0806.csv"), 'w') as f:
             writer = csv.writer(f, delimiter=',')
 
             for i, (input, target) in enumerate(val_loader):
@@ -705,7 +792,7 @@ def test_with_novelty(val_loader, model, criterion):
                 input = input.cuda()
                 target = target.cuda(async=True)
 
-                # TODO (novelty-rej): check the target labels: keep or change - done 0730
+                # Check the target labels: keep or change
                 if args.test_with_novel:
                     for k in range(len(target)):
                         if target[k] >= args.nb_training_classes:
@@ -716,19 +803,30 @@ def test_with_novelty(val_loader, model, criterion):
 
 
                 # TODO (RT): check details about the RT...?
-                data_time.update(time.time() - end)
+                # data_time.update(time.time() - end)
 
+
+                # Extract the predictions from middle layers
+
+                # output, all_rt, all_ends, start = model(input_var)
                 output = model(input_var)
-                # print(len(output))
+                # print("*" * 50)
+                # print(all_rt)
+                # print(all_ends)
+                # print(start)
+                # print("Here is the output_5 for model")
+                # print(len(output_5))
+                # print(output_5)
+                # sys.exit()
 
-                # TODO (novelty-rej): extract the probability and apply our threshold
+
+                # extract the probability and apply our threshold
                 if args.test_with_novel or args.save_probs:
                     prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
                     prob_list = np.array(prob.cpu().tolist())
-
                     max_prob = np.max(prob_list)
 
-                    # TODO (novelty-rej): decide whether to do classification or reject
+                    # decide whether to do classification or reject
                     # When the probability is larger than our threshold
                     if max_prob >= args.thresh_top_1:
                         print("Max top-1 probability is %f, larger than threshold %f" %
@@ -783,14 +881,14 @@ def test_with_novelty(val_loader, model, criterion):
                         #     top5[j].update(prec5.item(), input.size(0))
 
                 # measure elapsed time
-                batch_time.update(time.time() - end)
-                end = time.time()
+                # batch_time.update(time.time() - end)
+                # end = time.time()
 
                 # print((target.tolist()[0], pred_label, batch_time.avg))
-                print("Ground Truth: %d, Prediction top-1: %d, RT: %f" %
-                      (target.tolist()[0], pred_label, batch_time.avg))
+                print("Ground Truth: %d, Prediction top-1: %d" %
+                      (target.tolist()[0], pred_label))
 
-                writer.writerow([target.tolist()[0], pred_label, batch_time.avg])
+                writer.writerow([target.tolist()[0], pred_label])
 
 
                 if args.save_probs:

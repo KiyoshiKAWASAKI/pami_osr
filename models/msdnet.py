@@ -1,7 +1,12 @@
 import torch.nn as nn
 import torch
 import math
+import time
 import pdb
+from timeit import default_timer as timer
+from args import arg_parser
+
+args = arg_parser.parse_args()
 
 class ConvBasic(nn.Module):
     def __init__(self, nIn, nOut, kernel=3, stride=1,
@@ -201,14 +206,20 @@ class ClassifierModule(nn.Module):
         return self.linear(res)
 
 class MSDNet(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, nb_blocks):
+        print("Initializing the model.")
         super(MSDNet, self).__init__()
         self.blocks = nn.ModuleList()
         self.classifier = nn.ModuleList()
-        self.nBlocks = args.nBlocks
+        self.nBlocks = nb_blocks
         self.nb_training_classes = args.nb_training_classes
         self.steps = [args.base]
         self.args = args
+
+        # Adding reaction time from inside the model
+        self.start_time = timer()
+        self.end_times = []
+        self.rts = []
         
         n_layers_all, n_layer_curr = args.base, 0
         for i in range(1, self.nBlocks):
@@ -239,6 +250,14 @@ class MSDNet(nn.Module):
             # There is a classifier (early exit) at the end of each block
             elif args.data == 'ImageNet':
                 self.classifier.append(self._build_classifier_imagenet(nIn * args.grFactor[-1], self.nb_training_classes ))
+
+                # Adding RT after each classifier
+                end_time = timer()
+                rt = end_time - self.start_time
+
+                self.end_times.append(end_time)
+                self.rts.append(rt)
+
             else:
                 raise NotImplementedError
 
@@ -335,10 +354,24 @@ class MSDNet(nn.Module):
         )
         return ClassifierModule(conv, nIn, num_classes)
 
-    def forward(self, x):
-        res = []
-        for i in range(self.nBlocks):
-            x = self.blocks[i](x)
-            res.append(self.classifier[i](x))
-        return res
+    # Only return both RT and prediction when testing with novel samples
+    if args.test_with_novel:
+        def forward(self, x):
+            res = []
+            for i in range(self.nBlocks):
+                x = self.blocks[i](x)
+                res.append(self.classifier[i](x))
+
+            # res is the network final output
+            # return res, self.rts, self.end_times, self.start_time
+            return res
+    else:
+        def forward(self, x):
+            res = []
+            for i in range(self.nBlocks):
+                x = self.blocks[i](x)
+                res.append(self.classifier[i](x))
+
+            # res is the network final output
+            return res
 

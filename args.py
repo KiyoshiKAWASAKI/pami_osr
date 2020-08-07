@@ -76,6 +76,7 @@ arch_group.add_argument('--bottleneck', default=True, type=bool)
 optim_group = arg_parser.add_argument_group('optimization',
                                             'optimization setting')
 optim_group.add_argument('--thresh_top_1',type=float)
+optim_group.add_argument('--thresh_top_3',type=float)
 optim_group.add_argument('--thresh_top_5',type=float)
 optim_group.add_argument('--train_k_plus_1', default=False, type=bool)
 optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
