@@ -45,6 +45,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
+from timeit import default_timer as timer
 
 torch.manual_seed(args.seed)
 
@@ -61,21 +62,26 @@ def main():
     if not os.path.exists(args.save):
         os.makedirs(args.save)
 
-
-    # Initialize a model with 1 block
-    model_clf_1 = getattr(models, args.arch)(args, nb_blocks=1)
-    # print(model_clf_1)
-    # sys.exit()
-    # Initialize a model with 2 blocks
-    model_clf_2 = getattr(models, args.arch)(args, nb_blocks=2)
-    # Initialize a model with 3 blocks
-    model_clf_3 = getattr(models, args.arch)(args, nb_blocks=3)
-    # Initialize a model with 4 blocks
-    model_clf_4 = getattr(models, args.arch)(args, nb_blocks=4)
     # Initialize a model with 5 blocks (original)
     model = getattr(models, args.arch)(args, nb_blocks=5)
-    # print(model)
 
+    # Get the block list
+    # parallel_blks = list(model.children())[0]
+    # clf_blks = list(model.children())[1]
+    #
+    # print(len(parallel_blks))
+    # print(len(clf_blks))
+
+    # Initialize a model with 1 block
+    # model_list_1 = parallel_blks[0].append(clf_blks[0])
+    # model_clf_1 = nn.Sequential(model_list_1)
+
+    # # Initialize a model with 2 blocks
+    # model_clf_2 = getattr(models, args.arch)(args, nb_blocks=2)
+    # # Initialize a model with 3 blocks
+    # model_clf_3 = getattr(models, args.arch)(args, nb_blocks=3)
+    # # Initialize a model with 4 blocks
+    # model_clf_4 = getattr(models, args.arch)(args, nb_blocks=4)
 
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
@@ -120,54 +126,56 @@ def main():
         # 361 294 216 138 48 70
 
         # Get the weight keys for each block
-        block_1, block_2, block_3, block_4 = [], [], [], []
-        clf_1, clf_2, clf_3, clf_4 = [], [], [], []
-
-        for key in state_dict.keys():
-            if key.startswith("module.blocks.0"):
-                block_1.append(key)
-            elif key.startswith("module.blocks.1"):
-                block_2.append(key)
-            elif key.startswith("module.blocks.2"):
-                block_3.append(key)
-            elif key.startswith("module.blocks.3"):
-                block_4.append(key)
-
-            elif key.startswith("module.classifier.0"):
-                clf_1.append(key)
-            elif key.startswith("module.classifier.1"):
-                clf_2.append(key)
-            elif key.startswith("module.classifier.2"):
-                clf_3.append(key)
-            elif key.startswith("module.classifier.3"):
-                clf_4.append(key)
+        # block_1, block_2, block_3, block_4 = [], [], [], []
+        # clf_1, clf_2, clf_3, clf_4 = [], [], [], []
+        #
+        # for key in state_dict.keys():
+        #     if key.startswith("module.blocks.0"):
+        #         block_1.append(key)
+        #     elif key.startswith("module.blocks.1"):
+        #         block_2.append(key)
+        #     elif key.startswith("module.blocks.2"):
+        #         block_3.append(key)
+        #     elif key.startswith("module.blocks.3"):
+        #         block_4.append(key)
+        #
+        #     elif key.startswith("module.classifier.0"):
+        #         clf_1.append(key)
+        #     elif key.startswith("module.classifier.1"):
+        #         clf_2.append(key)
+        #     elif key.startswith("module.classifier.2"):
+        #         clf_3.append(key)
+        #     elif key.startswith("module.classifier.3"):
+        #         clf_4.append(key)
 
 
         # Get different weights for 5 models perspectively
-        state_dict_1_key = block_1 + clf_1
-        state_dict_2_key = state_dict_1_key + block_2 + clf_2
-        state_dict_3_key = state_dict_2_key + block_3 + clf_4
-        state_dict_4_key = state_dict_3_key + block_4 + clf_4
+        # state_dict_1_key = block_1 + clf_1
+        # state_dict_2_key = state_dict_1_key + block_2 + clf_2
+        # state_dict_3_key = state_dict_2_key + block_3 + clf_4
+        # state_dict_4_key = state_dict_3_key + block_4 + clf_4
 
-        print(state_dict_1_key)
+        # print(len(state_dict_1_key)) # 375
 
         # Get the weights according to keys
-        state_dict_1 = {k: state_dict[k] for k in state_dict_1_key}
-        state_dict_2 = {k: state_dict[k] for k in state_dict_2_key}
-        state_dict_3 = {k: state_dict[k] for k in state_dict_3_key}
-        state_dict_4 = {k: state_dict[k] for k in state_dict_4_key}
+        # state_dict_1 = {k: state_dict[k] for k in state_dict_1_key}
+        # state_dict_2 = {k: state_dict[k] for k in state_dict_2_key}
+        # state_dict_3 = {k: state_dict[k] for k in state_dict_3_key}
+        # state_dict_4 = {k: state_dict[k] for k in state_dict_4_key}
 
-        state_dict_1_new = {key[7:]: value for key, value in state_dict_1.items()}
-        state_dict_2_new = {key[7:]: value for key, value in state_dict_2.items()}
-        state_dict_3_new = {key[7:]: value for key, value in state_dict_3.items()}
-        state_dict_4_new = {key[7:]: value for key, value in state_dict_4.items()}
+        # state_dict_1_new = {key[7:]: value for key, value in state_dict_1.items()}
+        # print(state_dict_1_new.keys())
+
+        # state_dict_2_new = {key[7:]: value for key, value in state_dict_2.items()}
+        # state_dict_3_new = {key[7:]: value for key, value in state_dict_3.items()}
+        # state_dict_4_new = {key[7:]: value for key, value in state_dict_4.items()}
 
 
         # Load weights
-        model_clf_1.load_state_dict(state_dict_1_new)
-        model_clf_2.load_state_dict(state_dict_2_new)
-        model_clf_3.load_state_dict(state_dict_3_new)
-        model_clf_4.load_state_dict(state_dict_4_new)
+        # model_clf_1.load_state_dict(state_dict_1_new)
+        # model_clf_2.load_state_dict(state_dict_2_new)
+        # model_clf_3.load_state_dict(state_dict_3_new)
+        # model_clf_4.load_state_dict(state_dict_4_new)
         model.load_state_dict(state_dict)
 
         print("Finished loading weights for all 5 models.")
@@ -177,10 +185,6 @@ def main():
         if args.evalmode == 'anytime':
             if args.test_with_novel:
                 test_with_novelty(val_loader=test_loader,
-                                  model_1=model_clf_1,
-                                  model_2=model_clf_2,
-                                  model_3=model_clf_3,
-                                  model_4=model_clf_4,
                                   model=model,
                                   criterion=criterion)
             else:
@@ -742,10 +746,6 @@ def validate(val_loader, model, criterion, epoch=None):
 
 
 def test_with_novelty(val_loader,
-                      model_1,
-                      model_2,
-                      model_3,
-                      model_4,
                       model,
                       criterion):
     """
@@ -769,17 +769,13 @@ def test_with_novelty(val_loader,
         top5.append(AverageMeter())
 
     # Set the model to evaluation mode
-    model_1.eval()
-    model_2.eval()
-    model_3.eval()
-    model_4.eval()
     model.eval()
-
 
     sm = torch.nn.Softmax()
 
     full_prob_list = []
     full_target_list = []
+    full_rt_list = []
 
 
     with torch.no_grad():
@@ -789,6 +785,7 @@ def test_with_novelty(val_loader,
             for i, (input, target) in enumerate(val_loader):
                 print("*" * 50)
 
+                rts = []
                 input = input.cuda()
                 target = target.cuda(async=True)
 
@@ -801,24 +798,14 @@ def test_with_novelty(val_loader,
                 input_var = torch.autograd.Variable(input)
                 target_var = torch.autograd.Variable(target)
 
+                # Get the model outputs and RTs
+                print("Timer started.")
 
-                # TODO (RT): check details about the RT...?
-                # data_time.update(time.time() - end)
+                start =timer()
+                output, end_time = model(input_var)
 
-
-                # Extract the predictions from middle layers
-
-                # output, all_rt, all_ends, start = model(input_var)
-                output = model(input_var)
-                # print("*" * 50)
-                # print(all_rt)
-                # print(all_ends)
-                # print(start)
-                # print("Here is the output_5 for model")
-                # print(len(output_5))
-                # print(output_5)
-                # sys.exit()
-
+                for end in end_time:
+                    rts.append(end-start)
 
                 # extract the probability and apply our threshold
                 if args.test_with_novel or args.save_probs:
@@ -837,10 +824,7 @@ def test_with_novelty(val_loader,
 
                         for j in range(len(output)):
                             _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
-
                             pred_label_list.append(pred.tolist())
-
-                        # print(pred_label_list)
 
                         # Update the evaluation metrics for one sample
                         # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
@@ -848,45 +832,19 @@ def test_with_novelty(val_loader,
                         top_1_list = []
 
                         for l in pred_label_list:
-                            # print("l") #
-                            # print(l)
                             top_1_list.append(l[0][0])
 
-                        # print("top-1s")
-                        # print(top_1_list)
 
                         if target.tolist()[0] in top_1_list:
-                            # print("Right pred!")
                             pred_label = target.tolist()[0]
                         else:
                             pred_label = top_1_list[-1]
-                            # print("Wrong pred!")
-                            # print(pred_label)
-
-
-                        # TODO (novelty-rej): need to change this part in the future
-                        # for j in range(len(output)):
-                        #     prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-                        #     top1[j].update(prec1.item(), input.size(0))
-                        #     top5[j].update(prec5.item(), input.size(0))
 
                     # When the probability is smaller than our threshold
                     else:
                         pred_label = -1
 
-                        # TODO (novelty-rej): need to change this part in the future
-                        # for j in range(len(output)):
-                        #     prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-                        #     top1[j].update(prec1.item(), input.size(0))
-                        #     top5[j].update(prec5.item(), input.size(0))
-
-                # measure elapsed time
-                # batch_time.update(time.time() - end)
-                # end = time.time()
-
-                # print((target.tolist()[0], pred_label, batch_time.avg))
-                print("Ground Truth: %d, Prediction top-1: %d" %
-                      (target.tolist()[0], pred_label))
+                print("Ground Truth: %d, Prediction top-1: %d" % (target.tolist()[0], pred_label))
 
                 writer.writerow([target.tolist()[0], pred_label])
 
@@ -922,44 +880,10 @@ def test_with_novelty(val_loader,
                 # TODO (novelty-rej): print for both for known and unknown
                 if args.test_with_novel:
                     pass
-                    # if i % args.print_freq == 0:
-                    #     print('Epoch: [{0}/{1}]\t'
-                    #           'Time {batch_time.avg:.3f}\t'
-                    #           'Acc@1 {top1.val:.4f}\t'
-                    #           'Acc@5 {top5.val:.4f}'.format(
-                    #         i + 1, len(val_loader),
-                    #         batch_time=batch_time,
-                    #         top1=top1[-1], top5=top5[-1]))
-                    #
-                    #     valid_f.write('Epoch: [{0}/{1}]\t'
-                    #                   'Time {batch_time.avg:.3f}\t'
-                    #                   'Acc@1 {top1.val:.4f}\t'
-                    #                   'Acc@5 {top5.val:.4f}\n'.format(
-                    #         i + 1, len(val_loader),
-                    #         batch_time=batch_time,
-                    #         top1=top1[-1], top5=top5[-1]))
+
                 else:
                     pass
-                    # if i % args.print_freq == 0:
-                    #     print('Epoch: [{0}/{1}]\t'
-                    #           'Time {batch_time.avg:.3f}\t'
-                    #           'Data {data_time.avg:.3f}\t'
-                    #           'Loss {loss.val:.4f}\t'
-                    #           'Acc@1 {top1.val:.4f}\t'
-                    #           'Acc@5 {top5.val:.4f}'.format(
-                    #             i + 1, len(val_loader),
-                    #             batch_time=batch_time, data_time=data_time,
-                    #             loss=losses, top1=top1[-1], top5=top5[-1]))
-                    #
-                    #     valid_f.write('Epoch: [{0}/{1}]\t'
-                    #           'Time {batch_time.avg:.3f}\t'
-                    #           'Data {data_time.avg:.3f}\t'
-                    #           'Loss {loss.val:.4f}\t'
-                    #           'Acc@1 {top1.val:.4f}\t'
-                    #           'Acc@5 {top5.val:.4f}\n'.format(
-                    #             i + 1, len(val_loader),
-                    #             batch_time=batch_time, data_time=data_time,
-                    #             loss=losses, top1=top1[-1], top5=top5[-1]))
+
 
             if args.save_probs == True:
                 full_prob_list_np = np.array(full_prob_list)
