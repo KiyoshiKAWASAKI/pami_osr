@@ -9,7 +9,7 @@ import sys
 
 
 
-prob_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_369_novel_44_07232020/07_29_threshold/0730_probs.npy"
+prob_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_369_novel_44_general/probs_0809_thresh.npy"
 label_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_369_novel_44_07232020/07_29_threshold/0730_targets.npy"
 
 

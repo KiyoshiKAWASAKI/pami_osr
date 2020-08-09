@@ -771,12 +771,12 @@ def test_with_novelty(val_loader,
     # Set the model to evaluation mode
     model.eval()
 
-    sm = torch.nn.Softmax()
+    sm = torch.nn.Softmax(dim=2)
 
+    full_original_label_list = []
     full_prob_list = []
     full_target_list = []
     full_rt_list = []
-
 
     with torch.no_grad():
         with open(os.path.join(args.save, "pred_results_369_44_0806.csv"), 'w') as f:
@@ -788,6 +788,11 @@ def test_with_novelty(val_loader,
                 rts = []
                 input = input.cuda()
                 target = target.cuda(async=True)
+
+                # Save orginal labels to the list
+                original_label_list = np.array(target.cpu().tolist())
+                for label in original_label_list:
+                    full_original_label_list.append(label)
 
                 # Check the target labels: keep or change
                 if args.test_with_novel:
@@ -804,12 +809,17 @@ def test_with_novelty(val_loader,
                 start =timer()
                 output, end_time = model(input_var)
 
+                # Save the RTs
                 for end in end_time:
                     rts.append(end-start)
+                full_rt_list.append(rts)
 
                 # extract the probability and apply our threshold
                 if args.test_with_novel or args.save_probs:
                     prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+                    # sum = torch.sum(prob, dim=2)
+                    # print(prob[0, :, :])
+                    # sys.exit()
                     prob_list = np.array(prob.cpu().tolist())
                     max_prob = np.max(prob_list)
 
@@ -855,7 +865,6 @@ def test_with_novelty(val_loader,
                                             (prob_list.shape[1],
                                              prob_list.shape[0],
                                              prob_list.shape[2]))
-
                     target_list = np.array(target.cpu().tolist())
 
                     for one_prob in prob_list.tolist():
@@ -888,11 +897,18 @@ def test_with_novelty(val_loader,
             if args.save_probs == True:
                 full_prob_list_np = np.array(full_prob_list)
                 full_target_list_np = np.array(full_target_list)
+                full_rt_list_np = np.array(full_rt_list)
+                full_original_label_list_np = np.array(full_original_label_list)
 
                 print("Saving probabilities to %s" % args.save_probs_path)
                 np.save(args.save_probs_path, full_prob_list_np)
-                print("Saving labels to %s" % args.save_targets_path)
+                print("Saving target labels to %s" % args.save_targets_path)
                 np.save(args.save_targets_path, full_target_list_np)
+                print("Saving original labels to %s" % args.save_original_label_path)
+                np.save(args.save_original_label_path, full_original_label_list_np)
+                print("Saving RTs to %s" % args.save_rt_path)
+                np.save(args.save_rt_path, full_rt_list_np)
+
 
 
     for j in range(args.nBlocks):

@@ -56,6 +56,8 @@ arch_group.add_argument('--reduction', default=0.5, type=float,
 arch_group.add_argument('--save_probs', default=False, type=bool)
 arch_group.add_argument('--save_probs_path', default=None, type=str)
 arch_group.add_argument('--save_targets_path', default=None, type=str)
+arch_group.add_argument('--save_original_label_path', default=None, type=str)
+arch_group.add_argument('--save_rt_path', default=None, type=str)
 
 # msdnet config
 arch_group.add_argument('--nb_training_classes', type=int)
