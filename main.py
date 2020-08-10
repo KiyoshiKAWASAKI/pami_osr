@@ -492,6 +492,8 @@ def test_with_novelty(val_loader,
                       model,
                       criterion):
     """
+    # TODO: Note on 0809 - currently saving everything and do post processing. Need to change in the future.
+
     1. Using threshold for novelty rejection.
     2. Implementing the early exits.
 
@@ -500,12 +502,9 @@ def test_with_novelty(val_loader,
     :param criterion:
     :return:
     """
-    # batch_time = AverageMeter()
     losses = AverageMeter()
-    # data_time = AverageMeter()
 
     top1, top3, top5 = [], [], []
-
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
         top3.append(AverageMeter())
@@ -514,6 +513,7 @@ def test_with_novelty(val_loader,
     # Set the model to evaluation mode
     model.eval()
 
+    # Define the softmax - do softmax to each block.
     sm = torch.nn.Softmax(dim=2)
 
     full_original_label_list = []
@@ -522,135 +522,122 @@ def test_with_novelty(val_loader,
     full_rt_list = []
 
     with torch.no_grad():
-        with open(os.path.join(args.save, "pred_results_369_44_0806.csv"), 'w') as f:
-            writer = csv.writer(f, delimiter=',')
+        for i, (input, target) in enumerate(val_loader):
+            print("*" * 50)
 
-            for i, (input, target) in enumerate(val_loader):
-                print("*" * 50)
+            rts = []
+            input = input.cuda()
+            target = target.cuda(async=True)
 
-                rts = []
-                input = input.cuda()
-                target = target.cuda(async=True)
+            # Save original labels to the list
+            original_label_list = np.array(target.cpu().tolist())
+            for label in original_label_list:
+                full_original_label_list.append(label)
 
-                # Save orginal labels to the list
-                original_label_list = np.array(target.cpu().tolist())
-                for label in original_label_list:
-                    full_original_label_list.append(label)
+            # Check the target labels: keep or change
+            if args.test_with_novel:
+                for k in range(len(target)):
+                    if target[k] >= args.nb_training_classes:
+                        target[k] = -1
 
-                # Check the target labels: keep or change
-                if args.test_with_novel:
-                    for k in range(len(target)):
-                        if target[k] >= args.nb_training_classes:
-                            target[k] = -1
+            input_var = torch.autograd.Variable(input)
+            target_var = torch.autograd.Variable(target)
 
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
+            # Get the model outputs and RTs
+            print("Timer started.")
+            start =timer()
+            output, end_time = model(input_var)
 
-                # Get the model outputs and RTs
-                print("Timer started.")
+            # Save the RTs
+            for end in end_time:
+                rts.append(end-start)
+            full_rt_list.append(rts)
 
-                start =timer()
-                output, end_time = model(input_var)
+            # extract the probability and apply our threshold
+            if args.test_with_novel or args.save_probs:
+                prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+                prob_list = np.array(prob.cpu().tolist())
+                max_prob = np.max(prob_list)
 
-                # Save the RTs
-                for end in end_time:
-                    rts.append(end-start)
-                full_rt_list.append(rts)
+                # decide whether to do classification or reject
+                # When the probability is larger than our threshold
+                if max_prob >= args.thresh_top_1:
+                    print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, args.thresh_top_1))
 
-                # extract the probability and apply our threshold
-                if args.test_with_novel or args.save_probs:
-                    prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-                    # sum = torch.sum(prob, dim=2)
-                    # print(prob[0, :, :])
-                    # sys.exit()
-                    prob_list = np.array(prob.cpu().tolist())
-                    max_prob = np.max(prob_list)
-
-                    # decide whether to do classification or reject
-                    # When the probability is larger than our threshold
-                    if max_prob >= args.thresh_top_1:
-                        print("Max top-1 probability is %f, larger than threshold %f" %
-                              (max_prob, args.thresh_top_1))
-
-                        # Get top-5 predictions from 5 classifiers
-                        pred_label_list = []
-
-                        for j in range(len(output)):
-                            _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
-                            pred_label_list.append(pred.tolist())
-
-                        # Update the evaluation metrics for one sample
-                        # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
-                        # top_5_list = pred_label_list
-                        top_1_list = []
-
-                        for l in pred_label_list:
-                            top_1_list.append(l[0][0])
-
-
-                        if target.tolist()[0] in top_1_list:
-                            pred_label = target.tolist()[0]
-                        else:
-                            pred_label = top_1_list[-1]
-
-                    # When the probability is smaller than our threshold
-                    else:
-                        pred_label = -1
-
-                print("Ground Truth: %d, Prediction top-1: %d" % (target.tolist()[0], pred_label))
-
-                writer.writerow([target.tolist()[0], pred_label])
-
-
-                if args.save_probs:
-                    # Reshape it into [batch, block, class]
-                    prob_list = np.reshape(prob_list,
-                                            (prob_list.shape[1],
-                                             prob_list.shape[0],
-                                             prob_list.shape[2]))
-                    target_list = np.array(target.cpu().tolist())
-
-                    for one_prob in prob_list.tolist():
-                        full_prob_list.append(one_prob)
-                    for one_target in target_list.tolist():
-                        full_target_list.append(one_target)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-
-                # TODO (novelty-rejection): runtime error when label is -1
-                if not args.test_with_novel:
-                    loss = 0.0
+                    # Get top-5 predictions from 5 classifiers
+                    pred_label_list = []
                     for j in range(len(output)):
-                        loss += criterion(output[j], target_var)
+                        _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
+                        pred_label_list.append(pred.tolist())
 
-                    losses.update(loss.item(), input.size(0))
+                    # Update the evaluation metrics for one sample
+                    # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
+                    # top_5_list = pred_label_list
+                    top_1_list = []
+
+                    for l in pred_label_list:
+                        top_1_list.append(l[0][0])
 
 
+                    if target.tolist()[0] in top_1_list:
+                        pred_label = target.tolist()[0]
+                    else:
+                        pred_label = top_1_list[-1]
 
-                # TODO (novelty-rej): print for both for known and unknown
-                if args.test_with_novel:
-                    pass
-
+                # When the probability is smaller than our threshold
                 else:
-                    pass
+                    pred_label = -1
 
 
-            if args.save_probs == True:
-                full_prob_list_np = np.array(full_prob_list)
-                full_target_list_np = np.array(full_target_list)
-                full_rt_list_np = np.array(full_rt_list)
-                full_original_label_list_np = np.array(full_original_label_list)
+            if args.save_probs:
+                # Reshape it into [batch, block, class]
+                prob_list = np.reshape(prob_list,
+                                        (prob_list.shape[1],
+                                         prob_list.shape[0],
+                                         prob_list.shape[2]))
+                target_list = np.array(target.cpu().tolist())
 
-                print("Saving probabilities to %s" % args.save_probs_path)
-                np.save(args.save_probs_path, full_prob_list_np)
-                print("Saving target labels to %s" % args.save_targets_path)
-                np.save(args.save_targets_path, full_target_list_np)
-                print("Saving original labels to %s" % args.save_original_label_path)
-                np.save(args.save_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % args.save_rt_path)
-                np.save(args.save_rt_path, full_rt_list_np)
+                for one_prob in prob_list.tolist():
+                    full_prob_list.append(one_prob)
+                for one_target in target_list.tolist():
+                    full_target_list.append(one_target)
+
+            if not isinstance(output, list):
+                output = [output]
+
+
+            # TODO (novelty-rejection): torch cannot deal with label -1
+            if not args.test_with_novel:
+                loss = 0.0
+                for j in range(len(output)):
+                    loss += criterion(output[j], target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+
+
+            # TODO: getting evaluations??
+            if args.test_with_novel:
+                pass
+
+            else:
+                pass
+
+
+        if args.save_probs == True:
+            full_prob_list_np = np.array(full_prob_list)
+            full_target_list_np = np.array(full_target_list)
+            full_rt_list_np = np.array(full_rt_list)
+            full_original_label_list_np = np.array(full_original_label_list)
+
+            print("Saving probabilities to %s" % args.save_probs_path)
+            np.save(args.save_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % args.save_targets_path)
+            np.save(args.save_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % args.save_original_label_path)
+            np.save(args.save_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % args.save_rt_path)
+            np.save(args.save_rt_path, full_rt_list_np)
 
 
 
