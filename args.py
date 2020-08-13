@@ -29,16 +29,17 @@ exp_group.add_argument('--gpu', default=None, type=str, help='GPU available.')
 
 # dataset related
 data_group = arg_parser.add_argument_group('data', 'dataset setting')
-data_group.add_argument('--data', metavar='D', default='cifar10',
+data_group.add_argument('--data', metavar='D', default='ImageNet',
                         choices=['cifar10', 'cifar100', 'ImageNet'],
                         help='data to work on')
 data_group.add_argument('--data-root', metavar='DIR', default='data',
                         help='path to dataset (default: data)')
 data_group.add_argument('--test_folder_name', type=str, default="test")
 data_group.add_argument('--train_folder_name', type=str, default="train")
+data_group.add_argument('--log_file_path', type=str)
 data_group.add_argument('--use-valid', action='store_true',
                         help='use validation set or not')
-data_group.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+data_group.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
 
 # model arch related
@@ -61,15 +62,15 @@ arch_group.add_argument('--save_rt_path', default=None, type=str)
 
 # msdnet config
 arch_group.add_argument('--nb_training_classes', type=int)
-arch_group.add_argument('--nBlocks', type=int, default=1)
+arch_group.add_argument('--nBlocks', type=int, default=5)
 arch_group.add_argument('--nChannels', type=int, default=32)
 arch_group.add_argument('--base', type=int,default=4)
-arch_group.add_argument('--stepmode', type=str, choices=['even', 'lin_grow'])
-arch_group.add_argument('--step', type=int, default=1)
-arch_group.add_argument('--growthRate', type=int, default=6)
-arch_group.add_argument('--grFactor', default='1-2-4', type=str)
+arch_group.add_argument('--stepmode', type=str, default='even', choices=['even', 'lin_grow'])
+arch_group.add_argument('--step', type=int, default=4)
+arch_group.add_argument('--growthRate', type=int, default=16)
+arch_group.add_argument('--grFactor', default='1-2-4-4', type=str)
 arch_group.add_argument('--prune', default='max', choices=['min', 'max'])
-arch_group.add_argument('--bnFactor', default='1-2-4')
+arch_group.add_argument('--bnFactor', default='1-2-4-4')
 arch_group.add_argument('--bottleneck', default=True, type=bool)
 
 
@@ -81,6 +82,7 @@ optim_group.add_argument('--thresh_top_1',type=float)
 optim_group.add_argument('--thresh_top_3',type=float)
 optim_group.add_argument('--thresh_top_5',type=float)
 optim_group.add_argument('--train_k_plus_1', default=False, type=bool)
+optim_group.add_argument('--train_early_exit', default=False, type=bool)
 optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
                          help='number of total epochs to run (default: 164)')
 optim_group.add_argument('--start-epoch', default=0, type=int, metavar='N',

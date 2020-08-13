@@ -11,6 +11,7 @@ import time
 import shutil
 import numpy as np
 import csv
+import logging
 
 from dataloader import get_dataloaders
 from args import arg_parser
@@ -19,7 +20,19 @@ import models
 from op_counter import measure_model
 from itertools import islice
 
+import torch
+import torch.nn as nn
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torch.optim
+from timeit import default_timer as timer
+import datetime
+
+
 args = arg_parser.parse_args()
+torch.manual_seed(args.seed)
+
+
 
 if args.gpu:
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -33,22 +46,19 @@ if args.use_valid:
 else:
     args.splits = ['train', 'val']
 
-# if args.data == 'cifar10':
-#     args.num_classes = 10
-# elif args.data == 'cifar100':
-#     args.num_classes = 100
-# else:
-#     args.num_classes = 413
+log_file_path = args.log_file_path
 
-import torch
-import torch.nn as nn
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim
-from timeit import default_timer as timer
+logging.basicConfig(filename=log_file_path,
+                    level=logging.DEBUG)
+# logging.basicConfig(stream=sys.stdout,
+#                     level=logging.DEBUG)
+logging_header = "date: {}".format(datetime.datetime.now())
 
-torch.manual_seed(args.seed)
 
+
+class train_msdnet():
+    def __init__(self):
+        self.args = arg_parser.parse_args()
 
 
 def main():
@@ -86,7 +96,7 @@ def main():
 
     # This is for test only
     if args.evalmode is not None:
-        print("****************Doing testing only****************")
+        logging.info("Doing testing only.")
         state_dict = torch.load(args.evaluate_from)['state_dict']
         model.load_state_dict(state_dict)
 
@@ -99,7 +109,7 @@ def main():
                 validate(test_loader, model, criterion)
 
         else:
-            print("Only supporting anytime prediction!")
+            logging.info("Only supporting anytime prediction!")
 
         return
 
@@ -108,17 +118,30 @@ def main():
     # Here is for training and validation
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
-        if args.train_k_plus_1 == True:
-            print("!! Training MSD-Net on K+1 classes.")
+        if args.train_k_plus_1:
+            logging.info("Training MSD-Net on K+1 classes.")
+
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
             val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
 
-        # Otherwise, just do the normal training
-        else:
-            print("!! Normal training with n classes.")
+        # Adding the option for training early exits using diff penalties.
+        elif args.train_early_exit:
+            logging.info("Training with weighted loss for different classes.")
+            # TODO: define the penalty factors here
+            penalty_factors = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-            train_loss, train_prec1, train_prec5, lr = train(train_loader, model, criterion, optimizer, epoch)
+            train_loss, train_prec1,train_prec5, lr = train_early_exit_loss(train_loader,
+                                                                            model,
+                                                                            criterion,
+                                                                            optimizer,
+                                                                            epoch,
+                                                                            penalty_factors,
+                                                                            "simple")
+
+            # TODO: Which validate function should we use? Probably testing_with_novelty?
+            # TODO: need to update original validate to top 1,3,5
             val_loss, val_prec1, val_prec5 = validate(val_loader, model, criterion, epoch)
+
 
         scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 6).format(epoch, lr, train_loss, val_loss, train_prec1, val_prec1, train_prec5, val_prec5))
 
@@ -127,7 +150,8 @@ def main():
         if is_best:
             best_prec1 = val_prec1
             best_epoch = epoch
-            print('Best var_prec1 {}'.format(best_prec1))
+
+            logging.info('Best var_prec1 {}'.format(best_prec1))
 
         model_filename = 'checkpoint_%03d.pth.tar' % epoch
         save_checkpoint({
@@ -137,16 +161,32 @@ def main():
             'best_prec1': best_prec1,
             'optimizer': optimizer.state_dict(),}, args, is_best, model_filename, scores)
 
-    print('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
+    logging.info('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
 
     return
 
 
 
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train():
+    pass
+
+
+
+
+def train_early_exit_loss(train_loader,
+                          model,
+                          criterion,
+                          optimizer,
+                          epoch,
+                          penalty_factors,
+                          strategy,
+                          nb_known_classes=325,
+                          nb_known_unknown_classes=44,
+                          nb_unknown_classes=44):
     """
-    Original training function from the authors.
+    Modify how the loss is calculated:
+    assign smaller penalties to earlier exits, and larger penalties to later exits.
 
     :param train_loader:
     :param model:
@@ -161,33 +201,54 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
 
     # TODO: Update the evaluation metrics to top-1, top-3 and top-5
-    top1, top5 = [], []
+    top1, top3, top5 = [], [], []
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
+        top3.append(AverageMeter())
         top5.append(AverageMeter())
 
     # switch to train mode
     model.train()
 
-    end = time.time()
-
     running_lr = None
 
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
-            # print("@"*30)
-            # print("Here is the targets for training data")
-            # print(target)
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
+    for i, (input, target) in enumerate(train_loader):
+        lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                  nBatch=len(train_loader), method=args.lr_type)
 
-            if running_lr is None:
-                running_lr = lr
+        if running_lr is None:
+            running_lr = lr
 
-            data_time.update(time.time() - end)
+        input_var = torch.autograd.Variable(input)
+
+        if strategy == "simple":
+            # Implement the simple weighted loss strategy
+            # by multiplying n weights to n exits respectively
 
             target = target.cuda(async=True)
-            input_var = torch.autograd.Variable(input)
+            target_var = torch.autograd.Variable(target)
+
+            output = model(input_var)
+
+            if not isinstance(output, list):
+                output = [output]
+
+            loss = 0.0
+
+            # Just add the penalty factors here
+            for j in range(len(output)):
+                # print(output[j].shape) # Shape: [batch, nb_classes]
+                # Assign different weights to the losses
+                penalty_factor = penalty_factors[j]
+                output_weighted = output[j] * penalty_factor
+
+                loss += criterion(output_weighted, target_var)
+
+            losses.update(loss.item(), input.size(0))
+
+        # TODO: Implement the more complex strategies
+        elif strategy == "complex":
+            target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target)
 
             output = model(input_var)
@@ -200,40 +261,31 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
             losses.update(loss.item(), input.size(0))
 
-            for j in range(len(output)):
-                prec1, prec5 = accuracy(output[j].data, target, topk=(1, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
 
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+        for j in range(len(output)):
+            prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
+            top1[j].update(prec1.item(), input.size(0))
+            top3[j].update(prec3.item(), input.size(0))
+            top5[j].update(prec5.item(), input.size(0))
 
-            if i % args.print_freq == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top5=top5[-1]))
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top5=top5[-1]))
+        # measure elapsed time
+
+        if i % args.print_freq == 0:
+            logging.info('Epoch: [{0}][{1}/{2}]\t'
+                  'Time {batch_time.avg:.3f}\t'
+                  'Data {data_time.avg:.3f}\t'
+                  'Loss {loss.val:.4f}\t'
+                  'Acc@1 {top1.val:.4f}\t'
+                  'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top5=top5[-1]))
 
     return losses.avg, top1[-1].avg, top5[-1].avg, running_lr
 
