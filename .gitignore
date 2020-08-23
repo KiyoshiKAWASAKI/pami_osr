@@ -14,8 +14,6 @@ __pycache__
 */*.pyc
 
 
-# shell script
-*.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

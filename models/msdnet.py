@@ -355,7 +355,7 @@ class MSDNet(nn.Module):
         return ClassifierModule(conv, nIn, num_classes)
 
     # Only return both RT and prediction when testing with novel samples
-    if args.test_with_novel:
+    if args.test_with_novel or args.train_k_plus_1:
         def forward(self, x):
             # print("Calling forward function")
             res = []
