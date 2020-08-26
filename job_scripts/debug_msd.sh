@@ -6,20 +6,15 @@ conda init bash
 source activate MSDNet
 
 # Application to execute
-python -W ignore main.py --data-root  /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1/known_classes/images \
-                           --data ImageNet \
-                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_413_no_novelty_07232020/90_epochs \
+python -W ignore main.py --data-root /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_for_threshold \
+                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_329_42_42/debug \
+                           --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_329_42_42/debug/test_logger.log \
+                           --train_folder_name small_valid_413 \
+                           --test_folder_name small_valid_413 \
+                           --train_early_exit True \
                            --arch msdnet \
                            --batch-size 128 \
-                           --epochs 90 \
-                           --nBlocks 5 \
-                           --stepmode even \
-                           --step 4 \
-                           --base 4 \
-                           --nChannels 32 \
-                           --growthRate 16 \
-                           --grFactor 1-2-4-4 \
-                           --bnFactor 1-2-4-4 \
+                           --nb_training_classes 413 \
+                           --epochs 3 \
                            --use-valid \
-                           --gpu 3 \
-                           -j 1
+                           --gpu 3

@@ -207,7 +207,7 @@ class ClassifierModule(nn.Module):
 
 class MSDNet(nn.Module):
     def __init__(self, args, nb_blocks):
-        print("Initializing the model.")
+        # print("Initializing the model.")
         super(MSDNet, self).__init__()
         self.blocks = nn.ModuleList()
         self.classifier = nn.ModuleList()

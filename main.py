@@ -47,13 +47,18 @@ if args.use_valid:
 else:
     args.splits = ['train', 'val']
 
-# log_file_path = args.log_file_path
-#
-# logging.basicConfig(filename=log_file_path,
-#                     level=logging.DEBUG)
+log_file_path = args.log_file_path
+
+logging.basicConfig(filename=log_file_path,
+                    level=logging.INFO,
+                    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+                    datefmt='%H:%M:%S')
+
 # logging.basicConfig(stream=sys.stdout,
-#                     level=logging.DEBUG)
-# logging_header = "date: {}".format(datetime.datetime.now())
+#                     level=logging.INFO,
+#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+#                     datefmt='%H:%M:%S')
+
 
 
 
@@ -97,8 +102,8 @@ def main():
 
     # This is for test only
     if args.evalmode is not None:
-        print("Doing testing only.")
-        # logging.info("Doing testing only.")
+        # print("Doing testing only.")
+        logging.info("Doing testing only.")
         state_dict = torch.load(args.evaluate_from)['state_dict']
         model.load_state_dict(state_dict)
 
@@ -107,37 +112,31 @@ def main():
                 test_with_novelty(val_loader=test_loader,
                                   model=model,
                                   criterion=criterion)
-            # elif args.train_k_plus_1:
-            #     print("Testing for K+1.")
-            #     validate_k_plus_one(val_loader=test_loader,
-            #                       model=model,
-            #                       criterion=criterion,
-            #                       epoch=1)
+
             else:
                 validate(test_loader, model, criterion)
 
         else:
-            print("Only supporting anytime prediction!")
-            # logging.info("Only supporting anytime prediction!")
+            logging.info("Only supporting anytime prediction!")
 
         return
 
-    scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec5\tval_prec5']
+    scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec3\tval_prec3\ttrain_prec5\tval_prec5']
 
     # Here is for training and validation
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
         if args.train_k_plus_1:
-            print("Training MSD-Net on K+1 classes.")
-            # logging.info("Training MSD-Net on K+1 classes.")
+            # print("Training MSD-Net on K+1 classes.")
+            logging.info("Training MSD-Net on K+1 classes.")
 
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
             val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
 
         # Adding the option for training early exits using diff penalties.
         elif args.train_early_exit:
-            print("Training with weighted loss for different exits.")
-            # logging.info("Training with weighted loss for different classes.")
+            # print("Training with weighted loss for different exits.")
+            logging.info("Training with weighted loss for different classes.")
             # TODO: define the penalty factors here
             # penalty_factors = [0.2, 0.4, 0.6, 0.8, 1.0]
             penalty_factors = [0.1, 0.5, 1.0, 1.5, 2.0]
@@ -156,16 +155,17 @@ def main():
             val_loss, val_prec1, val_prec3, val_prec5 = validate(val_loader, model, criterion, epoch)
 
 
-        scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 6).format(epoch, lr, train_loss, val_loss, train_prec1, val_prec1, train_prec5, val_prec5))
+        scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 8).format(epoch, lr, train_loss, val_loss,
+                                                             train_prec1, val_prec1,
+                                                             train_prec3, val_prec3,
+                                                             train_prec5, val_prec5))
 
         # Find the best model
         is_best = val_prec1 > best_prec1
         if is_best:
             best_prec1 = val_prec1
             best_epoch = epoch
-
-            print('Best var_prec1 {}'.format(best_prec1))
-            # logging.info('Best var_prec1 {}'.format(best_prec1))
+            logging.info('Best var_prec1 {}'.format(best_prec1))
 
         model_filename = 'checkpoint_%03d.pth.tar' % epoch
         save_checkpoint({
@@ -175,8 +175,7 @@ def main():
             'best_prec1': best_prec1,
             'optimizer': optimizer.state_dict(),}, args, is_best, model_filename, scores)
 
-    print('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
-    # logging.info('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
+    logging.info('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
 
     return
 
@@ -268,7 +267,7 @@ def train_early_exit_loss(train_loader,
                 target_var = torch.autograd.Variable(target)
 
                 output = model(input_var)
-                #
+
                 if not isinstance(output, list):
                     output = [output]
 
@@ -291,28 +290,19 @@ def train_early_exit_loss(train_loader,
             loss.backward()
             optimizer.step()
 
-            # measure elapsed time
-
+            # TODO: Fully utilize logger instead of writing to txt
+            # TODO: Issue - log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
-                # logging.info('Epoch: [{0}][{1}/{2}]\t'
-                #       'Time {batch_time.avg:.3f}\t'
-                #       'Data {data_time.avg:.3f}\t'
-                #       'Loss {loss.val:.4f}\t'
-                #       'Acc@1 {top1.val:.4f}\t'
-                #       'Acc@5 {top5.val:.4f}\n'.format(
-                #         epoch, i + 1, len(train_loader),
-                #         batch_time=batch_time, data_time=data_time,
-                #         loss=losses, top1=top1[-1], top5=top5[-1]))
-                print('Epoch: [{0}][{1}/{2}]\t'
-                     'Time {batch_time.avg:.3f}\t'
-                     'Data {data_time.avg:.3f}\t'
-                     'Loss {loss.val:.4f}\t'
-                     'Acc@1 {top1.val:.4f}\t'
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc@1 {top1.val:.4f}\t'
                       'Acc@3 {top3.val:.4f}\t'
-                     'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, len(train_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                      'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                 train_f.write('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
@@ -565,15 +555,16 @@ def validate(val_loader, model, criterion, epoch=None):
                 end = time.time()
 
                 if i % args.print_freq == 0:
-                    # print('Epoch: [{0}/{1}]\t'
-                    #       'Time {batch_time.avg:.3f}\t'
-                    #       'Data {data_time.avg:.3f}\t'
-                    #       'Loss {loss.val:.4f}\t'
-                    #       'Acc@1 {top1.val:.4f}\t'
-                    #       'Acc@5 {top5.val:.4f}'.format(
-                    #         i + 1, len(val_loader),
-                    #         batch_time=batch_time, data_time=data_time,
-                    #         loss=losses, top1=top1[-1], top5=top5[-1]))
+                    logging.info('Epoch: [{0}/{1}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@3 {top3.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}'.format(
+                            i + 1, len(val_loader),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                     valid_f.write('Epoch: [{0}][{1}/{2}]\t'
                                   'Time {batch_time.avg:.3f}\t'
@@ -587,8 +578,8 @@ def validate(val_loader, model, criterion, epoch=None):
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
     for j in range(args.nBlocks):
-        print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
-    # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
+        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(top1=top1[j], top3=top3[j], top5=top5[j]))
+
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
 
 
@@ -764,7 +755,7 @@ def save_checkpoint(state, args, is_best, filename, result):
     best_filename = os.path.join(model_dir, 'model_best.pth.tar')
     os.makedirs(args.save, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
-    print("=> saving checkpoint '{}'".format(model_filename))
+    logging.info("=> saving checkpoint '{}'".format(model_filename))
 
     torch.save(state, model_filename)
 
@@ -789,9 +780,9 @@ def load_checkpoint(args):
             model_filename = fin.readlines()[0].strip()
     else:
         return None
-    print("=> loading checkpoint '{}'".format(model_filename))
+    logging.info("=> loading checkpoint '{}'".format(model_filename))
     state = torch.load(model_filename)
-    print("=> loaded checkpoint '{}'".format(model_filename))
+    logging.info("=> loaded checkpoint '{}'".format(model_filename))
     return state
 
 
