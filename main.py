@@ -49,15 +49,15 @@ else:
 
 log_file_path = args.log_file_path
 
-logging.basicConfig(filename=log_file_path,
-                    level=logging.INFO,
-                    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-                    datefmt='%H:%M:%S')
-
-# logging.basicConfig(stream=sys.stdout,
+# logging.basicConfig(filename=log_file_path,
 #                     level=logging.INFO,
 #                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
 #                     datefmt='%H:%M:%S')
+
+logging.basicConfig(stream=sys.stdout,
+                    level=logging.INFO,
+                    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+                    datefmt='%H:%M:%S')
 
 
 

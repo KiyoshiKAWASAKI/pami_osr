@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import os
 import sys
+from utils import customized_dataloader as pp_dataloader
 
 
 def get_dataloaders(args):
@@ -84,14 +85,14 @@ def get_dataloaders(args):
             # num_sample_valid = 100
 
         if 'train' in args.splits:
-            train_loader = torch.utils.data.DataLoader(
+            train_loader = pp_dataloader.DataLoader(
                 train_set, batch_size=args.batch_size,
                 sampler=torch.utils.data.sampler.SubsetRandomSampler(
                     train_set_index[:-num_sample_valid]),
                 num_workers=args.workers, pin_memory=True)
 
         if 'val' in args.splits:
-            val_loader = torch.utils.data.DataLoader(
+            val_loader = pp_dataloader.DataLoader(
                 train_set,
                 batch_size=args.batch_size,
                 sampler=torch.utils.data.sampler.SubsetRandomSampler(
@@ -100,7 +101,7 @@ def get_dataloaders(args):
 
 
         if 'test' in args.splits:
-            test_loader = torch.utils.data.DataLoader(
+            test_loader = pp_dataloader.DataLoader(
                 val_set,
                 batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True)
@@ -111,6 +112,8 @@ def get_dataloaders(args):
                 train_set,
                 batch_size=args.batch_size, shuffle=True,
                 num_workers=args.workers, pin_memory=True)
+
+        # TODO: this logic looks weird if look at it with main.py ...
         if 'val' or 'test' in args.splits:
             val_loader = torch.utils.data.DataLoader(
                 val_set,
