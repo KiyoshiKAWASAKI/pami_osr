@@ -5,6 +5,7 @@
 import numpy as np
 import json
 import sys
+import os
 
 
 
@@ -27,9 +28,28 @@ How to prepare the data:
 
 """
 
-
+# Paths for saving RT npy
 save_train_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/first_40_train.npy"
 save_valid_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/first_40_valid.npy"
+
+# Data directories.
+# Reminder: Data switched for train_valid and test, because we did data collection on val folder.
+known_known_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/train_valid/known_known"
+known_known_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/known_known"
+known_unknown_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/known_unknown"
+known_unknown_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/train_valid/known_unknown"
+unknown_unknown_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/unknown_unknown"
+
+# Json save path
+train_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_known.json"
+valid_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+test_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test_known_known.json"
+
+train_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+valid_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+test_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
+
+test_unknown_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
 
 
 def remove_outliers(instance_rt_path,
@@ -192,17 +212,158 @@ def make_data_dict(class_labels,
     np.save(save_train_dict_path, training_dict)
     np.save(save_valid_dict_path, valid_dict)
 
-    return training_dict, valid_dict
+
+
+
+def gen_known_known_json(train_valid_known_known_dir,
+                         test_known_known_dir,
+                         save_train_path,
+                         save_valid_path,
+                         save_test_path,
+                         gen_train_valid=False,
+                         gen_test=False,
+                         training_ratio=0.8):
+    """
+
+    :param train_valid_known_known_dir:
+    :param test_known_known_dir:
+    :param save_train_path:
+    :param save_valid_path:
+    :return:
+    """
+    # Initialize the dicts
+    train_known_known_dict = {}
+    valid_known_known_dict = {}
+    test_known_known_dict = {}
+
+    # Set the label for the class: the labels in training has to be continuous integers starting from 0
+    label = 0
+    total_training_count = 0
+    total_valid_count = 0
+    total_test_count = 0
+
+    # Loop thru all the folders in training first: for training and validation data
+    if gen_train_valid:
+        for path, subdirs, files in os.walk(train_valid_known_known_dir):
+            print("Processing folder: %s" % path)
+
+            training_count = 0
+            valid_count = 0
+
+            if len(files) == 0:
+                continue
+            else:
+                nb_training = int(len(files) * training_ratio)
+                nb_valid = len(files) - nb_training
+                print("There are %d training samples and %d validation samples for this class" % (nb_training, nb_valid))
+
+            for one_file_name in files:
+                full_path = os.path.join(path, one_file_name)
+
+                one_file_dict = {}
+                key_list = ["img_path", "label", "RT", "category"]
+                for key in key_list:
+                    one_file_dict[key] = None
+
+                if training_count!= nb_training:
+
+                    one_file_dict["img_path"] = full_path
+                    one_file_dict["label"] = label
+                    one_file_dict["RT"] = None
+                    one_file_dict["category"] = "known_known"
+
+                    train_known_known_dict[total_training_count] = one_file_dict
+
+                    training_count += 1
+                    total_training_count += 1
+
+                elif training_count == nb_training and valid_count != nb_valid:
+                    one_file_dict["img_path"] = full_path
+                    one_file_dict["label"] = label
+                    one_file_dict["RT"] = None
+                    one_file_dict["category"] = "known_known"
+
+                    valid_known_known_dict[total_valid_count] = one_file_dict
+
+                    valid_count += 1
+                    total_valid_count += 1
+
+                elif training_count == nb_training and valid_count == nb_valid:
+                    training_count = 0
+                    valid_count = 0
+
+            label += 1
+
+            with open(save_train_path, 'w') as train_f:
+                json.dump(save_train_path, train_f)
+                print("Saving file to %s" % save_train_path)
+
+            with open(save_valid_path, 'w') as valid_f:
+                json.dump(save_valid_path, valid_f)
+                print("Saving file to %s" % save_valid_path)
+
+
+    if gen_test:
+        for path, subdirs, files in os.walk(test_known_known_dir):
+            print("Processing folder: %s" % path)
+
+            for one_file_name in files:
+                full_path = os.path.join(path, one_file_name)
+
+                one_file_dict = {}
+                key_list = ["img_path", "label", "RT", "category"]
+                for key in key_list:
+                    one_file_dict[key] = None
+
+                one_file_dict["img_path"] = full_path
+                one_file_dict["label"] = label
+                one_file_dict["RT"] = None
+                one_file_dict["category"] = "known_known"
+
+                test_known_known_dict[total_training_count] = one_file_dict
+
+                total_test_count += 1
+
+            label += 1
+
+            with open(save_test_path, 'w') as test_f:
+                json.dump(save_test_path, test_f)
+                print("Saving file to %s" % save_test_path)
 
 
 
 
-def gen_data_json(training_rt_dict,
-                  valid_rt_dict):
 
 
+def gen_known_unknown_json(training_rt_dict_path,
+                           valid_rt_dict_path,
+                           train_valid_known_unknown_dir,
+                           test_known_unknown_dir,
+                           test_unknown_unknown_dir,
+                           save_train_path,
+                           save_valid_path,
+                           save_test_path,
+                           gen_train_valid=False,
+                           gen_test=False,
+                           training_ratio=0.80):
+    """
 
-    # Load instance level RT npy file and sort the entries by class label
+    :param training_rt_dict_path:
+    :param valid_rt_dict_path:
+    :param train_valid_known_known_dir:
+    :param test_known_known_dir:
+    :param train_valid_known_unknown_dir:
+    :param test_known_unknown_dir:
+    :param test_unknown_unknown_dir:
+    :param training_ratio:
+    :return:
+    """
+    # Load instance level RT npy file for training and validation
+    training_rt_nyp = np.load(training_rt_dict_path)
+    valid_rt_npy = np.load(valid_rt_dict_path)
+
+    #
+
 
 
     pass
@@ -210,11 +371,19 @@ def gen_data_json(training_rt_dict,
 
 
 if __name__ == '__main__':
-    class_labels, image_names, rts = remove_outliers(instance_rt_path=first_round_rt_path)
-    make_data_dict(class_labels=class_labels,
-                   image_names=image_names,
-                   rts=rts,
-                   category="known_unknown",
-                   save_train_dict_path=save_train_npy_path,
-                   save_valid_dict_path=save_valid_npy_path)
-    # gen_data_json(instance_rt_path=first_round_rt_path)
+    # class_labels, image_names, rts = remove_outliers(instance_rt_path=first_round_rt_path)
+
+    # make_data_dict(class_labels=class_labels,
+    #                image_names=image_names,
+    #                rts=rts,
+    #                category="known_unknown",
+    #                save_train_dict_path=save_train_npy_path,
+    #                save_valid_dict_path=save_valid_npy_path)
+
+    # gen_known_known_json(train_valid_known_known_dir=known_known_train_val_path,
+    #                      test_known_known_dir=known_known_test_path,
+    #                      save_train_path=train_known_known_json_path,
+    #                      save_valid_path=valid_known_known_json_path,
+    #                      save_test_path=test_known_known_json_path,
+    #                      gen_test=True)
+
