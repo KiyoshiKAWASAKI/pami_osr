@@ -6,6 +6,8 @@ import numpy as np
 import json
 import sys
 import os
+import ast
+import pickle
 
 
 
@@ -50,6 +52,12 @@ valid_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open
 test_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
 
 test_unknown_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
+
+# TXT paths
+save_train_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_rt.txt"
+save_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid_rt.txt"
+
+
 
 
 def remove_outliers(instance_rt_path,
@@ -334,15 +342,74 @@ def gen_known_known_json(train_valid_known_known_dir,
 
 
 
+def process_npy(training_rt_dict_path,
+                valid_rt_dict_path,
+                save_train_txt_path,
+                save_valid_txt_path):
+    """
+    The npy was not saved in a good format, so process the dict to make it easier
+    to match the data.
 
-def gen_known_unknown_json(training_rt_dict_path,
-                           valid_rt_dict_path,
+    :param training_rt_dict_path:
+    :param valid_rt_dict_path:
+    :return:
+    """
+    # Load instance level RT npy file for training and validation (these are dictionaries)
+    training_rt_dict = np.load(training_rt_dict_path, allow_pickle=True).item()
+    valid_rt_dict = np.load(valid_rt_dict_path, allow_pickle=True).item()
+
+    training_rt_dict = ast.literal_eval(json.dumps(training_rt_dict))
+    valid_rt_dict = ast.literal_eval(json.dumps(valid_rt_dict))
+
+    training_list = []
+    valid_list = []
+
+    # Use python list instead
+    training_class_labels = []
+    training_rt = []
+    training_image_name = []
+
+    valid_class_labels = []
+    valid_rt = []
+    valid_image_name = []
+
+    # Loop through the dictionary
+    for i in range(len(training_rt_dict)):
+        one_entry = training_rt_dict[str(i)]
+
+        training_class_labels.append(one_entry["class_label"])
+        training_rt.append(one_entry["rt"])
+        training_image_name.append(one_entry["image_name"])
+
+    for i in range(len(valid_rt_dict)):
+        one_entry = valid_rt_dict[str(i)]
+
+        valid_class_labels.append(one_entry["class_label"])
+        valid_rt.append(one_entry["rt"])
+        valid_image_name.append(one_entry["image_name"])
+
+    training_list.append([training_class_labels, training_rt, training_image_name])
+    valid_list.append([valid_class_labels, valid_rt, valid_image_name])
+
+    with open(save_train_txt_path, 'wb') as fp:
+        pickle.dump(training_list, fp)
+
+    with open(save_valid_txt_path, 'wb') as fp:
+        pickle.dump(valid_list, fp)
+
+
+
+
+
+
+def gen_known_unknown_json(train_list_path,
+                           valid_list_path,
                            train_valid_known_unknown_dir,
                            test_known_unknown_dir,
-                           test_unknown_unknown_dir,
                            save_train_path,
                            save_valid_path,
                            save_test_path,
+                           nb_known_classes=335,
                            gen_train_valid=False,
                            gen_test=False,
                            training_ratio=0.80):
@@ -358,15 +425,42 @@ def gen_known_unknown_json(training_rt_dict_path,
     :param training_ratio:
     :return:
     """
-    # Load instance level RT npy file for training and validation
-    training_rt_nyp = np.load(training_rt_dict_path)
-    valid_rt_npy = np.load(valid_rt_dict_path)
 
+    with open(train_list_path, 'rb') as fp:
+        training_list = pickle.load(fp)
+    with open(valid_list_path, 'rb') as fp:
+        valid_list = pickle.load(fp)
+
+    print(len(training_list[0]))
+    print(len(valid_list[0]))
+
+    # Initialize the dicts
+    train_known_unknown_dict = {}
+    valid_known_unknown_dict = {}
+    test_known_unknown_dict = {}
+
+    known_unknown_label = nb_known_classes+1
+    unknown_unknown_label = nb_known_classes+2
+
+    total_training_count = 0
+    total_valid_count = 0
+    total_test_count = 0
+
+    # if gen_train_valid:
+    #     for path, subdirs, files in os.walk(train_valid_known_unknown_dir):
+    #         # print("Processing folder: %s" % path)
     #
+    #         training_count = 0
+    #         valid_count = 0
+    #
+    #         if len(files) == 0:
+    #             continue
+    #         else:
+    #             nb_training = int(len(files) * training_ratio)
+    #             nb_valid = len(files) - nb_training
+    #             # print("There are %d training samples and %d validation samples for this class" % (nb_training, nb_valid))
 
 
-
-    pass
 
 
 
@@ -386,4 +480,18 @@ if __name__ == '__main__':
     #                      save_valid_path=valid_known_known_json_path,
     #                      save_test_path=test_known_known_json_path,
     #                      gen_test=True)
+
+    # process_npy(training_rt_dict_path=save_train_npy_path,
+    #             valid_rt_dict_path=save_valid_npy_path,
+    #             save_train_txt_path=save_train_txt_path,
+    #             save_valid_txt_path=save_valid_txt_path)
+
+    gen_known_unknown_json(train_list_path=save_train_txt_path,
+                           valid_list_path=save_valid_txt_path,
+                           train_valid_known_unknown_dir=known_unknown_train_val_path,
+                           test_known_unknown_dir=known_known_test_path,
+                           save_train_path=train_known_unknown_json_path,
+                           save_valid_path=valid_known_unknown_json_path,
+                           save_test_path=test_known_unknown_json_path,
+                           gen_train_valid=True)
 
