@@ -27,11 +27,15 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 from timeit import default_timer as timer
 import datetime
+from utils.customized_dataloader import msd_net_dataset
 
 
 
 args = arg_parser.parse_args()
 torch.manual_seed(args.seed)
+
+# TODO: Use a small json file for debugging first
+debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
 
 
 
@@ -63,8 +67,39 @@ logging.basicConfig(stream=sys.stdout,
 
 
 class train_msdnet():
-    def __init__(self):
-        self.args = arg_parser.parse_args()
+    def __init__(self,
+                 nb_training_classes,
+
+                 grFactor="1-2-4-4", bnFactor='1-2-4-4', nBlocks=5,
+                 nChannels=32, base=4, stepmode="even", step=4,
+                 growthRate=16, prune="max", bottleneck=True,
+                 momentum=0.90, learning_rate=0.1, weight_decay=1e-4):
+
+        self.grFactor = list(map(int, grFactor.split('-')))
+        self.bnFactor = list(map(int, bnFactor.split('-')))
+        self.nScales = len(grFactor)
+        self.nb_training_classes = nb_training_classes
+        self.nBlocks = nBlocks
+        self.nChannels = nChannels
+        self.base = base
+        self.stepmode = stepmode
+        self.step = step
+        self.growthRate = growthRate
+        self.prune = prune
+        self.bottleneck = bottleneck
+
+        # TODO: This line may be wrong and need to be changed
+        self.get_model = getattr(models, 'resnet')(args, nb_blocks=5)
+        self.model = torch.nn.DataParallel(self.get_model).cuda()
+        self.criterion = nn.CrossEntropyLoss().cuda()
+
+        self.optimizer = torch.optim.SGD(self.model.parameters(),
+                                         learning_rate,
+                                         momentum=momentum,
+                                         weight_decay=weight_decay)
+
+
+
 
 
 def main():
@@ -98,7 +133,21 @@ def main():
 
     cudnn.benchmark = True
 
-    train_loader, val_loader, test_loader = get_dataloaders(args)
+    ############################################################
+    # Create dataset and data loader
+    ############################################################
+    # TODO: add the data loader and everything to here, following Sam's method
+    # TODO: First, get the dataset
+    train_dataset = msd_net_dataset()
+    valid_dataset = None
+    test_dataset = None
+
+
+
+    # TODO: Use the dataloader
+
+
+    # train_loader, val_loader, test_loader = get_dataloaders(args)
 
     # This is for test only
     if args.evalmode is not None:

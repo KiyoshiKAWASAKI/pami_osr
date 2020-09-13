@@ -246,9 +246,6 @@ def gen_known_known_json(train_valid_known_known_dir,
 
     # Set the label for the class: the labels in training has to be continuous integers starting from 0
     label = 0
-    total_training_count = 0
-    total_valid_count = 0
-    total_test_count = 0
 
     # Loop thru all the folders in training first: for training and validation data
     if gen_train_valid:
@@ -280,10 +277,9 @@ def gen_known_known_json(train_valid_known_known_dir,
                     one_file_dict["RT"] = None
                     one_file_dict["category"] = "known_known"
 
-                    train_known_known_dict[total_training_count] = one_file_dict
-
+                    train_known_known_dict[len(train_known_known_dict)+1] = one_file_dict
                     training_count += 1
-                    total_training_count += 1
+
 
                 elif training_count == nb_training and valid_count != nb_valid:
                     one_file_dict["img_path"] = full_path
@@ -291,10 +287,8 @@ def gen_known_known_json(train_valid_known_known_dir,
                     one_file_dict["RT"] = None
                     one_file_dict["category"] = "known_known"
 
-                    valid_known_known_dict[total_valid_count] = one_file_dict
-
+                    valid_known_known_dict[len(valid_known_known_dict)+1] = one_file_dict
                     valid_count += 1
-                    total_valid_count += 1
 
                 elif training_count == nb_training and valid_count == nb_valid:
                     training_count = 0
@@ -302,13 +296,13 @@ def gen_known_known_json(train_valid_known_known_dir,
 
             label += 1
 
-            with open(save_train_path, 'w') as train_f:
-                json.dump(save_train_path, train_f)
-                print("Saving file to %s" % save_train_path)
+        with open(save_train_path, 'w') as train_f:
+            json.dump(train_known_known_dict, train_f)
+            print("Saving file to %s" % save_train_path)
 
-            with open(save_valid_path, 'w') as valid_f:
-                json.dump(save_valid_path, valid_f)
-                print("Saving file to %s" % save_valid_path)
+        with open(save_valid_path, 'w') as valid_f:
+            json.dump(valid_known_known_dict, valid_f)
+            print("Saving file to %s" % save_valid_path)
 
 
     if gen_test:
@@ -328,15 +322,14 @@ def gen_known_known_json(train_valid_known_known_dir,
                 one_file_dict["RT"] = None
                 one_file_dict["category"] = "known_known"
 
-                test_known_known_dict[total_training_count] = one_file_dict
-
-                total_test_count += 1
+                test_known_known_dict[len(test_known_known_dict)] = one_file_dict
 
             label += 1
 
-            with open(save_test_path, 'w') as test_f:
-                json.dump(save_test_path, test_f)
-                print("Saving file to %s" % save_test_path)
+        # print(test_known_known_dict)
+        with open(save_test_path, 'w') as test_f:
+            json.dump(test_known_known_dict, test_f)
+            print("Saving file to %s" % save_test_path)
 
 
 
@@ -484,47 +477,46 @@ def gen_known_unknown_json(train_list_path,
     valid_known_unknown_dict = {}
     test_known_unknown_dict = {}
 
+    label_list = []
+
     label = nb_known_classes + 1
 
-    total_training_count = 0
-    total_valid_count = 0
-    total_test_count = 0
+    # total_training_count = 0
+    # total_valid_count = 0
+    # total_test_count = 0
+
+    # Get the list of labels
+    for i in range(len(training_list)):
+        one_label = training_list[i][0].split("/")[0]
+        label_list.append(one_label)
+    label_list, label_counts = np.unique(np.asarray(label_list), return_counts=True)
+    label_list = label_list.tolist()
+    label_counts = label_counts.tolist()
+
+    print(label_list, label_counts)
 
     if gen_train_valid:
         """
         First, put all the RTs from training list into train dict 
         and valid list into valid dict
         """
-        training_class_labels = training_list[0][0]
-        training_rt = training_list[0][1]
-        training_image_name = training_list[0][2]
-        print("There are %d training samples containing RT" % len(training_class_labels))
-
-        valid_class_labels = valid_list[0][0]
-        valid_rt = valid_list[0][1]
-        valid_image_name = valid_list[0][2]
-        print("There are %d validation samples containing RT" % len(valid_class_labels))
-
-
         one_file_dict = {}
         key_list = ["img_path", "label", "RT", "category"]
         for key in key_list:
             one_file_dict[key] = None
 
-        for i in range(len(training_class_labels)):
-            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path,
-                                                     os.path.join(training_class_labels[i], training_image_name[i]))
+        for i in range(len(training_list)):
+            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, training_list[i][0])
             one_file_dict["label"] = label
-            one_file_dict["RT"] = training_rt[i]
+            one_file_dict["RT"] = training_list[i][1]
             one_file_dict["category"] = "known_unknown"
 
             train_known_unknown_dict[i] = one_file_dict
 
-        for i in range(len(valid_class_labels)):
-            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path,
-                                                     os.path.join(valid_class_labels[i], valid_image_name[i]))
+        for i in range(len(valid_list)):
+            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, valid_list[i][0])
             one_file_dict["label"] = label
-            one_file_dict["RT"] = valid_rt[i]
+            one_file_dict["RT"] = valid_list[i][1]
             one_file_dict["category"] = "known_unknown"
 
             valid_known_unknown_dict[i] = one_file_dict
@@ -538,14 +530,161 @@ def gen_known_unknown_json(train_list_path,
         """
         for path, subdirs, files in os.walk(train_valid_known_unknown_dir):
             print("Processing folder: %s" % path)
-            sys.exit(0)
 
             if len(files) == 0:
                 continue
             else:
-                # Calculate the number of files for this class
-                class_label = None
+                # Get the class label from path first
+                class_label = path.split("/")[-1]
+                training_count = 0
+                valid_count = 0
 
+            """
+            Check whether this class is in the 40 labels.
+            
+            If yes, calculate the number of entries, and decide the train/valid number
+            If no, directly split into train and valid
+            """
+            if class_label in label_list:
+                # Find how many entries are there in this class
+                class_count = label_counts[label_list.index(class_label)]
+
+                # Calculate the nb of images for training and validation
+                nb_total_use = len(files) - class_count
+                total_training_count = int(nb_total_use*training_ratio)
+                total_valid_count = int(nb_total_use-total_training_count)
+
+                # Find all the images that has this label
+                img_list = []
+                for one_pair in training_list:
+                    if one_pair[0].startswith(class_label):
+                        img_list.append(one_pair[1])
+
+                for one_file in files:
+                    if one_file.split("/")[-1] in img_list:
+                        print("This image has RT, pass")
+                        continue
+                    else:
+                        full_path = os.path.join(path, one_file)
+
+                        # Initialize a dictionary for this image
+                        one_file_dict = {}
+                        key_list = ["img_path", "label", "RT", "category"]
+                        for key in key_list:
+                            one_file_dict[key] = None
+
+                        one_file_dict["img_path"] = full_path
+                        one_file_dict["label"] = label
+                        one_file_dict["RT"] = None
+                        one_file_dict["category"] = "known_unknown"
+
+                        if training_count != total_training_count:
+                            train_known_unknown_dict[len(train_known_unknown_dict) + 1] = one_file_dict
+
+                        elif (training_count == total_training_count) and (valid_count != total_valid_count):
+                            valid_known_unknown_dict[len(valid_known_unknown_dict) + 1] = one_file_dict
+
+                        elif (training_count == total_training_count) and (valid_count == total_valid_count):
+                            training_count = 0
+                            valid_count = 0
+
+            else:
+
+                # Calculate the nb of images for training and validation
+                total_training_count = int(len(files) * training_ratio)
+                total_valid_count = int(len(files) - total_training_count)
+
+                for one_file in files:
+                    full_path = os.path.join(path, one_file)
+
+                    # Initialize a dictionary for this image
+                    one_file_dict = {}
+                    key_list = ["img_path", "label", "RT", "category"]
+                    for key in key_list:
+                        one_file_dict[key] = None
+
+                    one_file_dict["img_path"] = full_path
+                    one_file_dict["label"] = label
+                    one_file_dict["RT"] = None
+                    one_file_dict["category"] = "known_unknown"
+
+                    if training_count != total_training_count:
+                        train_known_unknown_dict[len(train_known_unknown_dict) + 1] = one_file_dict
+
+                    elif (training_count == total_training_count) and (valid_count != total_valid_count):
+                        valid_known_unknown_dict[len(valid_known_unknown_dict) + 1] = one_file_dict
+
+                    elif (training_count == total_training_count) and (valid_count == total_valid_count):
+                        training_count = 0
+                        valid_count = 0
+
+        with open(save_train_path, 'w') as train_f:
+            json.dump(train_known_unknown_dict, train_f)
+            print("Saving file to %s" % save_train_path)
+
+        with open(save_valid_path, 'w') as valid_f:
+            json.dump(valid_known_unknown_dict, valid_f)
+            print("Saving file to %s" % save_valid_path)
+
+    # For the "test_known_unknown" just save all the images
+    elif gen_test:
+        for path, subdirs, files in os.walk(test_known_unknown_dir):
+            print("Processing folder: %s" % path)
+
+            for one_file_name in files:
+                full_path = os.path.join(path, one_file_name)
+
+                one_file_dict = {}
+                key_list = ["img_path", "label", "RT", "category"]
+                for key in key_list:
+                    one_file_dict[key] = None
+
+                one_file_dict["img_path"] = full_path
+                one_file_dict["label"] = label
+                one_file_dict["RT"] = None
+                one_file_dict["category"] = "known_unknown"
+
+                test_known_unknown_dict[len(test_known_unknown_dict)+1] = one_file_dict
+
+        with open(save_test_path, 'w') as test_f:
+            json.dump(test_known_unknown_dict, test_f)
+            print("Saving file to %s" % save_test_path)
+
+
+
+
+def gen_unknown_unknown(test_unknown_unknown_dir,
+                        save_test_path,
+                        nb_known_classes=335):
+    """
+
+    :param test_unknown_unknown_dir:
+    :param save_test_dir:
+    :return:
+    """
+    test_unknown_unknown_dict = {}
+
+    for path, subdirs, files in os.walk(test_unknown_unknown_dir):
+        print("Processing folder: %s" % path)
+
+        for one_file_name in files:
+            full_path = os.path.join(path, one_file_name)
+
+            one_file_dict = {}
+            key_list = ["img_path", "label", "RT", "category"]
+            for key in key_list:
+                one_file_dict[key] = None
+
+            one_file_dict["img_path"] = full_path
+            one_file_dict["label"] = nb_known_classes+2
+            one_file_dict["RT"] = None
+            one_file_dict["category"] = "unknown_unknown"
+
+            test_unknown_unknown_dict[len(test_unknown_unknown_dict) + 1] = one_file_dict
+
+    with open(save_test_path, 'w') as test_f:
+        json.dump(test_unknown_unknown_dict, test_f)
+        print("Saving file to %s" % save_test_path)
 
 
 
@@ -567,19 +706,24 @@ if __name__ == '__main__':
     #                      save_train_path=train_known_known_json_path,
     #                      save_valid_path=valid_known_known_json_path,
     #                      save_test_path=test_known_known_json_path,
-    #                      gen_test=True)
+    #                      gen_train_valid=True,
+    #                      gen_test=False)
 
-    process_npy(training_rt_dict_path=save_train_npy_path,
-                valid_rt_dict_path=save_valid_npy_path,
-                save_train_txt_path=save_train_txt_path,
-                save_valid_txt_path=save_valid_txt_path)
+    # process_npy(training_rt_dict_path=save_train_npy_path,
+    #             valid_rt_dict_path=save_valid_npy_path,
+    #             save_train_txt_path=save_train_txt_path,
+    #             save_valid_txt_path=save_valid_txt_path)
 
-    # gen_known_unknown_json(train_list_path=save_train_txt_path,
-    #                        valid_list_path=save_valid_txt_path,
-    #                        train_valid_known_unknown_dir=known_unknown_train_val_path,
-    #                        test_known_unknown_dir=known_known_test_path,
-    #                        save_train_path=train_known_unknown_json_path,
-    #                        save_valid_path=valid_known_unknown_json_path,
-    #                        save_test_path=test_known_unknown_json_path,
-    #                        gen_train_valid=True)
+    gen_known_unknown_json(train_list_path=save_train_txt_path,
+                           valid_list_path=save_valid_txt_path,
+                           train_valid_known_unknown_dir=known_unknown_train_val_path,
+                           test_known_unknown_dir=known_unknown_test_path,
+                           save_train_path=train_known_unknown_json_path,
+                           save_valid_path=valid_known_unknown_json_path,
+                           save_test_path=test_known_unknown_json_path,
+                           gen_train_valid=False,
+                           gen_test=True)
+
+    # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
+    #                     save_test_path=test_unknown_unknown_json_path)
 
