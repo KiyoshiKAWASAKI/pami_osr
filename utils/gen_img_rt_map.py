@@ -245,7 +245,7 @@ def gen_known_known_json(train_valid_known_known_dir,
     test_known_known_dict = {}
 
     # Set the label for the class: the labels in training has to be continuous integers starting from 0
-    label = 0
+    label = 1
 
     # Loop thru all the folders in training first: for training and validation data
     if gen_train_valid:
@@ -472,6 +472,7 @@ def gen_known_unknown_json(train_list_path,
     with open(valid_list_path, 'rb') as fp:
         valid_list = pickle.load(fp)
 
+
     # Initialize the dicts
     train_known_unknown_dict = {}
     valid_known_unknown_dict = {}
@@ -500,26 +501,35 @@ def gen_known_unknown_json(train_list_path,
         First, put all the RTs from training list into train dict 
         and valid list into valid dict
         """
-        one_file_dict = {}
-        key_list = ["img_path", "label", "RT", "category"]
-        for key in key_list:
-            one_file_dict[key] = None
+
 
         for i in range(len(training_list)):
+            one_file_dict = {}
+            key_list = ["img_path", "label", "RT", "category"]
+            for key in key_list:
+                one_file_dict[key] = None
+
             one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, training_list[i][0])
             one_file_dict["label"] = label
             one_file_dict["RT"] = training_list[i][1]
             one_file_dict["category"] = "known_unknown"
 
-            train_known_unknown_dict[i] = one_file_dict
+            train_known_unknown_dict[len(train_known_unknown_dict)+1] = one_file_dict
+
+        # print(train_known_unknown_dict)
 
         for i in range(len(valid_list)):
+            one_file_dict = {}
+            key_list = ["img_path", "label", "RT", "category"]
+            for key in key_list:
+                one_file_dict[key] = None
+
             one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, valid_list[i][0])
             one_file_dict["label"] = label
             one_file_dict["RT"] = valid_list[i][1]
             one_file_dict["category"] = "known_unknown"
 
-            valid_known_unknown_dict[i] = one_file_dict
+            valid_known_unknown_dict[len(valid_known_unknown_dict)+1] = one_file_dict
 
         """
         For the whole directory:
@@ -706,8 +716,8 @@ if __name__ == '__main__':
     #                      save_train_path=train_known_known_json_path,
     #                      save_valid_path=valid_known_known_json_path,
     #                      save_test_path=test_known_known_json_path,
-    #                      gen_train_valid=True,
-    #                      gen_test=False)
+    #                      gen_train_valid=False,
+    #                      gen_test=True)
 
     # process_npy(training_rt_dict_path=save_train_npy_path,
     #             valid_rt_dict_path=save_valid_npy_path,
@@ -721,8 +731,8 @@ if __name__ == '__main__':
                            save_train_path=train_known_unknown_json_path,
                            save_valid_path=valid_known_unknown_json_path,
                            save_test_path=test_known_unknown_json_path,
-                           gen_train_valid=False,
-                           gen_test=True)
+                           gen_train_valid=True,
+                           gen_test=False)
 
     # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
     #                     save_test_path=test_unknown_unknown_json_path)
