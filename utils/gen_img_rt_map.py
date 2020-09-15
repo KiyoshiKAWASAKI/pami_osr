@@ -761,15 +761,79 @@ def combine_json(train_known_known_path,
     print("Valid json before combining json has %d entries." % len(valid_known_known_json))
     for i in range(1, len(valid_known_unknown_json) + 1):
         one_entry = valid_known_unknown_json[str(i)]
-        valid_known_known_json[len(train_known_known_json) + i] = one_entry
+        valid_known_known_json[len(valid_known_known_json) + i] = one_entry
     print("Valid json after combining json has %d entries." % len(valid_known_known_json))
 
     with open(save_valid_json_path, 'w') as f:
-        json.dump(train_known_known_json, f)
+        json.dump(valid_known_known_json, f)
         print("Saving file to %s" % save_valid_json_path)
 
 
     # TODO: no need to merge the test files at this point
+
+
+
+
+def adjust_json_index(train_json_path,
+                      valid_json_path,
+                     test_known_known_path=None,
+                     test_known_unknown_path=None,
+                     test_unknown_unknown_path=None):
+    """
+    Adjust the indices for dictionaries:
+        (1) Starting from 0 instead of 1
+        (2) Use int as indices instead of string
+
+    :param train_json_path:
+    :param valid_json_path:
+    :param test_known_known_path:
+    :param test_known_unknown_path:
+    :param test_unknown_unknown_path:
+    :return:
+    """
+
+    with open(train_json_path) as f_train:
+        print(train_json_path)
+        train_json = json.load(f_train)
+
+    with open(valid_json_path) as f_valid:
+        print(valid_json_path)
+        valid_json = json.load(f_valid)
+
+    print(len(train_json))
+    print(len(valid_json))
+
+    # Correct training json indices
+    train_dict = {}
+    for i in range(len(train_json)):
+        try:
+            one_entry = train_json[str(i+1)]
+        except:
+            # print(train_json[str(i+2)])
+            one_entry = train_json[str(i+2)]
+        train_dict[int(i)] = one_entry
+
+    train_dict = {int(k): v for k, v in train_dict.items()}
+
+    with open(train_json_path, 'w') as f:
+        json.dump(train_dict, f)
+        print("Saving file to %s" % train_json_path)
+
+    # Correct valid json indices
+    valid_dict={}
+    for i in range(len(valid_json)):
+        try:
+            one_entry = valid_json[str(i+1)]
+        except:
+            one_entry = valid_json[str(i+2)]
+        valid_dict[int(i)] = one_entry
+
+    valid_dict = {int(k): v for k, v in valid_dict.items()}
+
+    with open(valid_json_path, 'w') as f:
+        json.dump(valid_dict, f)
+        print("Saving file to %s" % valid_json_path)
+
 
 
 
@@ -820,4 +884,7 @@ if __name__ == '__main__':
                  save_training_json_path=save_training_json_path,
                  save_valid_json_path=save_valid_json_path,
                  save_test_json_path=save_test_json_path)
+
+    adjust_json_index(train_json_path=save_training_json_path,
+                      valid_json_path=save_valid_json_path)
 

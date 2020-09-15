@@ -89,7 +89,7 @@ class msd_net_dataset(Dataset):
         self.augmentation = augmentation
         self.randomWeights = None
 
-        for i in range(20):
+        for i in range(1, 20):
             print(self.data[str(i)])
 
 
@@ -100,9 +100,14 @@ class msd_net_dataset(Dataset):
     def __getitem__(self, idx):
         print("*" * 20)
         print(idx)
-        print(self.data[str(idx)])
+        if idx==0:
+            print(self.data[str(idx+1)])
+            item = self.data[str(idx+1)]
+        else:
+            print(self.data[str(idx)])
+            item = self.data[str(idx)]
         print("*" * 20)
-        item = self.data[str(idx)]
+
 
         img = cv2.imread(item["img_path"])
         img_category = item["category"]
