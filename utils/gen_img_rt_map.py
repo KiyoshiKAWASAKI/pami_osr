@@ -57,6 +57,12 @@ test_unknown_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/ope
 save_train_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_rt.txt"
 save_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid_rt.txt"
 
+# Combined Jsons
+save_training_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train.json"
+save_valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
+save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test.json"
+
+
 
 
 
@@ -699,6 +705,72 @@ def gen_unknown_unknown(test_unknown_unknown_dir,
 
 
 
+def combine_json(train_known_known_path,
+                 train_known_unknown_path,
+                 valid_known_known_path,
+                 valid_known_unknown_path,
+                 test_known_known_path,
+                 test_known_unknown_path,
+                 test_unknown_unknown_path,
+                 save_training_json_path,
+                 save_valid_json_path,
+                 save_test_json_path):
+    """
+    Combine 7 jsons into 3 big ones: train, valid, test
+
+    :param train_known_known_path:
+    :param train_known_unknown_path:
+    :param valid_known_known_path:
+    :param valid_known_unknown_path:
+    :param test_known_known_path:
+    :param test_known_unknown_path:
+    :param test_unknown_unknown_path:
+    :return:
+    """
+    # Load all Json files
+    with open(train_known_known_path) as train_known_known:
+        train_known_known_json = json.load(train_known_known)
+    with open(train_known_unknown_path) as train_known_unknown:
+        train_known_unknown_json = json.load(train_known_unknown)
+
+    with open(valid_known_known_path) as valid_known_known:
+        valid_known_known_json = json.load(valid_known_known)
+    with open(valid_known_unknown_path) as valid_known_unknown:
+        valid_known_unknown_json = json.load(valid_known_unknown)
+
+
+    with open(test_known_known_path) as test_known_known:
+        test_known_known_json = json.load(test_known_known)
+    with open(test_known_unknown_path) as test_known_unknown:
+        test_known_unknown_json = json.load(test_known_unknown)
+    with open(test_unknown_unknown_path) as test_unknown_unknown:
+        test_known_unknown_json = json.load(test_unknown_unknown)
+
+    # Merge Training Jsons
+    print("Training json before combining json has %d entries." % len(train_known_known_json))
+    for i in range(1, len(train_known_unknown_json)+1):
+        one_entry = train_known_unknown_json[str(i)]
+        train_known_known_json[len(train_known_known_json)+i] = one_entry
+    print("Training json after combining json has %d entries." % len(train_known_known_json))
+
+    with open(save_training_json_path, 'w') as f:
+        json.dump(train_known_known_json, f)
+        print("Saving file to %s" % save_training_json_path)
+
+    # Merge valid Jsons
+    print("Valid json before combining json has %d entries." % len(valid_known_known_json))
+    for i in range(1, len(valid_known_unknown_json) + 1):
+        one_entry = valid_known_unknown_json[str(i)]
+        valid_known_known_json[len(train_known_known_json) + i] = one_entry
+    print("Valid json after combining json has %d entries." % len(valid_known_known_json))
+
+    with open(save_valid_json_path, 'w') as f:
+        json.dump(train_known_known_json, f)
+        print("Saving file to %s" % save_valid_json_path)
+
+
+    # TODO: no need to merge the test files at this point
+
 
 
 if __name__ == '__main__':
@@ -724,16 +796,28 @@ if __name__ == '__main__':
     #             save_train_txt_path=save_train_txt_path,
     #             save_valid_txt_path=save_valid_txt_path)
 
-    gen_known_unknown_json(train_list_path=save_train_txt_path,
-                           valid_list_path=save_valid_txt_path,
-                           train_valid_known_unknown_dir=known_unknown_train_val_path,
-                           test_known_unknown_dir=known_unknown_test_path,
-                           save_train_path=train_known_unknown_json_path,
-                           save_valid_path=valid_known_unknown_json_path,
-                           save_test_path=test_known_unknown_json_path,
-                           gen_train_valid=True,
-                           gen_test=False)
+    # gen_known_unknown_json(train_list_path=save_train_txt_path,
+    #                        valid_list_path=save_valid_txt_path,
+    #                        train_valid_known_unknown_dir=known_unknown_train_val_path,
+    #                        test_known_unknown_dir=known_unknown_test_path,
+    #                        save_train_path=train_known_unknown_json_path,
+    #                        save_valid_path=valid_known_unknown_json_path,
+    #                        save_test_path=test_known_unknown_json_path,
+    #                        gen_train_valid=True,
+    #                        gen_test=False)
 
     # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
     #                     save_test_path=test_unknown_unknown_json_path)
+
+
+    combine_json(train_known_known_path=train_known_known_json_path,
+                 train_known_unknown_path=train_known_unknown_json_path,
+                 valid_known_known_path=valid_known_known_json_path,
+                 valid_known_unknown_path=valid_known_unknown_json_path,
+                 test_known_known_path=test_known_known_json_path,
+                 test_known_unknown_path=test_known_unknown_json_path,
+                 test_unknown_unknown_path=test_unknown_unknown_json_path,
+                 save_training_json_path=save_training_json_path,
+                 save_valid_json_path=save_valid_json_path,
+                 save_test_json_path=save_test_json_path)
 
