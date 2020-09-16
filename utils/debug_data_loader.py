@@ -26,26 +26,36 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 from timeit import default_timer as timer
 import datetime
+import torchvision.transforms as transforms
 
 from customized_dataloader import msd_net_dataset
 import customized_dataloader
 
 
-debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
 
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
 
-# TODO: debugging for getting dataset and
-train_dataset = msd_net_dataset(json_path=debugging_json_path)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=False, num_workers=1,
-                                  collate_fn=customized_dataloader.collate)
+train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
+                                    transforms.RandomHorizontalFlip(),
+                                    transforms.ToTensor(),
+                                    normalize])
+
+train_dataset = msd_net_dataset(json_path=debugging_json_path,
+                                transform=train_transform)
+train_set_index = torch.randperm(len(train_dataset))
+
+train_loader = torch.utils.data.DataLoader(train_dataset,
+                                           batch_size=2,
+                                           shuffle=False,
+                                           sampler=torch.utils.data.RandomSampler(train_dataset),
+                                           collate_fn=customized_dataloader.collate)
 
 for i, batch in enumerate(train_loader):
-    if i <= 10:
-        print(i)
-        print(batch)
-
-    else:
-        break
+    print("@"*30)
+    print(i)
+    # print(batch)
 
 
 

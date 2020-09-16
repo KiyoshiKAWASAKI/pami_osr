@@ -5,45 +5,52 @@ import torchvision
 import torchvision.datasets as datasets
 from torch.utils.data import Dataset
 # from torchvision import datasets as datasets
+import torchvision.transforms as transforms
 from torch.autograd import Variable
 
 from collections import defaultdict
 import os
 import cv2
 import numpy as np
-
+from PIL import Image
+import sys
 import random
 
 def collate(batch):
+    # print(batch)
+    # sys.exit(0)
     PADDING_CONSTANT = 0
 
     batch = [b for b in batch if b is not None]
     #These all should be the same size or error
-    assert len(set([b['line_img'].shape[0] for b in batch])) == 1
-    assert len(set([b['line_img'].shape[2] for b in batch])) == 1
+    assert len(set([b["img"].shape[0] for b in batch])) == 1
+    assert len(set([b["img"].shape[2] for b in batch])) == 1
 
-    dim0 = batch[0]['line_img'].shape[0]
-    dim1 = max([b['line_img'].shape[1] for b in batch])
+    # TODO: what is dim 0, 1, 2??
+    """
+    dim0: channel
+    dim1: ??
+    dim2: hight?
+    """
+    dim0 = batch[0]["img"].shape[0]
+    dim1 = max([b["img"].shape[1] for b in batch])
     dim1 = dim1 + (dim0 - (dim1 % dim0))
-    dim2 = batch[0]['line_img'].shape[2]
+    dim2 = batch[0]["img"].shape[2]
 
     all_labels = []
-    # label_lengths = []
     psychs = []
 
     input_batch = np.full((len(batch), dim0, dim1, dim2), PADDING_CONSTANT).astype(np.float32)
+
     for i in range(len(batch)):
-        b_img = batch[i]['line_img']
+        b_img = batch[i]["img"]
         input_batch[i,:,:b_img.shape[1],:] = b_img
-        l = batch[i]['gt_label']
+        l = batch[i]["gt_label"]
         psych = batch[i]["rt"]
         all_labels.append(l)
-        # label_lengths.append(len(l))
 
+        # TODO: What is this part?
         if psych is not None:
-            # print(psych)
-            # print(((200-psych)/len(l)))
-            # print("-----------")
             psych = (423)-psych
             if psych < 0:
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -52,20 +59,14 @@ def collate(batch):
             psychs.append((psych)*100000)
         else:
             psychs.append(0)
-    # all_labels = np.concatenate(all_labels)
-    # label_lengths = np.array(label_lengths)
 
     line_imgs = input_batch.transpose([0,3,1,2])
     line_imgs = torch.from_numpy(line_imgs)
     labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
-    # label_lengths = torch.from_numpy(label_lengths.astype(np.int32))
 
-    return {
-        "line_imgs": line_imgs,
-        "labels": labels,
-        "psychs": psychs,
-        "gt_label": [b['gt_label'] for b in batch]
-    }
+    return {"imgs": line_imgs,
+            "labels": labels,
+            "rts": psychs}
 
 
 
@@ -73,84 +74,53 @@ def collate(batch):
 class msd_net_dataset(Dataset):
     def __init__(self,
                  json_path,
+                 transform,
                  img_height=32,
                  augmentation=False):
 
-        # Everything was in one JSON
         with open(json_path) as f:
             data = json.load(f)
-        print("Json file loaded!")
 
         self.img_height = img_height
         self.data = data
-        # print("*" * 20)
-        # print(self.data["0"])
-        # print("*" * 20)
+        self.transform = transform
         self.augmentation = augmentation
-        self.randomWeights = None
-
-        for i in range(1, 20):
-            print(self.data[str(i)])
-
-
+        self.random_weight = None
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        print("*" * 20)
-        print(idx)
-        if idx==0:
-            print(self.data[str(idx+1)])
-            item = self.data[str(idx+1)]
-        else:
+        item = self.data[str(idx)]
+
+        # Open the image and do normalization and augmentation
+        img = Image.open(item["img_path"])
+        img = img.convert('RGB')
+        print(img.size)
+        try:
+            img = self.transform(img)
+        except:
+            print(idx)
             print(self.data[str(idx)])
-            item = self.data[str(idx)]
-        print("*" * 20)
+            sys.exit(0)
 
-
-        img = cv2.imread(item["img_path"])
-        img_category = item["category"]
-        print("Loaded one image: %s" % item["img_path"])
-
-        if self.randomWeights is None:
-            print("Checking whether an RT exists for this image...")
-            try:
+        # Deal with reaction times
+        if self.random_weight is None:
+            # print("Checking whether an RT exists for this image...")
+            if item["RT"] != None:
                 rt = item["RT"]
-                print("RT exists")
-            except:
-                print("RT does not exist")
+                # print("RT exists")
+            else:
+                # print("RT does not exist")
                 rt = None
         else:
             # TODO: should we apply random psyphy weights??
             pass
-            # print("WARNING!!! RANDOM PSYCHOMETRIC WEIGHTS ARE BEING USED")
-            # psych = self.randomWeights[idx]
-            # print psych
-
-        if img is None:
-            print("Warning: image is None:", item["img_path"])
-            return None
-
-        # TODO: check the image size for image_net and change this part
-        percent = float(self.img_height) / img.shape[0]
-        img = cv2.resize(img, (0,0), fx=percent, fy=percent, interpolation = cv2.INTER_CUBIC)
-
-        # TODO: Adding multiple data augmentation methods
-        if self.augmentation:
-            pass
-            # img = grid_distortion.warp_image(img, h_mesh_std=5, w_mesh_std=10)
-
-        # img = img.astype(np.float32)
-        # img = img / 128.0 - 1.0
-
-        gt = item["label"]
-        # gt_label = string_utils.str2label(gt, self.char_to_idx)
 
         return {
-            "line_img": img,
-            "gt_label": gt,
+            "img": img,
+            "gt_label": item["label"],
             "rt": rt,
-            "category": img_category
+            "category": item["category"]
         }
 
