@@ -49,7 +49,7 @@ train_set_index = torch.randperm(len(train_dataset))
 train_loader = torch.utils.data.DataLoader(train_dataset,
                                            batch_size=2,
                                            shuffle=False,
-                                           sampler=torch.utils.data.RandomSampler(train_dataset),
+                                           sampler=torch.utils.data.RandomSampler(train_set_index),
                                            collate_fn=customized_dataloader.collate)
 
 for i, batch in enumerate(train_loader):

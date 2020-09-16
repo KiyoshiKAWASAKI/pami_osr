@@ -28,6 +28,8 @@ import torch.optim
 from timeit import default_timer as timer
 import datetime
 from utils.customized_dataloader import msd_net_dataset
+import customized_dataloader
+import torchvision.transforms as transforms
 
 
 
@@ -104,6 +106,9 @@ class train_msdnet():
 
 def main():
     global args
+    ####################################################################
+    # Initialize the model and args
+    ####################################################################
     best_prec1, best_epoch = 0.0, 0
 
     if not os.path.exists(args.save):
@@ -117,6 +122,11 @@ def main():
     else:
         model = torch.nn.DataParallel(model).cuda()
 
+
+    ####################################################################
+    # Define the loss and optimizer
+    ####################################################################
+    # TODO: change here for the loss
     criterion = nn.CrossEntropyLoss().cuda()
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
@@ -133,23 +143,57 @@ def main():
 
     cudnn.benchmark = True
 
-    ############################################################
+
+    ####################################################################
+    # Define data transformation
+    ####################################################################
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
+                                          transforms.RandomHorizontalFlip(),
+                                          transforms.ToTensor(),
+                                          normalize])
+
+    valid_transform = train_transform
+
+    test_transform = transforms.Compose([transforms.Resize(256),
+                                        transforms.CenterCrop(224),
+                                        transforms.ToTensor(),
+                                        normalize])
+
+
+    #####################################################################
     # Create dataset and data loader
-    ############################################################
-    # TODO: add the data loader and everything to here, following Sam's method
-    # TODO: First, get the dataset
-    train_dataset = msd_net_dataset()
-    valid_dataset = None
-    test_dataset = None
+    #####################################################################
+    # Get the dataset
+    train_dataset = msd_net_dataset(json_path=None, transform=train_transform)
+    train_set_index = torch.randperm(len(train_dataset))
+
+    valid_dataset = msd_net_dataset(json_path=None, transform=valid_transform)
+    valid_set_index = torch.randperm(len(valid_dataset))
+
+    # TODO: add test dataset (we have 3 test jsons, do them separately)
+
+    #Use the dataloader
+    train_loader = torch.utils.data.DataLoader(train_dataset,
+                                               batch_size=args.batch_size,
+                                               shuffle=False,
+                                               sampler=torch.utils.data.RandomSampler(train_set_index),
+                                               collate_fn=customized_dataloader.collate)
+
+    val_loader = torch.utils.data.DataLoader(valid_dataset,
+                                            batch_size=args.batch_size,
+                                            shuffle=False,
+                                            sampler=torch.utils.data.RandomSampler(valid_set_index),
+                                            collate_fn=customized_dataloader.collate)
+
+    # TODO: add test data loader (use 3 separately)
 
 
-
-    # TODO: Use the dataloader
-
-
-    # train_loader, val_loader, test_loader = get_dataloaders(args)
-
-    # This is for test only
+    ####################################################################
+    # Check whether we only do testing
+    ####################################################################
     if args.evalmode is not None:
         # print("Doing testing only.")
         logging.info("Doing testing only.")
@@ -172,24 +216,22 @@ def main():
 
     scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec3\tval_prec3\ttrain_prec5\tval_prec5']
 
-    # Here is for training and validation
+
+    ####################################################################
+    # Do training and validation
+    ####################################################################
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
         if args.train_k_plus_1:
-            # print("Training MSD-Net on K+1 classes.")
             logging.info("Training MSD-Net on K+1 classes.")
-
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
             val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
 
         # Adding the option for training early exits using diff penalties.
         elif args.train_early_exit:
-            # print("Training with weighted loss for different exits.")
             logging.info("Training with weighted loss for different classes.")
-            # TODO: define the penalty factors here
-            # penalty_factors = [0.2, 0.4, 0.6, 0.8, 1.0]
-            penalty_factors = [0.1, 0.5, 1.0, 1.5, 2.0]
-
+            # TODO: define the penalty factors here - it came from the data distribution for RT
+            penalty_factors = None
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_loss(train_loader,
                                                                                             model,
                                                                                             criterion,
@@ -200,16 +242,17 @@ def main():
 
             # TODO: Which validate function should we use? Probably testing_with_novelty?
             # TODO: need to update original validate to top 1,3,5
-
             val_loss, val_prec1, val_prec3, val_prec5 = validate(val_loader, model, criterion, epoch)
 
 
+        ####################################################################
+        # Update and save the result
+        ####################################################################
         scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 8).format(epoch, lr, train_loss, val_loss,
                                                              train_prec1, val_prec1,
                                                              train_prec3, val_prec3,
                                                              train_prec5, val_prec5))
 
-        # Find the best model
         is_best = val_prec1 > best_prec1
         if is_best:
             best_prec1 = val_prec1
@@ -231,8 +274,134 @@ def main():
 
 
 
-def train():
-    pass
+def train_early_exit_with_pp_loss(train_loader,
+                                  model,
+                                  criterion,
+                                  optimizer,
+                                  epoch,
+                                  penalty_factors,
+                                  strategy,
+                                  nb_known_classes=325,
+                                  nb_known_unknown_classes=44,
+                                  nb_unknown_classes=44):
+    """
+    Modify how the loss is calculated:
+    assign smaller penalties to earlier exits, and larger penalties to later exits.
+
+    :param train_loader:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param epoch:
+    :return:
+    """
+
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    # TODO: Update the evaluation metrics to top-1, top-3 and top-5
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    # switch to train mode
+    model.train()
+
+    running_lr = None
+
+    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
+        for i, (input, target) in enumerate(train_loader):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader), method=args.lr_type)
+
+            if running_lr is None:
+                running_lr = lr
+
+            input_var = torch.autograd.Variable(input)
+
+            if strategy == "simple":
+                # Implement the simple weighted loss strategy
+                # by multiplying n weights to n exits respectively
+
+                target = target.cuda(async=True)
+                target_var = torch.autograd.Variable(target)
+
+                output = model(input_var)
+
+                if not isinstance(output, list):
+                    output = [output]
+
+                loss = 0.0
+
+                # Just add the penalty factors here
+                for j in range(len(output)):
+                    # print(output[j].shape) # Shape: [batch, nb_classes]
+                    # Assign different weights to the losses
+                    penalty_factor = penalty_factors[j]
+                    output_weighted = output[j] * penalty_factor
+
+                    loss += criterion(output_weighted, target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+            # TODO: Implement the complex strategies
+            elif strategy == "complex":
+                target = target.cuda(async=True)
+                target_var = torch.autograd.Variable(target)
+
+                output = model(input_var)
+
+                if not isinstance(output, list):
+                    output = [output]
+
+                loss = 0.0
+                for j in range(len(output)):
+                    loss += criterion(output[j], target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+
+
+            for j in range(len(output)):
+                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
+
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # TODO: Fully utilize logger instead of writing to txt
+            # TODO: Issue - log file is empty until whole training is done. Hard to check middle status.
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc@1 {top1.val:.4f}\t'
+                      'Acc@3 {top3.val:.4f}\t'
+                      'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
 
 
 
