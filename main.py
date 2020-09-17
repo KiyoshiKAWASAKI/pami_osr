@@ -28,7 +28,7 @@ import torch.optim
 from timeit import default_timer as timer
 import datetime
 from utils.customized_dataloader import msd_net_dataset
-import customized_dataloader
+from utils import customized_dataloader
 import torchvision.transforms as transforms
 
 
@@ -47,11 +47,6 @@ if args.gpu:
 args.grFactor = list(map(int, args.grFactor.split('-')))
 args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
-
-if args.use_valid:
-    args.splits = ['train', 'val', 'test']
-else:
-    args.splits = ['train', 'val']
 
 log_file_path = args.log_file_path
 
@@ -126,8 +121,9 @@ def main():
     ####################################################################
     # Define the loss and optimizer
     ####################################################################
-    # TODO: change here for the loss
+    # TODO: add psyphy loss here
     criterion = nn.CrossEntropyLoss().cuda()
+    criterion_pp = None
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -162,33 +158,81 @@ def main():
                                         transforms.ToTensor(),
                                         normalize])
 
-
     #####################################################################
     # Create dataset and data loader
     #####################################################################
-    # Get the dataset
-    train_dataset = msd_net_dataset(json_path=None, transform=train_transform)
-    train_set_index = torch.randperm(len(train_dataset))
+    # Training loaders
+    train_known_known_dataset = msd_net_dataset(json_path=args.train_known_known_path,
+                                                transform=train_transform)
+    train_known_known_index = torch.randperm(len(train_known_known_dataset))
 
-    valid_dataset = msd_net_dataset(json_path=None, transform=valid_transform)
-    valid_set_index = torch.randperm(len(valid_dataset))
+    train_known_unknown_dataset = msd_net_dataset(json_path=args.train_known_unknown_path,
+                                                  transform=train_transform)
+    train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
 
-    # TODO: add test dataset (we have 3 test jsons, do them separately)
+    train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
+                                                           batch_size=args.batch_size,
+                                                           shuffle=False,
+                                                           sampler=torch.utils.data.RandomSampler(train_known_known_index),
+                                                           collate_fn=customized_dataloader.collate)
+    train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
+                                                           batch_size=args.batch_size,
+                                                           shuffle=False,
+                                                           sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
+                                                           collate_fn=customized_dataloader.collate)
 
-    #Use the dataloader
-    train_loader = torch.utils.data.DataLoader(train_dataset,
-                                               batch_size=args.batch_size,
-                                               shuffle=False,
-                                               sampler=torch.utils.data.RandomSampler(train_set_index),
-                                               collate_fn=customized_dataloader.collate)
+    # Validation loaders
+    valid_known_known_dataset = msd_net_dataset(json_path=args.valid_known_known_path,
+                                                transform=valid_transform)
+    valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
 
-    val_loader = torch.utils.data.DataLoader(valid_dataset,
-                                            batch_size=args.batch_size,
+    valid_known_unknown_dataset = msd_net_dataset(json_path=args.valid_known_unknown_path,
+                                                  transform=valid_transform)
+    valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
+
+    valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
+                                             batch_size=args.batch_size,
+                                             shuffle=False,
+                                             sampler=torch.utils.data.RandomSampler(valid_known_known_index),
+                                             collate_fn=customized_dataloader.collate)
+
+    valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
+                                             batch_size=args.batch_size,
+                                             shuffle=False,
+                                             sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
+                                             collate_fn=customized_dataloader.collate)
+
+    # Test loaders
+    test_known_known_dataset = msd_net_dataset(json_path=args.test_known_known_path,
+                                               transform=test_transform)
+    test_known_known_index = torch.randperm(len(test_known_known_dataset))
+
+    test_known_unknown_dataset = msd_net_dataset(json_path=args.test_known_unknown_path,
+                                                 transform=test_transform)
+    test_known_unknown_index = torch.randperm(len(test_known_unknown_dataset))
+
+    test_unknown_unknown_dataset = msd_net_dataset(json_path=args.test_unknown_unknown_path,
+                                                   transform=test_transform)
+    test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
+
+    # When doing test, set the batch size to 1 to test the time one by one accurately
+    test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+                                             batch_size=1,
+                                             shuffle=False,
+                                             sampler=torch.utils.data.RandomSampler(test_known_known_index),
+                                             collate_fn=customized_dataloader.collate)
+
+    test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
+                                              batch_size=1,
+                                              shuffle=False,
+                                              sampler=torch.utils.data.RandomSampler(test_known_unknown_index),
+                                              collate_fn=customized_dataloader.collate)
+
+    test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
+                                            batch_size=1,
                                             shuffle=False,
-                                            sampler=torch.utils.data.RandomSampler(valid_set_index),
+                                            sampler=torch.utils.data.RandomSampler(test_unknown_unknown_index),
                                             collate_fn=customized_dataloader.collate)
-
-    # TODO: add test data loader (use 3 separately)
 
 
     ####################################################################
@@ -201,13 +245,18 @@ def main():
         model.load_state_dict(state_dict)
 
         if args.evalmode == 'anytime':
-            if args.test_with_novel or args.train_k_plus_1:
-                test_with_novelty(val_loader=test_loader,
-                                  model=model,
-                                  criterion=criterion)
+            # Test 3 diff categories separately
+            test_with_novelty(val_loader=test_known_known_loader,
+                              model=model,
+                              criterion=criterion)
 
-            else:
-                validate(test_loader, model, criterion)
+            test_with_novelty(val_loader=test_known_unknown_loader,
+                              model=model,
+                              criterion=criterion)
+
+            test_with_novelty(val_loader=test_unknown_unknown_loader,
+                              model=model,
+                              criterion=criterion)
 
         else:
             logging.info("Only supporting anytime prediction!")
@@ -216,34 +265,53 @@ def main():
 
     scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec3\tval_prec3\ttrain_prec5\tval_prec5']
 
-
     ####################################################################
     # Do training and validation
     ####################################################################
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
         if args.train_k_plus_1:
-            logging.info("Training MSD-Net on K+1 classes.")
-            train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
-            val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
+            return
+            # logging.info("Training MSD-Net on K+1 classes.")
+            # train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
+            # val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
 
         # Adding the option for training early exits using diff penalties.
         elif args.train_early_exit:
             logging.info("Training with weighted loss for different classes.")
-            # TODO: define the penalty factors here - it came from the data distribution for RT
-            penalty_factors = None
-            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_loss(train_loader,
-                                                                                            model,
-                                                                                            criterion,
-                                                                                            optimizer,
-                                                                                            epoch,
-                                                                                            penalty_factors,
-                                                                                            "simple")
+            """
+            Define the penalty factors here:
+                For known samples:
+                For unknown samples: came from the data distribution for RT
+                
+            Training strategy:
+                Train the model on know_known first, no psyphy-loss applied, only use the simple factors
+                Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
+            """
+            penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
+            penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
-            # TODO: Which validate function should we use? Probably testing_with_novelty?
+            # TODO: Train and validate on known_known first
+            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_known_known_loader,
+                                                                                                    model,
+                                                                                                    criterion,
+                                                                                                    optimizer,
+                                                                                                    epoch,
+                                                                                                    penalty_factors_for_known,
+                                                                                                    False)
+
             # TODO: need to update original validate to top 1,3,5
-            val_loss, val_prec1, val_prec3, val_prec5 = validate(val_loader, model, criterion, epoch)
+            # When training on known_known, there are only known classes,
+            # so we only need to use the normal validate function modified to fit the new data format
+            val_loss, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(valid_known_known_loader,
+                                                                                         model,
+                                                                                         criterion,
+                                                                                         epoch)
 
+
+            # TODO: Load the model that was trained on known_known and continue training on known_unknown
+
+            # TODO: Then train and validate on known_unknown
 
         ####################################################################
         # Update and save the result
@@ -271,19 +339,19 @@ def main():
 
     return
 
-
-
-
+############################################################
+# Use these 2 for training and validation from 09/15
+############################################################
 def train_early_exit_with_pp_loss(train_loader,
                                   model,
                                   criterion,
                                   optimizer,
                                   epoch,
                                   penalty_factors,
-                                  strategy,
-                                  nb_known_classes=325,
-                                  nb_known_unknown_classes=44,
-                                  nb_unknown_classes=44):
+                                  train_unknown,
+                                  nb_known_classes=335,
+                                  nb_known_unknown_classes=40,
+                                  nb_unknown_classes=38):
     """
     Modify how the loss is calculated:
     assign smaller penalties to earlier exits, and larger penalties to later exits.
@@ -295,73 +363,52 @@ def train_early_exit_with_pp_loss(train_loader,
     :param epoch:
     :return:
     """
-
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
 
-    # TODO: Update the evaluation metrics to top-1, top-3 and top-5
     top1, top3, top5 = [], [], []
     for i in range(args.nBlocks):
         top1.append(AverageMeter())
         top3.append(AverageMeter())
         top5.append(AverageMeter())
 
-    # switch to train mode
     model.train()
 
     running_lr = None
 
+    ##########################################
+    # training process
+    ##########################################
     with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
+        for i, one_batch in enumerate(train_loader):
             lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
                                       nBatch=len(train_loader), method=args.lr_type)
 
             if running_lr is None:
                 running_lr = lr
 
+            print(one_batch)
+
             input_var = torch.autograd.Variable(input)
 
-            if strategy == "simple":
-                # Implement the simple weighted loss strategy
-                # by multiplying n weights to n exits respectively
+            # TODO: Implement the training strategy here with the new losses
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target)
 
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
+            output = model(input_var)
 
-                output = model(input_var)
+            if not isinstance(output, list):
+                output = [output]
 
-                if not isinstance(output, list):
-                    output = [output]
+            loss = 0.0
+            for j in range(len(output)):
+                loss += criterion(output[j], target_var)
 
-                loss = 0.0
-
-                # Just add the penalty factors here
-                for j in range(len(output)):
-                    # print(output[j].shape) # Shape: [batch, nb_classes]
-                    # Assign different weights to the losses
-                    penalty_factor = penalty_factors[j]
-                    output_weighted = output[j] * penalty_factor
-
-                    loss += criterion(output_weighted, target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-            # TODO: Implement the complex strategies
-            elif strategy == "complex":
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
+            losses.update(loss.item(), input.size(0))
 
 
 
@@ -404,6 +451,83 @@ def train_early_exit_with_pp_loss(train_loader,
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
 
 
+
+def validate_early_exit_with_pp_loss(val_loader, model, criterion, epoch=None):
+    batch_time = AverageMeter()
+    losses = AverageMeter()
+    data_time = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.eval()
+
+    end = time.time()
+    with torch.no_grad():
+        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
+            for i, (input, target) in enumerate(val_loader):
+                target = target.cuda(async=True)
+                input = input.cuda()
+
+                input_var = torch.autograd.Variable(input)
+                target_var = torch.autograd.Variable(target)
+
+                data_time.update(time.time() - end)
+
+                output = model(input_var)
+                if not isinstance(output, list):
+                    output = [output]
+
+                loss = 0.0
+                for j in range(len(output)):
+                    loss += criterion(output[j], target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+                for j in range(len(output)):
+                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), input.size(0))
+                    top3[j].update(prec1.item(), input.size(0))
+                    top5[j].update(prec5.item(), input.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+                if i % args.print_freq == 0:
+                    logging.info('Epoch: [{0}/{1}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@3 {top3.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}'.format(
+                            i + 1, len(val_loader),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                    valid_f.write('Epoch: [{0}][{1}/{2}]\t'
+                                  'Time {batch_time.avg:.3f}\t'
+                                  'Data {data_time.avg:.3f}\t'
+                                  'Loss {loss.val:.4f}\t'
+                                  'Acc@1 {top1.val:.4f}\t'
+                                  'Acc@3 {top3.val:.4f}\t'
+                                  'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(val_loader),
+                        batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    for j in range(args.nBlocks):
+        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(top1=top1[j], top3=top3[j], top5=top5[j]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+
+############################################################
+# END
+############################################################
 
 
 def train_early_exit_loss(train_loader,

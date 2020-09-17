@@ -31,31 +31,57 @@ import torchvision.transforms as transforms
 from customized_dataloader import msd_net_dataset
 import customized_dataloader
 
+train_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train.json"
+valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
 
-debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
 
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
 
-train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
-                                    transforms.RandomHorizontalFlip(),
-                                    transforms.ToTensor(),
-                                    normalize])
+def test_data_loader(json_path,
+                     check_data=False):
+    """
+    1. Use this function to test whether the data loader is working
+    2. Go thru all the data to check whether the shapes are correct
+    :param json_path:
+    :return:
+    """
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-train_dataset = msd_net_dataset(json_path=debugging_json_path,
-                                transform=train_transform)
-train_set_index = torch.randperm(len(train_dataset))
+    transform = transforms.Compose([transforms.RandomResizedCrop(224),
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.ToTensor(),
+                                        normalize])
 
-train_loader = torch.utils.data.DataLoader(train_dataset,
-                                           batch_size=2,
-                                           shuffle=False,
-                                           sampler=torch.utils.data.RandomSampler(train_set_index),
-                                           collate_fn=customized_dataloader.collate)
+    dataset = msd_net_dataset(json_path=json_path,
+                              transform=transform)
+    set_index = torch.randperm(len(dataset))
 
-for i, batch in enumerate(train_loader):
-    print("@"*30)
-    print(i)
-    # print(batch)
+    if check_data:
+        print("Checking data...")
+        data_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_size=32,
+                                                   shuffle=False,
+                                                   collate_fn=customized_dataloader.collate)
+
+    else:
+        data_loader = torch.utils.data.DataLoader(dataset,
+                                                   batch_size=32,
+                                                   shuffle=False,
+                                                   sampler=torch.utils.data.RandomSampler(set_index),
+                                                   collate_fn=customized_dataloader.collate)
+
+
+    for i, batch in enumerate(data_loader):
+        pass
+
+
+
+if __name__ == '__main__':
+    # test_data_loader(json_path=train_json_path,
+    #                  check_data=True)
+    test_data_loader(json_path=valid_json_path,
+                     check_data=True)
+
 
 
 

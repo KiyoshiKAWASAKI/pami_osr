@@ -10,63 +10,64 @@ from torch.autograd import Variable
 
 from collections import defaultdict
 import os
-import cv2
 import numpy as np
 from PIL import Image
 import sys
 import random
 
 def collate(batch):
-    # print(batch)
-    # sys.exit(0)
-    PADDING_CONSTANT = 0
+    try:
+        PADDING_CONSTANT = 0
 
-    batch = [b for b in batch if b is not None]
-    #These all should be the same size or error
-    assert len(set([b["img"].shape[0] for b in batch])) == 1
-    assert len(set([b["img"].shape[2] for b in batch])) == 1
+        batch = [b for b in batch if b is not None]
+        #These all should be the same size or error
+        assert len(set([b["img"].shape[0] for b in batch])) == 1
+        assert len(set([b["img"].shape[2] for b in batch])) == 1
 
-    # TODO: what is dim 0, 1, 2??
-    """
-    dim0: channel
-    dim1: ??
-    dim2: hight?
-    """
-    dim0 = batch[0]["img"].shape[0]
-    dim1 = max([b["img"].shape[1] for b in batch])
-    dim1 = dim1 + (dim0 - (dim1 % dim0))
-    dim2 = batch[0]["img"].shape[2]
+        # TODO: what is dim 0, 1, 2??
+        """
+        dim0: channel
+        dim1: ??
+        dim2: hight?
+        """
+        dim0 = batch[0]["img"].shape[0]
+        dim1 = max([b["img"].shape[1] for b in batch])
+        dim1 = dim1 + (dim0 - (dim1 % dim0))
+        dim2 = batch[0]["img"].shape[2]
 
-    all_labels = []
-    psychs = []
+        all_labels = []
+        psychs = []
 
-    input_batch = np.full((len(batch), dim0, dim1, dim2), PADDING_CONSTANT).astype(np.float32)
+        input_batch = np.full((len(batch), dim0, dim1, dim2), PADDING_CONSTANT).astype(np.float32)
 
-    for i in range(len(batch)):
-        b_img = batch[i]["img"]
-        input_batch[i,:,:b_img.shape[1],:] = b_img
-        l = batch[i]["gt_label"]
-        psych = batch[i]["rt"]
-        all_labels.append(l)
+        for i in range(len(batch)):
+            b_img = batch[i]["img"]
+            input_batch[i,:,:b_img.shape[1],:] = b_img
+            l = batch[i]["gt_label"]
+            psych = batch[i]["rt"]
+            all_labels.append(l)
 
-        # TODO: What is this part?
-        if psych is not None:
-            psych = (423)-psych
-            if psych < 0:
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print((psych))
+            # TODO: What is this part?
+            if psych is not None:
+                psych = (423)-psych
+                if psych < 0:
+                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    print((psych))
 
-            psychs.append((psych)*100000)
-        else:
-            psychs.append(0)
+                psychs.append((psych)*100000)
+            else:
+                psychs.append(0)
 
-    line_imgs = input_batch.transpose([0,3,1,2])
-    line_imgs = torch.from_numpy(line_imgs)
-    labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
+        line_imgs = input_batch.transpose([0,3,1,2])
+        line_imgs = torch.from_numpy(line_imgs)
+        labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
 
-    return {"imgs": line_imgs,
-            "labels": labels,
-            "rts": psychs}
+        return {"imgs": line_imgs,
+                "labels": labels,
+                "rts": psychs}
+
+    except Exception as e:
+        print(e)
 
 
 
@@ -80,6 +81,7 @@ class msd_net_dataset(Dataset):
 
         with open(json_path) as f:
             data = json.load(f)
+        print("Json file loaded: %s" % json_path)
 
         self.img_height = img_height
         self.data = data
@@ -96,13 +98,14 @@ class msd_net_dataset(Dataset):
         # Open the image and do normalization and augmentation
         img = Image.open(item["img_path"])
         img = img.convert('RGB')
-        print(img.size)
+        # print(img.size)
         try:
             img = self.transform(img)
         except:
+            print("@" * 20)
             print(idx)
             print(self.data[str(idx)])
-            sys.exit(0)
+            # sys.exit(0)
 
         # Deal with reaction times
         if self.random_weight is None:

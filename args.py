@@ -29,6 +29,16 @@ exp_group.add_argument('--gpu', default=None, type=str, help='GPU available.')
 
 # dataset related
 data_group = arg_parser.add_argument_group('data', 'dataset setting')
+data_group.add_argument('--train_known_known_path', type=str, default=None)
+data_group.add_argument('--train_known_unknown_path', type=str, default=None)
+data_group.add_argument('--valid_known_known_path', type=str, default=None)
+data_group.add_argument('--valid_known_unknown_path', type=str, default=None)
+data_group.add_argument('--test_known_known_path', type=str, default=None)
+data_group.add_argument('--test_known_unknown_path', type=str, default=None)
+data_group.add_argument('--test_unknown_unknown_path', type=str, default=None)
+
+
+
 data_group.add_argument('--data', metavar='D', default='ImageNet',
                         choices=['cifar10', 'cifar100', 'ImageNet'],
                         help='data to work on')
