@@ -35,10 +35,13 @@ def collate(batch):
         dim1 = dim1 + (dim0 - (dim1 % dim0))
         dim2 = batch[0]["img"].shape[2]
 
+        # print(batch)
+
         all_labels = []
         psychs = []
 
         input_batch = np.full((len(batch), dim0, dim1, dim2), PADDING_CONSTANT).astype(np.float32)
+        # input_batch = batch
 
         for i in range(len(batch)):
             b_img = batch[i]["img"]
@@ -58,8 +61,9 @@ def collate(batch):
             else:
                 psychs.append(0)
 
-        line_imgs = input_batch.transpose([0,3,1,2])
-        line_imgs = torch.from_numpy(line_imgs)
+        # line_imgs = input_batch.transpose([0,3,1,2])
+        # line_imgs = torch.from_numpy(line_imgs)
+        line_imgs = torch.from_numpy(input_batch)
         labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
 
         return {"imgs": line_imgs,

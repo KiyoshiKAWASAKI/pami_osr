@@ -17,7 +17,7 @@ python -W ignore main.py --train_known_known_path /afs/crc.nd.edu/user/j/jhuang2
                            --log_file_path None \
                            --train_early_exit True \
                            --arch msdnet \
-                           --batch-size 32 \
+                           --batch-size 128 \
                            --nb_training_classes 336 \
                            --epochs 1 \
                            --use-valid \

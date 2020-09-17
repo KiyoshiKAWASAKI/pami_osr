@@ -291,14 +291,14 @@ def main():
             penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
             penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
-            # TODO: Train and validate on known_known first
+            # Train on known_known first
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_known_known_loader,
                                                                                                     model,
                                                                                                     criterion,
                                                                                                     optimizer,
                                                                                                     epoch,
                                                                                                     penalty_factors_for_known,
-                                                                                                    False)
+                                                                                                    True)
 
             # TODO: need to update original validate to top 1,3,5
             # When training on known_known, there are only known classes,
@@ -348,10 +348,7 @@ def train_early_exit_with_pp_loss(train_loader,
                                   optimizer,
                                   epoch,
                                   penalty_factors,
-                                  train_unknown,
-                                  nb_known_classes=335,
-                                  nb_known_unknown_classes=40,
-                                  nb_unknown_classes=38):
+                                  train_unknown):
     """
     Modify how the loss is calculated:
     assign smaller penalties to earlier exits, and larger penalties to later exits.
@@ -377,43 +374,76 @@ def train_early_exit_with_pp_loss(train_loader,
         top5.append(AverageMeter())
 
     model.train()
+    end = time.time()
 
     running_lr = None
 
     ##########################################
-    # training process
+    # training process setup...
     ##########################################
     with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
         for i, one_batch in enumerate(train_loader):
             lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
                                       nBatch=len(train_loader), method=args.lr_type)
-
             if running_lr is None:
                 running_lr = lr
 
-            print(one_batch)
+            data_time.update(time.time() - end)
 
-            input_var = torch.autograd.Variable(input)
+            # Get data from dictionary
+            input = one_batch["imgs"]
+            target = one_batch["labels"] - 1
+            rts = one_batch["rts"]
 
-            # TODO: Implement the training strategy here with the new losses
-            target = target.cuda(async=True)
-            target_var = torch.autograd.Variable(target)
+            ###################################################
+            # training known data: no RT, just normal training
+            ###################################################
+            if train_unknown == True:
+                input_var = torch.autograd.Variable(input)
+                target = target.cuda(async=True)
+                target_var = torch.autograd.Variable(target).long()
 
-            output = model(input_var)
+                output = model(input_var)
 
-            if not isinstance(output, list):
-                output = [output]
+                if not isinstance(output, list):
+                    output = [output]
 
-            loss = 0.0
+                loss = 0.0
+
+                # Assign different weights to the losses
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors[j]
+                    output_weighted = output[j] * penalty_factor
+
+                    loss += criterion(output_weighted, target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+            ###################################################
+            # TODO: training unknown data: with RT + pp-loss
+            ###################################################
+            else:
+                input_var = torch.autograd.Variable(input)
+
+                target = target.cuda(async=True)
+                target_var = torch.autograd.Variable(target)
+
+                output = model(input_var)
+
+                if not isinstance(output, list):
+                    output = [output]
+
+                loss = 0.0
+                for j in range(len(output)):
+                    loss += criterion(output[j], target_var)
+
+                losses.update(loss.item(), input.size(0))
+
+            ##########################################
+            # Evaluate model
+            ##########################################
             for j in range(len(output)):
-                loss += criterion(output[j], target_var)
-
-            losses.update(loss.item(), input.size(0))
-
-
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
                 top1[j].update(prec1.item(), input.size(0))
                 top3[j].update(prec3.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
@@ -423,8 +453,11 @@ def train_early_exit_with_pp_loss(train_loader,
             loss.backward()
             optimizer.step()
 
-            # TODO: Fully utilize logger instead of writing to txt
-            # TODO: Issue - log file is empty until whole training is done. Hard to check middle status.
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            # TODO: Issue for logging- log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
                 logging.info('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.avg:.3f}\t'
@@ -452,7 +485,24 @@ def train_early_exit_with_pp_loss(train_loader,
 
 
 
-def validate_early_exit_with_pp_loss(val_loader, model, criterion, epoch=None):
+def validate_early_exit_with_pp_loss(val_loader,
+                                     model,
+                                     criterion,
+                                     penalty_factors,
+                                     valid_unknown,
+                                     epoch=None):
+    """
+
+    :param val_loader:
+    :param model:
+    :param criterion:
+    :param valid_known:
+    :param epoch:
+    :return:
+    """
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
     batch_time = AverageMeter()
     losses = AverageMeter()
     data_time = AverageMeter()
@@ -464,28 +514,65 @@ def validate_early_exit_with_pp_loss(val_loader, model, criterion, epoch=None):
         top5.append(AverageMeter())
 
     model.eval()
-
     end = time.time()
+
+    ##########################################
+    # Validation process
+    ##########################################
     with torch.no_grad():
         with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
-            for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
-                input = input.cuda()
-
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
-
+            for i, one_batch in enumerate(val_loader):
                 data_time.update(time.time() - end)
 
-                output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
+                # Get data from dictionary
+                input = one_batch["imgs"]
+                target = one_batch["labels"] - 1
+                rts = one_batch["rts"]
 
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
+                ##########################################
+                # Validation for knowns
+                ##########################################
+                if valid_unknown == False:
+                    input_var = torch.autograd.Variable(input)
+                    target = target.cuda(async=True)
+                    target_var = torch.autograd.Variable(target).long()
 
-                losses.update(loss.item(), input.size(0))
+                    data_time.update(time.time() - end)
+
+                    output = model(input_var)
+                    if not isinstance(output, list):
+                        output = [output]
+
+                    loss = 0.0
+                    # Assign different weights to the losses
+                    for j in range(len(output)):
+                        penalty_factor = penalty_factors[j]
+                        output_weighted = output[j] * penalty_factor
+                        loss += criterion(output_weighted, target_var)
+
+                    losses.update(loss.item(), input.size(0))
+
+                ##########################################
+                # TODO: Validation for unknowns
+                ##########################################
+                else:
+                    target = target.cuda(async=True)
+                    input = input.cuda()
+
+                    input_var = torch.autograd.Variable(input)
+                    target_var = torch.autograd.Variable(target)
+
+                    data_time.update(time.time() - end)
+
+                    output = model(input_var)
+                    if not isinstance(output, list):
+                        output = [output]
+
+                    loss = 0.0
+                    for j in range(len(output)):
+                        loss += criterion(output[j], target_var)
+
+                    losses.update(loss.item(), input.size(0))
 
                 for j in range(len(output)):
                     prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
