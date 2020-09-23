@@ -29,7 +29,9 @@ from timeit import default_timer as timer
 import datetime
 from utils.customized_dataloader import msd_net_dataset
 from utils import customized_dataloader
+from utils.psyphy_loss import pp_loss
 import torchvision.transforms as transforms
+from itertools import cycle
 
 
 
@@ -123,7 +125,7 @@ def main():
     ####################################################################
     # TODO: add psyphy loss here
     criterion = nn.CrossEntropyLoss().cuda()
-    criterion_pp = None
+    criterion_pp = pp_loss()
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -266,7 +268,7 @@ def main():
     scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec3\tval_prec3\ttrain_prec5\tval_prec5']
 
     ####################################################################
-    # Do training and validation
+    # Do training and validation: known_known and known_unknown
     ####################################################################
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
@@ -291,27 +293,24 @@ def main():
             penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
             penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
-            # Train on known_known first
-            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_known_known_loader,
-                                                                                                    model,
-                                                                                                    criterion,
-                                                                                                    optimizer,
-                                                                                                    epoch,
-                                                                                                    penalty_factors_for_known,
-                                                                                                    True)
+            # TODO: combine the training process: train known_known and known_unknown at the same time
+            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
+                                                                                      train_loader_unknown=train_known_unknown_loader,
+                                                                                      model=model,
+                                                                                      criterion_known=criterion,
+                                                                                      criterion_unknown=criterion_pp,
+                                                                                      optimizer=optimizer,
+                                                                                      epoch=epoch,
+                                                                                      penalty_factors_known=penalty_factors_for_known,
+                                                                                      penalty_factors_unknown=penalty_factors_for_novel)
 
-            # TODO: need to update original validate to top 1,3,5
-            # When training on known_known, there are only known classes,
-            # so we only need to use the normal validate function modified to fit the new data format
             val_loss, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(valid_known_known_loader,
                                                                                          model,
                                                                                          criterion,
+                                                                                         penalty_factors_for_known,
+                                                                                         False,
                                                                                          epoch)
 
-
-            # TODO: Load the model that was trained on known_known and continue training on known_unknown
-
-            # TODO: Then train and validate on known_unknown
 
         ####################################################################
         # Update and save the result
@@ -339,25 +338,31 @@ def main():
 
     return
 
+
+
 ############################################################
 # Use these 2 for training and validation from 09/15
 ############################################################
-def train_early_exit_with_pp_loss(train_loader,
+def train_early_exit_with_pp_loss(train_loader_known,
+                                  train_loader_unknown,
                                   model,
-                                  criterion,
+                                  criterion_known,
+                                  criterion_unknown,
                                   optimizer,
                                   epoch,
-                                  penalty_factors,
-                                  train_unknown):
+                                  penalty_factors_known,
+                                  penalty_factors_unknown):
     """
-    Modify how the loss is calculated:
-    assign smaller penalties to earlier exits, and larger penalties to later exits.
 
-    :param train_loader:
+    :param train_loader_known:
+    :param train_loader_unknown:
     :param model:
-    :param criterion:
+    :param criterion_known:
+    :param criterion_unknown:
     :param optimizer:
     :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
     :return:
     """
     ##########################################
@@ -378,39 +383,82 @@ def train_early_exit_with_pp_loss(train_loader,
 
     running_lr = None
 
-    ##########################################
+    ###################################################
     # training process setup...
-    ##########################################
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, one_batch in enumerate(train_loader):
+    ###################################################
+    # # Setup diff files for training known and unknown
+    # if train_unknown == False:
+    #     save_txt_path = os.path.join(args.save, "train_known_stats_epoch_" + str(epoch) + ".txt")
+    # else:
+    save_txt_path = os.path.join(args.save, "train_stats_epoch_" + str(epoch) + ".txt")
+
+    nb_known_batches = len(train_loader_known)
+    nb_unknown_batches = len(train_loader_unknown)
+    nb_total_batches = nb_known_batches + nb_unknown_batches
+
+    print("There are %d batches in known_known loader" % nb_known_batches)
+    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+
+
+    # Check which category has more samples/batches
+    if nb_known_batches >= nb_unknown_batches:
+        long_loader = train_loader_known
+        short_loader = iter(train_loader_unknown)
+    else:
+        long_loader = train_loader_unknown
+        short_loader = iter(train_loader_known)
+
+    # TODO: Get batch for known and unknown at the same time
+    with open(save_txt_path, 'w') as train_f:
+        for i, batch_1 in enumerate(long_loader):
+            try:
+                batch_2 = next(short_loader)
+            except StopIteration:
+                batch_2 = next(long_loader)
+
             lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
+                                      nBatch=nb_total_batches, method=args.lr_type)
             if running_lr is None:
                 running_lr = lr
 
             data_time.update(time.time() - end)
+
+            ###################################################
+            # Different cases
+            ###################################################
+            # TODO: Case 1: one batch from known_known, another batch from known_unknown
+            cate_1 = batch_1["category"]
+            cate_2 = batch_2["category"]
+            print(cate_1)
+            print(cate_2)
+
+            # TODO: Case 2: both batches from known_known
+
+            # TODO: Case 3: another batch from known_unknown
 
             # Get data from dictionary
             input = one_batch["imgs"]
             target = one_batch["labels"] - 1
             rts = one_batch["rts"]
 
+            print(target)
+
+            input_var = torch.autograd.Variable(input)
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            output = model(input_var)
+            # Output shape: batch_size * nb_clfs * nb_classes
+
+            if not isinstance(output, list):
+                output = [output]
+
+            loss = 0.0
+
             ###################################################
             # training known data: no RT, just normal training
             ###################################################
-            if train_unknown == True:
-                input_var = torch.autograd.Variable(input)
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target).long()
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-
-                # Assign different weights to the losses
+            if train_unknown == False:
                 for j in range(len(output)):
                     penalty_factor = penalty_factors[j]
                     output_weighted = output[j] * penalty_factor
@@ -423,19 +471,11 @@ def train_early_exit_with_pp_loss(train_loader,
             # TODO: training unknown data: with RT + pp-loss
             ###################################################
             else:
-                input_var = torch.autograd.Variable(input)
-
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
                 for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
+                    penalty_factor = penalty_factors[j]
+                    output_weighted = output[j] * penalty_factor
+
+                    loss += criterion(output_weighted[j], target_var)
 
                 losses.update(loss.item(), input.size(0))
 
@@ -519,8 +559,13 @@ def validate_early_exit_with_pp_loss(val_loader,
     ##########################################
     # Validation process
     ##########################################
+    if valid_unknown == False:
+        save_txt_path = os.path.join(args.save, "valid_known_stats_epoch_" + str(epoch) + ".txt")
+    else:
+        save_txt_path = os.path.join(args.save, "valid_unknown_stats_epoch_" + str(epoch) + ".txt")
+
     with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
+        with open(save_txt_path, 'w') as valid_f:
             for i, one_batch in enumerate(val_loader):
                 data_time.update(time.time() - end)
 
@@ -575,7 +620,7 @@ def validate_early_exit_with_pp_loss(val_loader,
                     losses.update(loss.item(), input.size(0))
 
                 for j in range(len(output)):
-                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
+                    prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
                     top1[j].update(prec1.item(), input.size(0))
                     top3[j].update(prec1.item(), input.size(0))
                     top5[j].update(prec5.item(), input.size(0))

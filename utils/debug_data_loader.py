@@ -4,6 +4,9 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+import warnings
+warnings.filterwarnings("ignore")
+
 # import os
 # import sys
 # import math
@@ -72,15 +75,15 @@ def test_data_loader(json_path,
 
 
     for i, batch in enumerate(data_loader):
-        pass
+        print(i)
 
 
 
 if __name__ == '__main__':
-    # test_data_loader(json_path=train_json_path,
-    #                  check_data=True)
-    test_data_loader(json_path=valid_json_path,
+    test_data_loader(json_path=train_json_path,
                      check_data=True)
+    # test_data_loader(json_path=valid_json_path,
+    #                  check_data=True)
 
 
 

@@ -1,5 +1,8 @@
 import json
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import torch
 import torchvision
 import torchvision.datasets as datasets
@@ -48,16 +51,18 @@ def collate(batch):
             input_batch[i,:,:b_img.shape[1],:] = b_img
             l = batch[i]["gt_label"]
             psych = batch[i]["rt"]
+            cate = batch[i]["category"]
             all_labels.append(l)
 
-            # TODO: What is this part?
+            # TODO: Leave the scale factor alone for now
             if psych is not None:
-                psych = (423)-psych
-                if psych < 0:
-                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    print((psych))
+                # psych = (423)-psych
+                # if psych < 0:
+                #     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                #     print((psych))
 
-                psychs.append((psych)*100000)
+                # psychs.append((psych)*100000)
+                psychs.append(psych)
             else:
                 psychs.append(0)
 
@@ -68,7 +73,8 @@ def collate(batch):
 
         return {"imgs": line_imgs,
                 "labels": labels,
-                "rts": psychs}
+                "rts": psychs,
+                "category": cate}
 
     except Exception as e:
         print(e)
@@ -105,11 +111,14 @@ class msd_net_dataset(Dataset):
         # print(img.size)
         try:
             img = self.transform(img)
-        except:
+
+        except Exception as e:
+            print("@" * 20)
+            print(e)
             print("@" * 20)
             print(idx)
             print(self.data[str(idx)])
-            # sys.exit(0)
+            sys.exit(0)
 
         # Deal with reaction times
         if self.random_weight is None:
@@ -120,8 +129,8 @@ class msd_net_dataset(Dataset):
             else:
                 # print("RT does not exist")
                 rt = None
+        # No random weights for reaction time
         else:
-            # TODO: should we apply random psyphy weights??
             pass
 
         return {
