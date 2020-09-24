@@ -103,7 +103,10 @@ class msd_net_dataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        item = self.data[str(idx)]
+        try:
+            item = self.data[str(idx)]
+        except KeyError:
+            item = self.data[str(idx+1)]
 
         # Open the image and do normalization and augmentation
         img = Image.open(item["img_path"])

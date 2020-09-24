@@ -297,8 +297,7 @@ def main():
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
                                                                                       train_loader_unknown=train_known_unknown_loader,
                                                                                       model=model,
-                                                                                      criterion_known=criterion,
-                                                                                      criterion_unknown=criterion_pp,
+                                                                                      criterion=criterion,
                                                                                       optimizer=optimizer,
                                                                                       epoch=epoch,
                                                                                       penalty_factors_known=penalty_factors_for_known,
@@ -343,15 +342,34 @@ def main():
 ############################################################
 # Use these 2 for training and validation from 09/15
 ############################################################
+def get_pp_factor(rt,
+                  scale=1,
+                  rt_max=20):
+    """
+    scalar * (RTmax - RTi) / RTmax + 1
+
+    :param rt:
+    :param scale:
+    :param rt_max:
+    :return:
+    """
+    if rt > rt_max:
+        return 1
+    else:
+        return (scale*(rt_max-rt)/rt_max +1)
+
+
+
+
 def train_early_exit_with_pp_loss(train_loader_known,
                                   train_loader_unknown,
                                   model,
-                                  criterion_known,
-                                  criterion_unknown,
+                                  criterion,
                                   optimizer,
                                   epoch,
                                   penalty_factors_known,
-                                  penalty_factors_unknown):
+                                  penalty_factors_unknown,
+                                  rt_max=20):
     """
 
     :param train_loader_known:
@@ -426,67 +444,292 @@ def train_early_exit_with_pp_loss(train_loader_known,
             ###################################################
             # Different cases
             ###################################################
-            # TODO: Case 1: one batch from known_known, another batch from known_unknown
             cate_1 = batch_1["category"]
             cate_2 = batch_2["category"]
-            print(cate_1)
-            print(cate_2)
+
+            # print(cate_1)
+            # print(cate_2)
+
+            # TODO: Case 1: one batch from known_known, another batch from known_unknown
+            if cate_1 == "known_known" and cate_2 == "known_unknown":
+                # print("case 1-1")
+                loss = 0.0
+
+                ###################################################
+                # training known data: no RT, just normal training
+                ###################################################
+                # print("Training the first batch")
+                known_input = batch_1["imgs"]
+                known_target = batch_1["labels"] - 1
+
+                known_input_var = torch.autograd.Variable(known_input)
+                known_target = known_target.cuda(async=True)
+                known_target_var = torch.autograd.Variable(known_target).long()
+
+                output_1 = model(known_input_var)
+
+                if not isinstance(output_1, list):
+                    output_1 = [output_1]
+
+                for j in range(len(output_1)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
+
+                    loss += criterion(output_weighted, known_target_var)
+
+                losses.update(loss.item(), known_input.size(0))
+
+                ###################################################
+                # Training unknown data: with RT + pp-loss
+                ###################################################
+                # print("Training the second batch")
+                unknown_input = batch_2["imgs"]
+                unknown_target = batch_2["labels"] - 1
+                rts = batch_2["rts"]
+
+                unknown_input_var = torch.autograd.Variable(unknown_input)
+                unknown_target = unknown_target.cuda(async=True)
+                unknown_target_var = torch.autograd.Variable(unknown_target).long()
+
+                output_2 = model(unknown_input_var)
+
+                if not isinstance(output_2, list):
+                    output_2 = [output_2]
+
+                for j in range(len(output_2)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output_2[j] * penalty_factor
+
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, unknown_target_var)
+
+                losses.update(loss.item(), unknown_input.size(0))
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
+                for j in range(len(output_2)):
+                    prec1, prec3, prec5 = accuracy(output_2[j].data, unknown_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), unknown_input.size(0))
+                    top3[j].update(prec3.item(), unknown_input.size(0))
+                    top5[j].update(prec5.item(), unknown_input.size(0))
+
+
+            elif cate_2 == "known_known" and cate_1 == "known_unknown":
+                # print("case 1-2")
+                loss = 0.0
+                ###################################################
+                # training known data: no RT, just normal training
+                ###################################################
+                # print("Training the first batch")
+                known_input = batch_2["imgs"]
+                known_target = batch_2["labels"] - 1
+
+                known_input_var = torch.autograd.Variable(known_input)
+                known_target = known_target.cuda(async=True)
+                known_target_var = torch.autograd.Variable(known_target).long()
+
+                output_1 = model(known_input_var)
+
+                if not isinstance(output_1, list):
+                    output_1 = [output_1]
+
+                for j in range(len(output_1)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
+
+                    loss += criterion(output_weighted, known_target_var)
+
+                losses.update(loss.item(), known_input.size(0))
+
+                ###################################################
+                # Training unknown data: with RT + pp-loss
+                ###################################################
+                # print("Training the second batch")
+                unknown_input = batch_1["imgs"]
+                unknown_target = batch_1["labels"] - 1
+                rts = batch_1["rts"]
+
+                unknown_input_var = torch.autograd.Variable(unknown_input)
+                unknown_target = unknown_target.cuda(async=True)
+                unknown_target_var = torch.autograd.Variable(unknown_target).long()
+
+                output_2 = model(unknown_input_var)
+
+                for j in range(len(output_2)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output_2[j] * penalty_factor
+
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, unknown_target_var)
+
+
+                losses.update(loss.item(), unknown_input.size(0))
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, unknown_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
+                for j in range(len(output_2)):
+                    prec1, prec3, prec5 = accuracy(output_2[j].data, known_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), unknown_input.size(0))
+                    top3[j].update(prec3.item(), unknown_input.size(0))
+                    top5[j].update(prec5.item(), unknown_input.size(0))
+
+
 
             # TODO: Case 2: both batches from known_known
+            elif cate_1 == "known_known" and cate_2 == "known_known":
+                # print("case 2")
+                loss = 0.0
 
-            # TODO: Case 3: another batch from known_unknown
+                ###################################################
+                # Training the first known batch
+                ###################################################
+                # print("Training the first batch")
+                known_input_1 = batch_1["imgs"]
+                known_target_1 = batch_1["labels"] - 1
 
-            # Get data from dictionary
-            input = one_batch["imgs"]
-            target = one_batch["labels"] - 1
-            rts = one_batch["rts"]
+                known_input_var_1 = torch.autograd.Variable(known_input_1)
+                known_target_1 = known_target_1.cuda(async=True)
+                known_target_var_1 = torch.autograd.Variable(known_target_1).long()
 
-            print(target)
+                output_1 = model(known_input_var_1)
 
-            input_var = torch.autograd.Variable(input)
-            target = target.cuda(async=True)
-            target_var = torch.autograd.Variable(target).long()
+                if not isinstance(output_1, list):
+                    output_1 = [output_1]
 
-            output = model(input_var)
-            # Output shape: batch_size * nb_clfs * nb_classes
+                for j in range(len(output_1)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
 
-            if not isinstance(output, list):
-                output = [output]
+                    loss += criterion(output_weighted, known_target_var_1)
 
-            loss = 0.0
+                losses.update(loss.item(), known_input_1.size(0))
 
-            ###################################################
-            # training known data: no RT, just normal training
-            ###################################################
-            if train_unknown == False:
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors[j]
-                    output_weighted = output[j] * penalty_factor
+                ###################################################
+                # Training the 2nd known batch
+                ###################################################
+                # print("Training the second batch")
+                known_input_2 = batch_2["imgs"]
+                known_target_2 = batch_2["labels"] - 1
 
-                    loss += criterion(output_weighted, target_var)
+                known_input_var_2 = torch.autograd.Variable(known_input_2)
+                known_target_2 = known_target_2.cuda(async=True)
+                known_target_var_2 = torch.autograd.Variable(known_target_2).long()
 
-                losses.update(loss.item(), input.size(0))
+                output_2 = model(known_input_var_2)
 
-            ###################################################
-            # TODO: training unknown data: with RT + pp-loss
-            ###################################################
+                if not isinstance(output_2, list):
+                    output_2 = [output_2]
+
+                for j in range(len(output_2)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_2[j] * penalty_factor
+
+                    loss += criterion(output_weighted, known_target_var_2)
+
+                losses.update(loss.item(), known_input_2.size(0))
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var_1, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
+                for j in range(len(output_2)):
+                    prec1, prec3, prec5 = accuracy(output_2[j].data, known_target_var_2, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
+
+            # TODO: Case 3: both batches from known_unknown
+            elif cate_1 == "known_unknown" and cate_2 == "known_unknown":
+                # print("case 3")
+                loss = 0.0
+
+                ###################################################
+                # training the 1st batch of unknown
+                ###################################################
+                # print("Training the first batch")
+                unknown_input_1 = batch_1["imgs"]
+                unknown_target_1 = batch_1["labels"] - 1
+                rts_1 = batch_1["rts"]
+
+                unknown_input_var_1 = torch.autograd.Variable(unknown_input_1)
+                unknown_target_1 = unknown_target_1.cuda(async=True)
+                unknown_target_var_1 = torch.autograd.Variable(unknown_target_1).long()
+
+                output_1 = model(unknown_input_var_1)
+
+                for j in range(len(output_1)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output_1[j] * penalty_factor
+
+                    scale_factor = rt_max - rts_1[j]
+                    loss += scale_factor * criterion(output_weighted, unknown_target_var_1)
+
+                losses.update(loss.item(), unknown_input.size(0))
+
+                ###################################################
+                # training the 2nd batch of unknown
+                ###################################################
+                # print("Training the second batch")
+                unknown_input_2 = batch_2["imgs"]
+                unknown_target_2 = batch_2["labels"] - 1
+                rts_2 = batch_2["rts"]
+
+                unknown_input_var_2 = torch.autograd.Variable(unknown_input_2)
+                unknown_target_2 = unknown_target_2.cuda(async=True)
+                unknown_target_var_2 = torch.autograd.Variable(unknown_target_2).long()
+
+                output_2 = model(unknown_input_var_2)
+
+                for j in range(len(output_2)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output_2[j] * penalty_factor
+
+                    scale_factor = rt_max - rts_2[j]
+                    loss += scale_factor * criterion(output_weighted, unknown_target_var_2)
+
+                losses.update(loss.item(), unknown_input.size(0))
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, unknown_target_var_1, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), unknown_input.size(0))
+                    top3[j].update(prec3.item(), unknown_input.size(0))
+                    top5[j].update(prec5.item(), unknown_input.size(0))
+
+                for j in range(len(output_2)):
+                    prec1, prec3, prec5 = accuracy(output_2[j].data, unknown_target_var_2, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), unknown_input.size(0))
+                    top3[j].update(prec3.item(), unknown_input.size(0))
+                    top5[j].update(prec5.item(), unknown_input.size(0))
+
+
+
+            # TODO: Case 4: something is wrong...
             else:
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors[j]
-                    output_weighted = output[j] * penalty_factor
-
-                    loss += criterion(output_weighted[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-            ##########################################
-            # Evaluate model
-            ##########################################
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
+                print("something is wrong...")
+                return
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -506,7 +749,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                       'Acc@1 {top1.val:.4f}\t'
                       'Acc@3 {top3.val:.4f}\t'
                       'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
+                        epoch, i + 1, nb_total_batches,
                         batch_time=batch_time, data_time=data_time,
                         loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
@@ -517,7 +760,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                               'Acc@1 {top1.val:.4f}\t'
                               'Acc@3 {top3.val:.4f}\t'
                               'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, len(train_loader),
+                    epoch, i + 1, nb_total_batches,
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
