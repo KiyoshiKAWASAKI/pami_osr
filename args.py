@@ -21,7 +21,7 @@ exp_group.add_argument('--evalmode', default=None,
                        help='which mode to evaluate')
 exp_group.add_argument('--evaluate-from', default=None, type=str, metavar='PATH',
                        help='path to saved checkpoint (default: none)')
-exp_group.add_argument('--print-freq', '-p', default=10, type=int,
+exp_group.add_argument('--print-freq', '-p', default=20, type=int,
                        metavar='N', help='print frequency (default: 100)')
 exp_group.add_argument('--seed', default=0, type=int,
                        help='random seed')

@@ -32,16 +32,13 @@ from utils import customized_dataloader
 from utils.psyphy_loss import pp_loss
 import torchvision.transforms as transforms
 from itertools import cycle
-
-
+import torchvision.models as torch_model
 
 args = arg_parser.parse_args()
 torch.manual_seed(args.seed)
 
 # TODO: Use a small json file for debugging first
 debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
-
-
 
 if args.gpu:
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -65,42 +62,6 @@ logging.basicConfig(stream=sys.stdout,
 
 
 
-class train_msdnet():
-    def __init__(self,
-                 nb_training_classes,
-
-                 grFactor="1-2-4-4", bnFactor='1-2-4-4', nBlocks=5,
-                 nChannels=32, base=4, stepmode="even", step=4,
-                 growthRate=16, prune="max", bottleneck=True,
-                 momentum=0.90, learning_rate=0.1, weight_decay=1e-4):
-
-        self.grFactor = list(map(int, grFactor.split('-')))
-        self.bnFactor = list(map(int, bnFactor.split('-')))
-        self.nScales = len(grFactor)
-        self.nb_training_classes = nb_training_classes
-        self.nBlocks = nBlocks
-        self.nChannels = nChannels
-        self.base = base
-        self.stepmode = stepmode
-        self.step = step
-        self.growthRate = growthRate
-        self.prune = prune
-        self.bottleneck = bottleneck
-
-        # TODO: This line may be wrong and need to be changed
-        self.get_model = getattr(models, 'resnet')(args, nb_blocks=5)
-        self.model = torch.nn.DataParallel(self.get_model).cuda()
-        self.criterion = nn.CrossEntropyLoss().cuda()
-
-        self.optimizer = torch.optim.SGD(self.model.parameters(),
-                                         learning_rate,
-                                         momentum=momentum,
-                                         weight_decay=weight_decay)
-
-
-
-
-
 def main():
     global args
     ####################################################################
@@ -111,22 +72,13 @@ def main():
     if not os.path.exists(args.save):
         os.makedirs(args.save)
 
-    model = getattr(models, args.arch)(args, nb_blocks=5)
-
-    if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
-        model.features = torch.nn.DataParallel(model.features)
-        model.cuda()
-    else:
-        model = torch.nn.DataParallel(model).cuda()
-
+    model = torch_model.densenet161()
+    model = torch.nn.DataParallel(model).cuda()
 
     ####################################################################
     # Define the loss and optimizer
     ####################################################################
-    # TODO: add psyphy loss here
     criterion = nn.CrossEntropyLoss().cuda()
-    criterion_pp = pp_loss()
-
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -140,7 +92,6 @@ def main():
             optimizer.load_state_dict(checkpoint['optimizer'])
 
     cudnn.benchmark = True
-
 
     ####################################################################
     # Define data transformation
@@ -156,9 +107,9 @@ def main():
     valid_transform = train_transform
 
     test_transform = transforms.Compose([transforms.Resize(256),
-                                        transforms.CenterCrop(224),
-                                        transforms.ToTensor(),
-                                        normalize])
+                                         transforms.CenterCrop(224),
+                                         transforms.ToTensor(),
+                                         normalize])
 
     #####################################################################
     # Create dataset and data loader
@@ -175,13 +126,15 @@ def main():
     train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
                                                            batch_size=args.batch_size,
                                                            shuffle=False,
-                                                           sampler=torch.utils.data.RandomSampler(train_known_known_index),
+                                                           sampler=torch.utils.data.RandomSampler(
+                                                               train_known_known_index),
                                                            collate_fn=customized_dataloader.collate)
     train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
-                                                           batch_size=args.batch_size,
-                                                           shuffle=False,
-                                                           sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
-                                                           collate_fn=customized_dataloader.collate)
+                                                             batch_size=args.batch_size,
+                                                             shuffle=False,
+                                                             sampler=torch.utils.data.RandomSampler(
+                                                                 train_known_unknown_index),
+                                                             collate_fn=customized_dataloader.collate)
 
     # Validation loaders
     valid_known_known_dataset = msd_net_dataset(json_path=args.valid_known_known_path,
@@ -193,16 +146,18 @@ def main():
     valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
 
     valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
-                                             batch_size=args.batch_size,
-                                             shuffle=False,
-                                             sampler=torch.utils.data.RandomSampler(valid_known_known_index),
-                                             collate_fn=customized_dataloader.collate)
+                                                           batch_size=args.batch_size,
+                                                           shuffle=False,
+                                                           sampler=torch.utils.data.RandomSampler(
+                                                               valid_known_known_index),
+                                                           collate_fn=customized_dataloader.collate)
 
     valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
-                                             batch_size=args.batch_size,
-                                             shuffle=False,
-                                             sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
-                                             collate_fn=customized_dataloader.collate)
+                                                             batch_size=args.batch_size,
+                                                             shuffle=False,
+                                                             sampler=torch.utils.data.RandomSampler(
+                                                                 valid_known_unknown_index),
+                                                             collate_fn=customized_dataloader.collate)
 
     # Test loaders
     test_known_known_dataset = msd_net_dataset(json_path=args.test_known_known_path,
@@ -219,23 +174,25 @@ def main():
 
     # When doing test, set the batch size to 1 to test the time one by one accurately
     test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
-                                             batch_size=1,
-                                             shuffle=False,
-                                             sampler=torch.utils.data.RandomSampler(test_known_known_index),
-                                             collate_fn=customized_dataloader.collate)
+                                                          batch_size=1,
+                                                          shuffle=False,
+                                                          sampler=torch.utils.data.RandomSampler(
+                                                              test_known_known_index),
+                                                          collate_fn=customized_dataloader.collate)
 
     test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
-                                              batch_size=1,
-                                              shuffle=False,
-                                              sampler=torch.utils.data.RandomSampler(test_known_unknown_index),
-                                              collate_fn=customized_dataloader.collate)
+                                                            batch_size=1,
+                                                            shuffle=False,
+                                                            sampler=torch.utils.data.RandomSampler(
+                                                                test_known_unknown_index),
+                                                            collate_fn=customized_dataloader.collate)
 
     test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
-                                            batch_size=1,
-                                            shuffle=False,
-                                            sampler=torch.utils.data.RandomSampler(test_unknown_unknown_index),
-                                            collate_fn=customized_dataloader.collate)
-
+                                                              batch_size=1,
+                                                              shuffle=False,
+                                                              sampler=torch.utils.data.RandomSampler(
+                                                                  test_unknown_unknown_index),
+                                                              collate_fn=customized_dataloader.collate)
 
     ####################################################################
     # Check whether we only do testing
@@ -285,7 +242,7 @@ def main():
             Define the penalty factors here:
                 For known samples:
                 For unknown samples: came from the data distribution for RT
-                
+
             Training strategy:
                 Train the model on know_known first, no psyphy-loss applied, only use the simple factors
                 Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
@@ -294,14 +251,15 @@ def main():
             penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
             # TODO: combine the training process: train known_known and known_unknown at the same time
-            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
-                                                                                      train_loader_unknown=train_known_unknown_loader,
-                                                                                      model=model,
-                                                                                      criterion=criterion,
-                                                                                      optimizer=optimizer,
-                                                                                      epoch=epoch,
-                                                                                      penalty_factors_known=penalty_factors_for_known,
-                                                                                      penalty_factors_unknown=penalty_factors_for_novel)
+            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(
+                train_loader_known=train_known_known_loader,
+                train_loader_unknown=train_known_unknown_loader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                epoch=epoch,
+                penalty_factors_known=penalty_factors_for_known,
+                penalty_factors_unknown=penalty_factors_for_novel)
 
             val_loss, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(valid_known_known_loader,
                                                                                          model,
@@ -309,7 +267,6 @@ def main():
                                                                                          penalty_factors_for_known,
                                                                                          False,
                                                                                          epoch)
-
 
         ####################################################################
         # Update and save the result
@@ -331,12 +288,11 @@ def main():
             'arch': args.arch,
             'state_dict': model.state_dict(),
             'best_prec1': best_prec1,
-            'optimizer': optimizer.state_dict(),}, args, is_best, model_filename, scores)
+            'optimizer': optimizer.state_dict(), }, args, is_best, model_filename, scores)
 
     logging.info('Best val_prec1: {:.4f} at epoch {}'.format(best_prec1, best_epoch))
 
     return
-
 
 
 ############################################################
@@ -356,7 +312,7 @@ def get_pp_factor(rt,
     if rt > rt_max:
         return 1
     else:
-        return (scale*(rt_max-rt)/rt_max +1)
+        return (scale * (rt_max - rt) / rt_max + 1)
 
 
 
@@ -416,7 +372,6 @@ def train_early_exit_with_pp_loss(train_loader_known,
 
     print("There are %d batches in known_known loader" % nb_known_batches)
     print("There are %d batches in known_unknown loader" % nb_unknown_batches)
-
 
     # Check which category has more samples/batches
     if nb_known_batches >= nb_unknown_batches:
@@ -537,6 +492,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
 
                 output_1 = model(known_input_var)
                 # print(len(output_1))
+                # print(output_1)
 
                 if not isinstance(output_1, list):
                     output_1 = [output_1]
@@ -563,6 +519,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
 
                 output_2 = model(unknown_input_var)
                 # print(len(output_2))
+                # print(output_2)
 
                 if not isinstance(output_2, list):
                     output_2 = [output_2]
@@ -573,7 +530,6 @@ def train_early_exit_with_pp_loss(train_loader_known,
 
                     scale_factor = get_pp_factor(rts[j])
                     loss += scale_factor * criterion(output_weighted, unknown_target_var)
-
 
                 losses.update(loss.item(), unknown_input.size(0))
 
@@ -759,15 +715,15 @@ def train_early_exit_with_pp_loss(train_loader_known,
             # TODO: Issue for logging- log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
                 logging.info('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, nb_total_batches,
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                             'Time {batch_time.avg:.3f}\t'
+                             'Data {data_time.avg:.3f}\t'
+                             'Loss {loss.val:.4f}\t'
+                             'Acc@1 {top1.val:.4f}\t'
+                             'Acc@3 {top3.val:.4f}\t'
+                             'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, nb_total_batches,
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                 train_f.write('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
@@ -890,15 +846,15 @@ def validate_early_exit_with_pp_loss(val_loader,
 
                 if i % args.print_freq == 0:
                     logging.info('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top3.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                                 'Time {batch_time.avg:.3f}\t'
+                                 'Data {data_time.avg:.3f}\t'
+                                 'Loss {loss.val:.4f}\t'
+                                 'Acc@1 {top1.val:.4f}\t'
+                                 'Acc@3 {top3.val:.4f}\t'
+                                 'Acc@5 {top5.val:.4f}'.format(
+                        i + 1, len(val_loader),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                     valid_f.write('Epoch: [{0}][{1}/{2}]\t'
                                   'Time {batch_time.avg:.3f}\t'
@@ -909,414 +865,18 @@ def validate_early_exit_with_pp_loss(val_loader,
                                   'Acc@5 {top5.val:.4f}\n'.format(
                         epoch, i + 1, len(val_loader),
                         batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
     for j in range(args.nBlocks):
-        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(top1=top1[j], top3=top3[j], top5=top5[j]))
+        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(
+            top1=top1[j], top3=top3[j], top5=top5[j]))
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+
 
 ############################################################
 # END
 ############################################################
-
-
-def train_early_exit_loss(train_loader,
-                          model,
-                          criterion,
-                          optimizer,
-                          epoch,
-                          penalty_factors,
-                          strategy,
-                          nb_known_classes=325,
-                          nb_known_unknown_classes=44,
-                          nb_unknown_classes=44):
-    """
-    Modify how the loss is calculated:
-    assign smaller penalties to earlier exits, and larger penalties to later exits.
-
-    :param train_loader:
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param epoch:
-    :return:
-    """
-
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-
-    # TODO: Update the evaluation metrics to top-1, top-3 and top-5
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    # switch to train mode
-    model.train()
-
-    running_lr = None
-
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
-
-            if running_lr is None:
-                running_lr = lr
-
-            input_var = torch.autograd.Variable(input)
-
-            if strategy == "simple":
-                # Implement the simple weighted loss strategy
-                # by multiplying n weights to n exits respectively
-
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-
-                # Just add the penalty factors here
-                for j in range(len(output)):
-                    # print(output[j].shape) # Shape: [batch, nb_classes]
-                    # Assign different weights to the losses
-                    penalty_factor = penalty_factors[j]
-                    output_weighted = output[j] * penalty_factor
-
-                    loss += criterion(output_weighted, target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-            # TODO: Implement the complex strategies
-            elif strategy == "complex":
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # TODO: Fully utilize logger instead of writing to txt
-            # TODO: Issue - log file is empty until whole training is done. Hard to check middle status.
-            if i % args.print_freq == 0:
-                logging.info('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
-                              'Time {batch_time.avg:.3f}\t'
-                              'Data {data_time.avg:.3f}\t'
-                              'Loss {loss.val:.4f}\t'
-                              'Acc@1 {top1.val:.4f}\t'
-                              'Acc@3 {top3.val:.4f}\t'
-                              'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, len(train_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
-
-
-
-
-def train_k_plus_one(train_loader, model, criterion, optimizer, epoch):
-    """
-    Training k known classes and all other classes as +1 unknown class.
-
-    :param train_loader:
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param epoch:
-    :return:
-    """
-
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-
-    # Update the evaluation metrics to top-1, top-3 and top-5
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.train()
-
-    end = time.time()
-
-    running_lr = None
-
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
-
-            if running_lr is None:
-                running_lr = lr
-
-            data_time.update(time.time() - end)
-
-            target = target.cuda(async=True)
-
-            # Check the labels, change the label if it belongs to "unknown"
-            # Be reminded that the label generated by data loader starts from 0
-            for k in range(len(target)):
-                if target[k] >= args.nb_training_classes - 1:
-                    target[k] = args.nb_training_classes - 1
-
-            input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
-
-            output = model(input_var)
-            if not isinstance(output, list):
-                output = [output]
-
-            loss = 0.0
-            for j in range(len(output)):
-                loss += criterion(output[j], target_var)
-
-            losses.update(loss.item(), input.size(0))
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
-
-
-
-
-
-def validate_k_plus_one(val_loader, model, criterion, epoch):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
-            for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
-                input = input.cuda()
-
-                # Check the labels, change the label if it belongs to "unknown"
-                # Be reminded that the label generated by data loader starts from 0
-                for k in range(len(target)):
-                    if target[k] >= args.nb_training_classes - 1:
-                        target[k] = args.nb_training_classes - 1
-
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
-
-                data_time.update(time.time() - end)
-
-                output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-                for j in range(len(output)):
-                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), input.size(0))
-                    top3[j].update(prec3.item(), input.size(0))
-                    top5[j].update(prec5.item(), input.size(0))
-
-                # measure elapsed time
-                batch_time.update(time.time() - end)
-                end = time.time()
-
-                if i % args.print_freq == 0:
-                    print('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top1.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top3=top3[-1],top5=top5[-1]))
-
-                    valid_f.write('Epoch: [{0}][{1}/{2}]\t'
-                                  'Time {batch_time.avg:.3f}\t'
-                                  'Data {data_time.avg:.3f}\t'
-                                  'Loss {loss.val:.4f}\t'
-                                  'Acc@1 {top1.val:.4f}\t'
-                                  'Acc@3 {top3.val:.4f}\t'
-                                  'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(val_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-
-        for j in range(args.nBlocks):
-            print(' * prec@1 {top1.avg:.3f} prec@3 {top3.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j],
-                                                                                                top3=top3[j],
-                                                                                            top5=top5[j]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
-
-
-
-
-def validate(val_loader, model, criterion, epoch=None):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
-            for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
-                input = input.cuda()
-
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
-
-                data_time.update(time.time() - end)
-
-                output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-                for j in range(len(output)):
-                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), input.size(0))
-                    top3[j].update(prec1.item(), input.size(0))
-                    top5[j].update(prec5.item(), input.size(0))
-
-                # measure elapsed time
-                batch_time.update(time.time() - end)
-                end = time.time()
-
-                if i % args.print_freq == 0:
-                    logging.info('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top3.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                    valid_f.write('Epoch: [{0}][{1}/{2}]\t'
-                                  'Time {batch_time.avg:.3f}\t'
-                                  'Data {data_time.avg:.3f}\t'
-                                  'Loss {loss.val:.4f}\t'
-                                  'Acc@1 {top1.val:.4f}\t'
-                                  'Acc@3 {top3.val:.4f}\t'
-                                  'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(val_loader),
-                        batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    for j in range(args.nBlocks):
-        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(top1=top1[j], top3=top3[j], top5=top5[j]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
-
-
-
 
 def test_with_novelty(val_loader,
                       model,
@@ -1375,17 +935,17 @@ def test_with_novelty(val_loader,
 
             # Get the model outputs and RTs
             print("Timer started.")
-            start =timer()
+            start = timer()
             output, end_time = model(input_var)
 
             # Save the RTs
             for end in end_time:
-                rts.append(end-start)
+                rts.append(end - start)
             full_rt_list.append(rts)
 
             # extract the probability and apply our threshold
             if args.test_with_novel or args.save_probs:
-                prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+                prob = sm(torch.stack(output).to())  # Shape is [block, batch, class]
                 prob_list = np.array(prob.cpu().tolist())
                 max_prob = np.max(prob_list)
 
@@ -1397,7 +957,7 @@ def test_with_novelty(val_loader,
                     # Get top-5 predictions from 5 classifiers
                     pred_label_list = []
                     for j in range(len(output)):
-                        _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
+                        _, pred = output[j].data.topk(5, 1, True, True)  # pred is a tensor
                         pred_label_list.append(pred.tolist())
 
                     # Update the evaluation metrics for one sample
@@ -1408,7 +968,6 @@ def test_with_novelty(val_loader,
                     for l in pred_label_list:
                         top_1_list.append(l[0][0])
 
-
                     if target.tolist()[0] in top_1_list:
                         pred_label = target.tolist()[0]
                     else:
@@ -1418,13 +977,12 @@ def test_with_novelty(val_loader,
                 else:
                     pred_label = -1
 
-
             if args.save_probs:
                 # Reshape it into [batch, block, class]
                 prob_list = np.reshape(prob_list,
-                                        (prob_list.shape[1],
-                                         prob_list.shape[0],
-                                         prob_list.shape[2]))
+                                       (prob_list.shape[1],
+                                        prob_list.shape[0],
+                                        prob_list.shape[2]))
                 target_list = np.array(target.cpu().tolist())
 
                 for one_prob in prob_list.tolist():
@@ -1435,7 +993,6 @@ def test_with_novelty(val_loader,
             if not isinstance(output, list):
                 output = [output]
 
-
             # TODO (novelty-rejection): torch cannot deal with label -1
             # if not args.test_with_novel:
             #     loss = 0.0
@@ -1444,15 +1001,12 @@ def test_with_novelty(val_loader,
             #
             #     losses.update(loss.item(), input.size(0))
 
-
-
             # TODO: getting evaluations??
             if args.test_with_novel:
                 pass
 
             else:
                 pass
-
 
         if args.save_probs == True:
             full_prob_list_np = np.array(full_prob_list)
@@ -1469,14 +1023,10 @@ def test_with_novelty(val_loader,
             print("Saving RTs to %s" % args.save_rt_path)
             np.save(args.save_rt_path, full_rt_list_np)
 
-
-
     for j in range(args.nBlocks):
         print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j], top5=top5[j]))
     # print(' * prec@1 {top1.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[-1], top5=top5[-1]))
     return losses.avg, top1[-1].avg, top5[-1].avg
-
-
 
 
 def save_checkpoint(state, args, is_best, filename, result):
@@ -1504,7 +1054,6 @@ def save_checkpoint(state, args, is_best, filename, result):
     return
 
 
-
 def load_checkpoint(args):
     model_dir = os.path.join(args.save, 'save_models')
     latest_filename = os.path.join(model_dir, 'latest.txt')
@@ -1517,9 +1066,6 @@ def load_checkpoint(args):
     state = torch.load(model_filename)
     logging.info("=> loaded checkpoint '{}'".format(model_filename))
     return state
-
-
-
 
 
 class AverageMeter(object):
@@ -1541,61 +1087,34 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-
-
 def accuracy(output, target, topk=(1,)):
-    """
-    Computes the precor@k for the specified values of k
-    :param output:
-    :param target:
-    :param topk:
-    :return:
-    """
-
+    """Computes the precor@k for the specified values of k"""
     maxk = max(topk)
     batch_size = target.size(0)
 
-    print("Here are the ground truth label")
-    print(target)
-
     _, pred = output.topk(maxk, 1, True, True)
-    print("Here is the pred in accuracy function")
-    # print(pred.shape) # torch.Size ==> [batch_size, nb_clfs]
-    print(pred)
+    # print("Here is the pred in accuracy function")
+    # print(pred.shape) # torch.Size([64, 5])
 
     pred = pred.t()
-
     try:
         correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-        print("Here is the output for correct:")
+        # print("Here is the output for correct:")
         # print(correct.shape) # torch.Size([5, 64])
-        print(correct)
-
-        # sys.exit(0)
 
         res = []
         for k in topk:
             correct_k = correct[:k].view(-1).float().sum(0)
             res.append(correct_k.mul_(100.0 / batch_size))
-
-        print("*" * 20)
-        print(res)
-        print("*" * 20)
         return res
 
     except:
-        print("Error occured in ")
         print(pred.shape)
         print(pred)
         print(target)
         # sys.exit(0)
         return [0.0, 0.0, 0.0]
-
-
-
-
-
 
 
 def adjust_learning_rate(optimizer, epoch, args, batch=None,
@@ -1618,11 +1137,10 @@ def adjust_learning_rate(optimizer, epoch, args, batch=None,
     return lr
 
 
-
-
 def take(n, iterable):
     "Return first n items of the iterable as a list"
     return list(islice(iterable, n))
+
 
 if __name__ == '__main__':
     main()
