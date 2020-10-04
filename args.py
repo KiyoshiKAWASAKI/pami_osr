@@ -10,6 +10,8 @@ arg_parser = argparse.ArgumentParser(
 
 exp_group = arg_parser.add_argument_group('exp', 'experiment setting')
 exp_group.add_argument('--test_with_novel', default=False, type=bool)
+exp_group.add_argument('--use_5_weights', default=False, type=bool)
+exp_group.add_argument('--use_pp_loss', default=False, type=bool)
 exp_group.add_argument('--save', default='save/default-{}'.format(time.time()),
                        type=str, metavar='SAVE',
                        help='path to the experiment logging directory'
@@ -21,7 +23,7 @@ exp_group.add_argument('--evalmode', default=None,
                        help='which mode to evaluate')
 exp_group.add_argument('--evaluate-from', default=None, type=str, metavar='PATH',
                        help='path to saved checkpoint (default: none)')
-exp_group.add_argument('--print-freq', '-p', default=20, type=int,
+exp_group.add_argument('--print-freq', '-p', default=10, type=int,
                        metavar='N', help='print frequency (default: 100)')
 exp_group.add_argument('--seed', default=0, type=int,
                        help='random seed')
@@ -46,6 +48,7 @@ data_group.add_argument('--data-root', metavar='DIR', default='data',
                         help='path to dataset (default: data)')
 data_group.add_argument('--test_folder_name', type=str, default="test")
 data_group.add_argument('--train_folder_name', type=str, default="train")
+data_group.add_argument('--tf_board_path', type=str)
 data_group.add_argument('--log_file_path', type=str)
 data_group.add_argument('--use-valid', action='store_true',
                         help='use validation set or not')

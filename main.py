@@ -32,7 +32,8 @@ from utils import customized_dataloader
 from utils.psyphy_loss import pp_loss
 import torchvision.transforms as transforms
 from itertools import cycle
-
+from torch.utils.tensorboard import SummaryWriter
+from torch.autograd import Variable
 
 
 args = arg_parser.parse_args()
@@ -52,17 +53,18 @@ args.nScales = len(args.grFactor)
 
 log_file_path = args.log_file_path
 
-# logging.basicConfig(filename=log_file_path,
-#                     level=logging.INFO,
-#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-#                     datefmt='%H:%M:%S')
-
-logging.basicConfig(stream=sys.stdout,
+logging.basicConfig(filename=log_file_path,
                     level=logging.INFO,
                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
                     datefmt='%H:%M:%S')
 
+# logging.basicConfig(stream=sys.stdout,
+#                     level=logging.INFO,
+#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+#                     datefmt='%H:%M:%S')
 
+# Define the TensorBoard
+writer = SummaryWriter(args.tf_board_path)
 
 
 class train_msdnet():
@@ -245,17 +247,17 @@ def main():
 
         if args.evalmode == 'anytime':
             # Test 3 diff categories separately
-            test_with_novelty(val_loader=test_known_known_loader,
-                              model=model,
-                              criterion=criterion)
+            test_with_novelty_pp(data_loader=test_known_known_loader,
+                                  model=model,
+                                  criterion=criterion)
 
-            test_with_novelty(val_loader=test_known_unknown_loader,
-                              model=model,
-                              criterion=criterion)
+            test_with_novelty_pp(data_loader=test_known_unknown_loader,
+                                  model=model,
+                                  criterion=criterion)
 
-            test_with_novelty(val_loader=test_unknown_unknown_loader,
-                              model=model,
-                              criterion=criterion)
+            test_with_novelty_pp(data_loader=test_unknown_unknown_loader,
+                                  model=model,
+                                  criterion=criterion)
 
         else:
             logging.info("Only supporting anytime prediction!")
@@ -287,8 +289,13 @@ def main():
                 Train the model on know_known first, no psyphy-loss applied, only use the simple factors
                 Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
             """
-            penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
-            penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+            if args.use_5_weights:
+                penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
+                penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+            else:
+                penalty_factors_for_known = [1.0, 1.0, 1.0, 1.0, 1.0]
+                penalty_factors_for_novel = [1.0, 1.0, 1.0, 1.0, 1.0]
+
 
             # combine the training process: train known_known and known_unknown at the same time
             train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
@@ -498,8 +505,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output_2[j] * penalty_factor
 
-                    scale_factor = get_pp_factor(rts[j])
-                    loss += scale_factor * criterion(output_weighted, unknown_target_var)
+                    if args.use_pp_loss:
+                        scale_factor = get_pp_factor(rts[j])
+                        loss += scale_factor * criterion(output_weighted, unknown_target_var)
+                    else:
+                        loss += criterion(output_weighted, unknown_target_var)
 
                 losses.update(loss.item(), unknown_input.size(0))
 
@@ -569,9 +579,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output_2[j] * penalty_factor
 
-                    scale_factor = get_pp_factor(rts[j])
-                    loss += scale_factor * criterion(output_weighted, unknown_target_var)
-
+                    if args.use_pp_loss:
+                        scale_factor = get_pp_factor(rts[j])
+                        loss += scale_factor * criterion(output_weighted, unknown_target_var)
+                    else:
+                        loss += criterion(output_weighted, unknown_target_var)
 
                 losses.update(loss.item(), unknown_input.size(0))
 
@@ -689,8 +701,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output_1[j] * penalty_factor
 
-                    scale_factor = rt_max - rts_1[j]
-                    loss += scale_factor * criterion(output_weighted, unknown_target_var_1)
+                    if args.use_pp_loss:
+                        scale_factor = rt_max - rts_1[j]
+                        loss += scale_factor * criterion(output_weighted, unknown_target_var_1)
+                    else:
+                        loss += criterion(output_weighted, unknown_target_var_1)
 
                 losses.update(loss.item(), unknown_input.size(0))
 
@@ -715,8 +730,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output_2[j] * penalty_factor
 
-                    scale_factor = rt_max - rts_2[j]
-                    loss += scale_factor * criterion(output_weighted, unknown_target_var_2)
+                    if args.use_pp_loss:
+                        scale_factor = rt_max - rts_2[j]
+                        loss += scale_factor * criterion(output_weighted, unknown_target_var_2)
+                    else:
+                        loss += criterion(output_weighted, unknown_target_var_2)
 
                 losses.update(loss.item(), unknown_input.size(0))
 
@@ -742,6 +760,10 @@ def train_early_exit_with_pp_loss(train_loader_known,
                 print("something is wrong...")
                 return
 
+            ###################################################
+            # BP
+            ###################################################
+
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
@@ -751,8 +773,26 @@ def train_early_exit_with_pp_loss(train_loader_known,
             batch_time.update(time.time() - end)
             end = time.time()
 
+
+
             # TODO: Issue for logging- log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
+                # TODO: Implement TensorBoard
+
+                print(losses.val)
+                print(top1[-1].val)
+                print(top3[-1].val)
+                print(top5[-1].val)
+
+                writer.add_scalar('training loss', losses.val, i)
+                writer.add_scalar('Acc top-1', top1[-1].val, i)
+                writer.add_scalar('Acc top-3', top3[-1].val, i)
+                writer.add_scalar('Acc top-5', top5[-1].val, i)
+
+
+                # Logging information and saving into txt
+                loss.register_hook(lambda grad: logging.info(grad))
+
                 logging.info('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.avg:.3f}\t'
                       'Data {data_time.avg:.3f}\t'
@@ -1181,9 +1221,9 @@ def validate_early_exit_with_pp_loss(val_known_loader,
 
 
 
-def test_with_novelty(data_loader,
-                      model,
-                      criterion):
+def test_with_novelty_pp(data_loader,
+                        model,
+                        criterion):
     """
     # TODO: Note on 0809 - currently saving everything and do post processing. Need to change in the future.
 
