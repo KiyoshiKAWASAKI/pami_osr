@@ -53,15 +53,15 @@ args.nScales = len(args.grFactor)
 
 log_file_path = args.log_file_path
 
-logging.basicConfig(filename=log_file_path,
-                    level=logging.INFO,
-                    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-                    datefmt='%H:%M:%S')
-
-# logging.basicConfig(stream=sys.stdout,
+# logging.basicConfig(filename=log_file_path,
 #                     level=logging.INFO,
 #                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
 #                     datefmt='%H:%M:%S')
+
+logging.basicConfig(stream=sys.stdout,
+                    level=logging.INFO,
+                    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+                    datefmt='%H:%M:%S')
 
 # Define the TensorBoard
 writer = SummaryWriter(args.tf_board_path)
@@ -175,12 +175,14 @@ def main():
                                                            batch_size=args.batch_size,
                                                            shuffle=False,
                                                            sampler=torch.utils.data.RandomSampler(train_known_known_index),
-                                                           collate_fn=customized_dataloader.collate)
+                                                           collate_fn=customized_dataloader.collate,
+                                                           drop_last=True)
     train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
                                                            batch_size=args.batch_size,
                                                            shuffle=False,
                                                            sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
-                                                           collate_fn=customized_dataloader.collate)
+                                                           collate_fn=customized_dataloader.collate,
+                                                           drop_last=True)
 
     # Validation loaders
     valid_known_known_dataset = msd_net_dataset(json_path=args.valid_known_known_path,
@@ -195,13 +197,15 @@ def main():
                                              batch_size=args.batch_size,
                                              shuffle=False,
                                              sampler=torch.utils.data.RandomSampler(valid_known_known_index),
-                                             collate_fn=customized_dataloader.collate)
+                                             collate_fn=customized_dataloader.collate,
+                                             drop_last=True)
 
     valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
                                              batch_size=args.batch_size,
                                              shuffle=False,
                                              sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
-                                             collate_fn=customized_dataloader.collate)
+                                             collate_fn=customized_dataloader.collate,
+                                             drop_last=True)
 
     # Test loaders
     test_known_known_dataset = msd_net_dataset(json_path=args.test_known_known_path,
@@ -221,19 +225,22 @@ def main():
                                              batch_size=1,
                                              shuffle=False,
                                              sampler=torch.utils.data.RandomSampler(test_known_known_index),
-                                             collate_fn=customized_dataloader.collate)
+                                             collate_fn=customized_dataloader.collate,
+                                             drop_last=True)
 
     test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
                                               batch_size=1,
                                               shuffle=False,
                                               sampler=torch.utils.data.RandomSampler(test_known_unknown_index),
-                                              collate_fn=customized_dataloader.collate)
+                                              collate_fn=customized_dataloader.collate,
+                                              drop_last=True)
 
     test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
                                             batch_size=1,
                                             shuffle=False,
                                             sampler=torch.utils.data.RandomSampler(test_unknown_unknown_index),
-                                            collate_fn=customized_dataloader.collate)
+                                            collate_fn=customized_dataloader.collate,
+                                            drop_last=True)
 
 
     ####################################################################
@@ -269,6 +276,18 @@ def main():
     ####################################################################
     # Do training and validation: known_known and known_unknown
     ####################################################################
+    # Get the step count: for logging tensor board
+    nb_known_batches = len(train_known_known_loader)
+    nb_unknown_batches = len(train_known_unknown_loader)
+
+    # Check which category has more samples/batches
+    if nb_known_batches >= nb_unknown_batches:
+        base_step = len(train_known_known_loader)
+    else:
+        base_step = len(train_known_unknown_loader)
+
+
+
     for epoch in range(args.start_epoch, args.epochs):
         # Adding the option for training k+1 classes
         if args.train_k_plus_1:
@@ -289,12 +308,16 @@ def main():
                 Train the model on know_known first, no psyphy-loss applied, only use the simple factors
                 Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
             """
-            if args.use_5_weights:
-                penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
-                penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
-            else:
-                penalty_factors_for_known = [1.0, 1.0, 1.0, 1.0, 1.0]
-                penalty_factors_for_novel = [1.0, 1.0, 1.0, 1.0, 1.0]
+            # if args.use_5_weights:
+            #     logging.info("using 5 weights")
+
+            penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
+            penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+            # else:
+            #     logging.info("")
+            #
+            #     penalty_factors_for_known = [1.0, 1.0, 1.0, 1.0, 1.0]
+            #     penalty_factors_for_novel = [1.0, 1.0, 1.0, 1.0, 1.0]
 
 
             # combine the training process: train known_known and known_unknown at the same time
@@ -305,7 +328,8 @@ def main():
                                                                                                   optimizer=optimizer,
                                                                                                   epoch=epoch,
                                                                                                   penalty_factors_known=penalty_factors_for_known,
-                                                                                                  penalty_factors_unknown=penalty_factors_for_novel)
+                                                                                                  penalty_factors_unknown=penalty_factors_for_novel,
+                                                                                                  base_step=base_step)
 
             val_loss, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(val_known_loader=valid_known_known_loader,
                                                                                          val_unknown_loader=valid_known_unknown_loader,
@@ -374,6 +398,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                                   epoch,
                                   penalty_factors_known,
                                   penalty_factors_unknown,
+                                  base_step,
                                   rt_max=20):
     """
 
@@ -477,8 +502,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     output_1 = [output_1]
 
                 for j in range(len(output_1)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output_1[j] * penalty_factor
+                    if args.use_5_weights:
+                        penalty_factor = penalty_factors_known[j]
+                        output_weighted = output_1[j] * penalty_factor
+                    else:
+                        output_weighted = output_1[j]
 
                     loss += criterion(output_weighted, known_target_var)
 
@@ -502,8 +530,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     output_2 = [output_2]
 
                 for j in range(len(output_2)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output_2[j] * penalty_factor
+                    if args.use_5_weights:
+                        penalty_factor = penalty_factors_unknown[j]
+                        output_weighted = output_2[j] * penalty_factor
+                    else:
+                        output_weighted = output_2[j]
 
                     if args.use_pp_loss:
                         scale_factor = get_pp_factor(rts[j])
@@ -774,24 +805,17 @@ def train_early_exit_with_pp_loss(train_loader_known,
             end = time.time()
 
 
-
-            # TODO: Issue for logging- log file is empty until whole training is done. Hard to check middle status.
+            # TODO: Issue for logging - log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
-                # TODO: Implement TensorBoard
-
-                print(losses.val)
-                print(top1[-1].val)
-                print(top3[-1].val)
-                print(top5[-1].val)
-
-                writer.add_scalar('training loss', losses.val, i)
-                writer.add_scalar('Acc top-1', top1[-1].val, i)
-                writer.add_scalar('Acc top-3', top3[-1].val, i)
-                writer.add_scalar('Acc top-5', top5[-1].val, i)
+                # Implement TensorBoard
+                writer.add_scalar('training loss', losses.val, i*epoch+base_step)
+                writer.add_scalar('Acc top-1', top1[-1].val, i*epoch+base_step)
+                writer.add_scalar('Acc top-3', top3[-1].val, i*epoch+base_step)
+                writer.add_scalar('Acc top-5', top5[-1].val, i*epoch+base_step)
 
 
                 # Logging information and saving into txt
-                loss.register_hook(lambda grad: logging.info(grad))
+                # loss.register_hook(lambda grad: logging.info(grad))
 
                 logging.info('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.avg:.3f}\t'
@@ -800,7 +824,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                       'Acc@1 {top1.val:.4f}\t'
                       'Acc@3 {top3.val:.4f}\t'
                       'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, nb_total_batches,
+                        epoch, i + 1, len(long_loader),
                         batch_time=batch_time, data_time=data_time,
                         loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
@@ -811,7 +835,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                               'Acc@1 {top1.val:.4f}\t'
                               'Acc@3 {top3.val:.4f}\t'
                               'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, nb_total_batches,
+                    epoch, i + 1, len(long_loader),
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 

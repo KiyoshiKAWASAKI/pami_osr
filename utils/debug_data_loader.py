@@ -8,7 +8,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # import os
-# import sys
+import sys
 # import math
 # import time
 # import shutil
@@ -34,8 +34,8 @@ import torchvision.transforms as transforms
 from customized_dataloader import msd_net_dataset
 import customized_dataloader
 
-train_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train.json"
-valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
+train_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known.json"
+valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown.json"
 
 
 
@@ -62,26 +62,27 @@ def test_data_loader(json_path,
     if check_data:
         print("Checking data...")
         data_loader = torch.utils.data.DataLoader(dataset,
-                                                   batch_size=32,
+                                                   batch_size=2,
                                                    shuffle=False,
                                                    collate_fn=customized_dataloader.collate)
 
     else:
         data_loader = torch.utils.data.DataLoader(dataset,
-                                                   batch_size=32,
+                                                   batch_size=2,
                                                    shuffle=False,
                                                    sampler=torch.utils.data.RandomSampler(set_index),
                                                    collate_fn=customized_dataloader.collate)
 
 
     for i, batch in enumerate(data_loader):
-        print(i)
+        print(batch)
+        sys.exit()
 
 
 
 if __name__ == '__main__':
     test_data_loader(json_path=train_json_path,
-                     check_data=True)
+                     check_data=False)
     # test_data_loader(json_path=valid_json_path,
     #                  check_data=True)
 

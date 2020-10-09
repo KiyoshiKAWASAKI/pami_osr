@@ -62,7 +62,9 @@ save_training_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/d
 save_valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/valid.json"
 save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test.json"
 
-
+# Debug json save path
+save_known_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known.json"
+save_unknown_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown.json"
 
 
 
@@ -835,6 +837,91 @@ def adjust_json_index(train_json_path,
         print("Saving file to %s" % valid_json_path)
 
 
+def gen_debug_jsons(train_known_known_json_path,
+                    train_known_unknown_json_path,
+                    save_known_path,
+                    save_unknown_path,
+                    count_known=5,
+                    count_unknown=1500):
+    """
+    Generate 2 small Jsons for debugging:
+        For known_known: Get 5 images from each class
+        For known_unknown: Get 500 images with RTs
+
+    :param train_known_known_json_path:
+    :param train_known_unknown_json_path:
+    :param save_known_path:
+    :param save_unknown_path:
+    :return:
+    """
+
+    with open(train_known_known_json_path) as f:
+        print(train_known_known_json_path)
+        known_known_json = json.load(f)
+
+    with open(train_known_unknown_json_path) as f:
+        print(train_known_unknown_json_path)
+        known_unknown_json = json.load(f)
+
+    print(len(known_known_json))
+    print(len(known_unknown_json))
+
+    # Creating a debug Json for known_known
+    known_known_dict = {}
+    label_count = 0
+    current_label = 1
+
+    print("Processing known_known Json")
+
+    for i in range(len(known_known_json)):
+        one_entry = known_known_json[str(i+1)]
+        label = one_entry["label"]
+
+        if label_count != count_known:
+            known_known_dict[len(known_known_dict)] = one_entry
+            label_count += 1
+
+        elif (label_count == count_known) and (label==current_label):
+            continue
+
+        elif (label_count == count_known) and (label != current_label):
+            label_count = 0
+            current_label += 1
+
+        else:
+            print("Something is wrong...")
+
+    print(len(known_known_dict))
+
+
+    with open(save_known_path, 'w') as f:
+        json.dump(known_known_dict, f)
+        print("Saving file to %s" % save_known_path)
+
+    # Creating a debug Json for known_unknown
+    known_unknown_dict = {}
+    count = 0
+
+    print("Processing known_unknown")
+
+    for i in range(len(known_unknown_json)):
+        one_entry = known_unknown_json[str(i+1)]
+
+        if count != count_unknown:
+            known_unknown_dict[len(known_unknown_dict)] = one_entry
+            count += 1
+
+        else:
+            break
+
+    print(len(known_unknown_dict))
+
+    with open(save_unknown_path, 'w') as f:
+        json.dump(known_unknown_dict, f)
+        print("Saving file to %s" % save_unknown_path)
+
+
+
 
 
 if __name__ == '__main__':
@@ -874,17 +961,21 @@ if __name__ == '__main__':
     #                     save_test_path=test_unknown_unknown_json_path)
 
 
-    combine_json(train_known_known_path=train_known_known_json_path,
-                 train_known_unknown_path=train_known_unknown_json_path,
-                 valid_known_known_path=valid_known_known_json_path,
-                 valid_known_unknown_path=valid_known_unknown_json_path,
-                 test_known_known_path=test_known_known_json_path,
-                 test_known_unknown_path=test_known_unknown_json_path,
-                 test_unknown_unknown_path=test_unknown_unknown_json_path,
-                 save_training_json_path=save_training_json_path,
-                 save_valid_json_path=save_valid_json_path,
-                 save_test_json_path=save_test_json_path)
+    # combine_json(train_known_known_path=train_known_known_json_path,
+    #              train_known_unknown_path=train_known_unknown_json_path,
+    #              valid_known_known_path=valid_known_known_json_path,
+    #              valid_known_unknown_path=valid_known_unknown_json_path,
+    #              test_known_known_path=test_known_known_json_path,
+    #              test_known_unknown_path=test_known_unknown_json_path,
+    #              test_unknown_unknown_path=test_unknown_unknown_json_path,
+    #              save_training_json_path=save_training_json_path,
+    #              save_valid_json_path=save_valid_json_path,
+    #              save_test_json_path=save_test_json_path)
+    #
+    # adjust_json_index(train_json_path=save_training_json_path,
+    #                   valid_json_path=save_valid_json_path)
 
-    adjust_json_index(train_json_path=save_training_json_path,
-                      valid_json_path=save_valid_json_path)
-
+    gen_debug_jsons(train_known_known_json_path=train_known_known_json_path,
+                    train_known_unknown_json_path=train_known_unknown_json_path,
+                    save_known_path=save_known_debug_path,
+                    save_unknown_path=save_unknown_debug_path)

@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu@@cvrl-titanxp -l gpu=1
-#$ -N cross_entropy_5_weights_sgd_0.1
+#$ -N cross_entropy_sgd_0.0005
 
 # Required modules
 module load conda
@@ -23,14 +23,14 @@ python -W ignore main.py --train_known_known_path /afs/crc.nd.edu/user/j/jhuang2
                            --batch-size 64 \
                            --use-valid \
                            --nb_training_classes 336 \
-                           --gpu 1 \
-                           --use_5_weights True \
+                           --gpu 3 \
+                           --use_5_weights False \
                            --use_pp_loss False \
-                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/0929_all/cross_entropy_5_weights_sgd_0.1 \
-                           --tf_board_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/0929_all/cross_entropy_5_weights_sgd_0.1/vis \
                            --optimizer sgd \
-                           --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/0929_all/cross_entropy_5_weights_sgd_0.1/record.log \
-                           --learning-rate 0.1 \
-                           --epochs 8
+                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1004_full_set_sgd_lr/0.0005 \
+                           --tf_board_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1004_full_set_sgd_lr/0.0005/tf \
+                           --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1004_full_set_sgd_lr/0.0005/info.log \
+                           --learning-rate 0.0005 \
+                           --epochs 10
 
 

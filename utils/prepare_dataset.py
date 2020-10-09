@@ -62,6 +62,29 @@ second_round_38_classes = [14, 15, 35, 38, 72, 77, 126, 128, 150, 151,
                             119, 255, 139, 140, 188, 196, 391, 392]
 
 
+def gen_label_match(first_round,
+                    second_round,
+                    nb_total_classes):
+    """
+
+    :param first_round:
+    :param second_round:
+    :param nb_total_classes:
+    :return:
+    """
+
+    all_labels = list(range(1, nb_total_classes+1))
+    print(all_labels)
+
+    all_unknown_labels = first_round + second_round
+
+    known_labels = [x for x in all_labels if x not in all_unknown_labels]
+    print(known_labels)
+
+    for i in range(1, len(known_labels)+1):
+        print(known_labels[i-1], i)
+
+
 
 def generate_csv(data_dir, csv_path):
     """
@@ -291,12 +314,12 @@ def generate_three_partitions(source_dir,
 
 
 if __name__ == "__main__":
-    generate_three_partitions(source_dir=original_413_path,
-                              target_dir=target_path,
-                              known_unknown_classes=first_round_40_classes,
-                              unknown_unknown_classes=second_round_38_classes,
-                              cp_unknown_unknown=True,
-                              make_debug_set=True)
+    # generate_three_partitions(source_dir=original_413_path,
+    #                           target_dir=target_path,
+    #                           known_unknown_classes=first_round_40_classes,
+    #                           unknown_unknown_classes=second_round_38_classes,
+    #                           cp_unknown_unknown=True,
+    #                           make_debug_set=True)
 
     # generate_sub_training_set(source_data_path=validation_data_path,
     #                           target_data_path=small_test_413_path,
@@ -315,3 +338,7 @@ if __name__ == "__main__":
     # Generate test csv
     # generate_csv(data_dir=test_data_path,
     #                        csv_path=test_csv_save_path)
+
+    gen_label_match(first_round=first_round_40_classes,
+                    second_round=second_round_38_classes,
+                    nb_total_classes=413)

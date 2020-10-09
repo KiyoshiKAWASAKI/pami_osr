@@ -56,12 +56,6 @@ def collate(batch):
 
             # TODO: Leave the scale factor alone for now
             if psych is not None:
-                # psych = (423)-psych
-                # if psych < 0:
-                #     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                #     print((psych))
-
-                # psychs.append((psych)*100000)
                 psychs.append(psych)
             else:
                 psychs.append(0)
@@ -70,6 +64,8 @@ def collate(batch):
         # line_imgs = torch.from_numpy(line_imgs)
         line_imgs = torch.from_numpy(input_batch)
         labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
+
+        # print(line_imgs.shape)
 
         return {"imgs": line_imgs,
                 "labels": labels,
@@ -105,6 +101,8 @@ class msd_net_dataset(Dataset):
     def __getitem__(self, idx):
         try:
             item = self.data[str(idx)]
+            # print("@" * 20)
+            # print(idx)
         except KeyError:
             item = self.data[str(idx+1)]
 
@@ -112,6 +110,8 @@ class msd_net_dataset(Dataset):
         img = Image.open(item["img_path"])
         img = img.convert('RGB')
         # print(img.size)
+        # print(item["img_path"])
+        # print(item["label"])
         try:
             img = self.transform(img)
 
