@@ -63,8 +63,8 @@ save_valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data
 save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/test.json"
 
 # Debug json save path
-save_known_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known.json"
-save_unknown_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown.json"
+save_known_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+save_unknown_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
 
 
 
@@ -841,8 +841,8 @@ def gen_debug_jsons(train_known_known_json_path,
                     train_known_unknown_json_path,
                     save_known_path,
                     save_unknown_path,
-                    count_known=5,
-                    count_unknown=1500):
+                    count_known=50,
+                    count_unknown=50):
     """
     Generate 2 small Jsons for debugging:
         For known_known: Get 5 images from each class

@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu@@cvrl-titanxp -l gpu=1
-#$ -N cross_entropy_sgd_0.0005
+#$ -N train_both_in_order_ce_sgd_0.1
 
 # Required modules
 module load conda

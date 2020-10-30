@@ -19,6 +19,7 @@ from adaptive_inference import dynamic_evaluate
 import models
 from op_counter import measure_model
 from itertools import islice
+import random
 
 import torch
 import torch.nn as nn
@@ -64,7 +65,7 @@ logging.basicConfig(stream=sys.stdout,
                     datefmt='%H:%M:%S')
 
 # Define the TensorBoard
-writer = SummaryWriter(args.tf_board_path)
+# writer = SummaryWriter(args.tf_board_path)
 
 
 class train_msdnet():
@@ -140,6 +141,8 @@ def main():
 
     cudnn.benchmark = True
 
+    # print(model.named_parameters())
+    # sys.exit()
 
     ####################################################################
     # Define data transformation
@@ -271,7 +274,13 @@ def main():
 
         return
 
-    scores = ['epoch\tlr\ttrain_loss\tval_loss\ttrain_prec1\tval_prec1\ttrain_prec3\tval_prec3\ttrain_prec5\tval_prec5']
+    scores = ['epoch\tlr\ttrain_loss\tval_loss\t'
+              'train_prec1_known\tval_prec1_known\t'
+              'train_prec3_known\tval_prec3_known\t'
+              'train_prec5_known\tval_prec5_known\t'
+              'train_prec1_unknown\tval_prec1_unknown\t'
+              'train_prec3_unknown\tval_prec3_unknown\t'
+              'train_prec5_unknown\tval_prec5_unknown\t']
 
     ####################################################################
     # Do training and validation: known_known and known_unknown
@@ -308,49 +317,86 @@ def main():
                 Train the model on know_known first, no psyphy-loss applied, only use the simple factors
                 Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
             """
-            # if args.use_5_weights:
-            #     logging.info("using 5 weights")
 
             penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
             penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
-            # else:
-            #     logging.info("")
-            #
-            #     penalty_factors_for_known = [1.0, 1.0, 1.0, 1.0, 1.0]
-            #     penalty_factors_for_novel = [1.0, 1.0, 1.0, 1.0, 1.0]
 
+            if args.train_in_order:
+                print("Training known and unknown batches in order")
 
-            # combine the training process: train known_known and known_unknown at the same time
-            train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
-                                                                                                  train_loader_unknown=train_known_unknown_loader,
-                                                                                                  model=model,
-                                                                                                  criterion=criterion,
-                                                                                                  optimizer=optimizer,
-                                                                                                  epoch=epoch,
-                                                                                                  penalty_factors_known=penalty_factors_for_known,
-                                                                                                  penalty_factors_unknown=penalty_factors_for_novel,
-                                                                                                  base_step=base_step)
+                train_loss, train_prec1_known, train_prec3_known, train_prec5_known, \
+                train_prec1_unknown, train_prec3_unknown, train_prec5_unknown, lr = train_known_unknown_in_order(train_loader_known=train_known_known_loader,
+                                                                                                     train_loader_unknown=train_known_unknown_loader,
+                                                                                                    model=model,
+                                                                                                    criterion=criterion,
+                                                                                                    optimizer=optimizer,
+                                                                                                    epoch=epoch,
+                                                                                                    penalty_factors_known=penalty_factors_for_known,
+                                                                                                    penalty_factors_unknown=penalty_factors_for_novel)
 
-            val_loss, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(val_known_loader=valid_known_known_loader,
-                                                                                         val_unknown_loader=valid_known_unknown_loader,
+                val_loss, val_prec1_known, val_prec3_known, val_prec5_known, \
+                val_prec1_unknown, val_prec3_unknown, val_prec5_unknown = valid_known_unknown_in_order(valid_loader_known=valid_known_known_loader,
+                                                                                         valid_loader_unknown=valid_known_unknown_loader,
                                                                                          model=model,
                                                                                          criterion=criterion,
                                                                                          penalty_factors_known=penalty_factors_for_known,
                                                                                          penalty_factors_unknown=penalty_factors_for_novel,
-                                                                                         epoch=epoch)
+                                                                                         epoch=epoch,
+                                                                                         base_step=base_step)
+
+            elif args.use_first_version:
+                train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
+                                                                                                      train_loader_unknown=train_known_unknown_loader,
+                                                                                                      model=model,
+                                                                                                      criterion=criterion,
+                                                                                                      optimizer=optimizer,
+                                                                                                      epoch=epoch,
+                                                                                                      penalty_factors_known=penalty_factors_for_known,
+                                                                                                      penalty_factors_unknown=penalty_factors_for_novel)
+
+                val_loss, val_prec1, val_prec3, val_prec5, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(val_known_loader=valid_known_known_loader,
+                                                                                             val_unknown_loader=valid_known_unknown_loader,
+                                                                                             model=model,
+                                                                                             criterion=criterion,
+                                                                                             penalty_factors_known=penalty_factors_for_known,
+                                                                                             penalty_factors_unknown=penalty_factors_for_novel)
+
+            elif args.train_known_only:
+                train_loss, train_prec1_known, train_prec3_known, train_prec5_known, \
+                train_prec1_unknown, train_prec3_unknown, train_prec5_unknown, lr = train_known_classes(train_loader_known=train_known_known_loader,
+                                                                                                        model=model,
+                                                                                                        criterion=criterion,
+                                                                                                        optimizer=optimizer,
+                                                                                                        epoch=epoch,
+                                                                                                        penalty_factors_known=penalty_factors_for_known)
+
+                val_loss, val_prec1_known, val_prec3_known, val_prec5_known, \
+                val_prec1_unknown, val_prec3_unknown, val_prec5_unknown = valid_known_classes(valid_loader_known=valid_known_known_loader,
+                                                                                            model=model,
+                                                                                            criterion=criterion,
+                                                                                            epoch=epoch,
+                                                                                            base_step=base_step)
 
 
-        ####################################################################
+            else:
+                pass
+
+
+
+        ###################################################################
         # Update and save the result
-        ####################################################################
-        scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 8).format(epoch, lr, train_loss, val_loss,
-                                                             train_prec1, val_prec1,
-                                                             train_prec3, val_prec3,
-                                                             train_prec5, val_prec5))
+        ###################################################################
+        scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 14).format(epoch, lr, train_loss, val_loss,
+                                                             train_prec1_known, val_prec1_known,
+                                                             train_prec3_known, val_prec3_known,
+                                                             train_prec5_known, val_prec5_known,
+                                                             train_prec1_unknown, val_prec1_unknown,
+                                                             train_prec3_unknown, val_prec3_unknown,
+                                                             train_prec5_unknown, val_prec5_unknown))
 
-        is_best = val_prec1 > best_prec1
+        is_best = val_prec1_known > best_prec1
         if is_best:
-            best_prec1 = val_prec1
+            best_prec1 = val_prec1_known
             best_epoch = epoch
             logging.info('Best var_prec1 {}'.format(best_prec1))
 
@@ -386,6 +432,839 @@ def get_pp_factor(rt,
         return 1
     else:
         return (scale*(rt_max-rt)/rt_max +1)
+
+
+
+
+
+
+
+def train_known_classes(train_loader_known,
+                      model,
+                      criterion,
+                      optimizer,
+                      epoch,
+                      penalty_factors_known,
+                      base_step):
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion_known:
+    :param criterion_unknown:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    # Initialize the accuracy for known and unknown respectively
+    top1_known, top3_known, top5_known = [], [], []
+    for i in range(args.nBlocks):
+        top1_known.append(AverageMeter())
+        top3_known.append(AverageMeter())
+        top5_known.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    running_lr = None
+
+    ###################################################
+    # training known data: no RT, just normal training
+    ###################################################
+    save_known_txt_path = os.path.join(args.save, "train_known_stats_epoch_" + str(epoch) + ".txt")
+
+    with open(save_known_txt_path, 'w') as train_f:
+        for i, batch in enumerate(train_loader_known):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader_known), method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            known_input = batch["imgs"]
+            known_target = batch["labels"] - 1
+
+            known_input_var = torch.autograd.Variable(known_input)
+            known_target = known_target.cuda(async=True)
+            known_target_var = torch.autograd.Variable(known_target).long()
+
+            output_1 = model(known_input_var)
+
+            if not isinstance(output_1, list):
+                output_1 = [output_1]
+
+            for j in range(len(output_1)):
+                if args.use_5_weights:
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
+                else:
+                    output_weighted = output_1[j]
+
+                loss += criterion(output_weighted, known_target_var)
+
+            losses.update(loss.item(), known_input.size(0))
+
+            ##########################################
+            # Evaluate model on known samples
+            ##########################################
+            for j in range(len(output_1)):
+                prec1_known, prec3_known, prec5_known = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                top1_known[j].update(prec1_known.item(), known_input.size(0))
+                top3_known[j].update(prec3_known.item(), known_input.size(0))
+                top5_known[j].update(prec5_known.item(), known_input.size(0))
+
+            ###################################################
+            # BP
+            ###################################################
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                             'Time {batch_time.avg:.3f}\t'
+                             'Data {data_time.avg:.3f}\t'
+                             'Loss {loss.val:.4f}\t'
+                             'Acc known@1 {top1.val:.4f}\t'
+                             'Acc known@3 {top3.val:.4f}\t'
+                             'Acc known@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_known),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc known@1 {top1.val:.4f}\t'
+                              'Acc known@3 {top3.val:.4f}\t'
+                              'Acc known@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_known),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+    top1_unknown = 0.0
+    top3_unknown = 0.0
+    top5_unknown = 0.0
+
+    return losses.avg, top1_known[-1].avg, top3_known[-1].avg, top5_known[-1].avg, \
+           top1_unknown, top3_unknown, top5_unknown, running_lr
+
+
+
+
+
+def valid_known_classes(valid_loader_known,
+                          model,
+                          criterion,
+                          epoch,
+                          penalty_factors_known,
+                          base_step):
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion_known:
+    :param criterion_unknown:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    running_lr = None
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(args.save, "valid_stats_epoch_" + str(epoch) + ".txt")
+
+    with torch.no_grad():
+        with open(save_txt_path, 'w') as train_f:
+            for i, batch in enumerate(valid_loader_known):
+                data_time.update(time.time() - end)
+
+                loss = 0.0
+
+                ###################################################
+                # training known data: no RT, just normal training
+                ###################################################
+                # print("Training the first batch")
+                known_input = batch["imgs"]
+                known_target = batch["labels"] - 1
+
+                known_input_var = torch.autograd.Variable(known_input)
+                known_target = known_target.cuda(async=True)
+                known_target_var = torch.autograd.Variable(known_target).long()
+
+                output_1 = model(known_input_var)
+
+                if not isinstance(output_1, list):
+                    output_1 = [output_1]
+
+                for j in range(len(output_1)):
+                    if args.use_5_weights:
+                        penalty_factor = penalty_factors_known[j]
+                        output_weighted = output_1[j] * penalty_factor
+                    else:
+                        output_weighted = output_1[j]
+
+                    loss += criterion(output_weighted, known_target_var)
+
+                losses.update(loss.item(), known_input.size(0))
+
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+
+                if i % args.print_freq == 0:
+                    # Implement TensorBoard
+                    # writer.add_scalar('validation loss', losses.val, i*epoch+base_step)
+                    # writer.add_scalar('valid acc top-1', top1[-1].val, i*epoch+base_step)
+                    # writer.add_scalar('valid acc top-3', top3[-1].val, i*epoch+base_step)
+                    # writer.add_scalar('valid acc top-5', top5[-1].val, i*epoch+base_step)
+
+                    logging.info('Epoch: [{0}][{1}/{2}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@3 {top3.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}\n'.format(
+                            epoch, i + 1, len(valid_loader_known),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                    train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                                  'Time {batch_time.avg:.3f}\t'
+                                  'Data {data_time.avg:.3f}\t'
+                                  'Loss {loss.val:.4f}\t'
+                                  'Acc@1 {top1.val:.4f}\t'
+                                  'Acc@3 {top3.val:.4f}\t'
+                                  'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(valid_loader_known),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    top1_unknown = 0.0
+    top3_unknown = 0.0
+    top5_unknown = 0.0
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, top1_unknown, top3_unknown, top5_unknown
+
+
+
+
+def train_known_unknown_switch(train_loader_known,
+                                train_loader_unknown,
+                                model,
+                                criterion,
+                                optimizer,
+                                epoch,
+                                penalty_factors_known,
+                                base_step):
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    running_lr = None
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(args.save, "train_stats_epoch_" + str(epoch) + ".txt")
+
+    # Count number of batches for known and unknown respectively
+    nb_known_batches = len(train_loader_known)
+    nb_unknown_batches = len(train_loader_unknown)
+
+    print("There are %d batches in known_known loader" % nb_known_batches)
+    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+
+    # Generate index for known and unknown and shuffle
+    all_indices = random.shuffle(list(range(nb_known_batches+nb_unknown_batches)))
+
+    known_indices = all_indices[:nb_known_batches]
+    unknown_indices = all_indices[nb_known_batches:]
+
+    print(known_indices)
+    print(unknown_indices)
+
+    #
+
+    with open(save_txt_path, 'w') as train_f:
+        for i, batch in enumerate(train_loader_known):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader_known), method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            ###################################################
+            # training known data: no RT, just normal training
+            ###################################################
+            # print("Training the first batch")
+            known_input = batch["imgs"]
+            known_target = batch["labels"] - 1
+
+            known_input_var = torch.autograd.Variable(known_input)
+            known_target = known_target.cuda(async=True)
+            known_target_var = torch.autograd.Variable(known_target).long()
+
+            output_1 = model(known_input_var)
+
+            if not isinstance(output_1, list):
+                output_1 = [output_1]
+
+            for j in range(len(output_1)):
+                if args.use_5_weights:
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
+                else:
+                    output_weighted = output_1[j]
+
+                loss += criterion(output_weighted, known_target_var)
+
+            losses.update(loss.item(), known_input.size(0))
+
+
+            ##########################################
+            # Evaluate model
+            ##########################################
+            for j in range(len(output_1)):
+                prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), known_input.size(0))
+                top3[j].update(prec3.item(), known_input.size(0))
+                top5[j].update(prec5.item(), known_input.size(0))
+
+            ###################################################
+            # BP
+            ###################################################
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+
+            if i % args.print_freq == 0:
+                # Implement TensorBoard
+                writer.add_scalar('training loss', losses.val, i*epoch+base_step)
+                writer.add_scalar('train acc top-1', top1[-1].val, i*epoch+base_step)
+                writer.add_scalar('train acc top-3', top3[-1].val, i*epoch+base_step)
+                writer.add_scalar('train acc top-5', top5[-1].val, i*epoch+base_step)
+
+                for name, param in model.named_parameters():
+                    if 'bn' not in name:
+                        writer.add_histogram(name, param, i*epoch+base_step)
+
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc@1 {top1.val:.4f}\t'
+                      'Acc@3 {top3.val:.4f}\t'
+                      'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader_known),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_known),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
+
+
+
+
+
+def train_known_unknown_in_order(train_loader_known,
+                                train_loader_unknown,
+                                model,
+                                criterion,
+                                optimizer,
+                                epoch,
+                                penalty_factors_known,
+                                penalty_factors_unknown):
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    # Initialize the accuracy for known and unknown respectively
+    top1_known, top3_known, top5_known = [], [], []
+    for i in range(args.nBlocks):
+        top1_known.append(AverageMeter())
+        top3_known.append(AverageMeter())
+        top5_known.append(AverageMeter())
+
+    top1_unknown, top3_unknown, top5_unknown = [], [], []
+    for i in range(args.nBlocks):
+        top1_unknown.append(AverageMeter())
+        top3_unknown.append(AverageMeter())
+        top5_unknown.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    running_lr = None
+
+
+    ###################################################
+    # training known data: no RT, just normal training
+    ###################################################
+    save_known_txt_path = os.path.join(args.save, "train_known_stats_epoch_" + str(epoch) + ".txt")
+
+    with open(save_known_txt_path, 'w') as train_f:
+        for i, batch in enumerate(train_loader_known):
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader_known), method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            known_input = batch["imgs"]
+            known_target = batch["labels"] - 1
+
+            known_input_var = torch.autograd.Variable(known_input)
+            known_target = known_target.cuda(async=True)
+            known_target_var = torch.autograd.Variable(known_target).long()
+
+            output_1 = model(known_input_var)
+
+            if not isinstance(output_1, list):
+                output_1 = [output_1]
+
+            for j in range(len(output_1)):
+                if args.use_5_weights:
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output_1[j] * penalty_factor
+                else:
+                    output_weighted = output_1[j]
+
+                loss += criterion(output_weighted, known_target_var)
+
+            losses.update(loss.item(), known_input.size(0))
+
+
+            ##########################################
+            # Evaluate model on known samples
+            ##########################################
+            for j in range(len(output_1)):
+                prec1_known, prec3_known, prec5_known = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                top1_known[j].update(prec1_known.item(), known_input.size(0))
+                top3_known[j].update(prec3_known.item(), known_input.size(0))
+                top5_known[j].update(prec5_known.item(), known_input.size(0))
+
+            ###################################################
+            # BP
+            ###################################################
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc known@1 {top1.val:.4f}\t'
+                      'Acc known@3 {top3.val:.4f}\t'
+                      'Acc known@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader_known),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc known@1 {top1.val:.4f}\t'
+                              'Acc known@3 {top3.val:.4f}\t'
+                              'Acc known@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_known),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+    ###################################################
+    # training unknown data: with RTs
+    ###################################################
+    save_unknown_txt_path = os.path.join(args.save, "train_unknown_stats_epoch_" + str(epoch) + ".txt")
+
+    with open(save_unknown_txt_path, 'w') as train_f:
+        for i, batch in enumerate(train_loader_unknown):
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            unknown_input = batch["imgs"]
+            unknown_target = batch["labels"] - 1
+            rts = batch["rts"]
+
+            unknown_input_var = torch.autograd.Variable(unknown_input)
+            unknown_target = unknown_target.cuda(async=True)
+            unknown_target_var = torch.autograd.Variable(unknown_target).long()
+
+            output_unknown = model(unknown_input_var)
+
+            if not isinstance(output_unknown, list):
+                output_unknown = [output_unknown]
+
+            for j in range(len(output_unknown)):
+                if args.use_5_weights:
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output_unknown[j] * penalty_factor
+                else:
+                    output_weighted = output_unknown[j]
+
+                if args.use_pp_loss:
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, unknown_target_var)
+                else:
+                    loss += criterion(output_weighted, unknown_target_var)
+
+                loss += criterion(output_weighted, unknown_target_var)
+
+            losses.update(loss.item(), unknown_input.size(0))
+
+            ##########################################
+            # Evaluate model
+            ##########################################
+            for j in range(len(output_unknown)):
+                prec1_unknown, prec3_unknown, prec5_unknown = accuracy(output_unknown[j].data, unknown_target_var, topk=(1, 3, 5))
+                top1_unknown[j].update(prec1_unknown.item(), unknown_input.size(0))
+                top3_unknown[j].update(prec3_unknown.item(), unknown_input.size(0))
+                top5_unknown[j].update(prec5_unknown.item(), unknown_input.size(0))
+
+            ###################################################
+            # BP
+            ###################################################
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                             'Time {batch_time.avg:.3f}\t'
+                             'Data {data_time.avg:.3f}\t'
+                             'Loss {loss.val:.4f}\t'
+                             'Acc unknown@1 {top1.val:.4f}\t'
+                             'Acc unknown@3 {top3.val:.4f}\t'
+                             'Acc unknown@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_unknown),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1_unknown[-1], top3=top3_unknown[-1], top5=top5_unknown[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_unknown),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1_unknown[-1], top3=top3_unknown[-1], top5=top5_unknown[-1]))
+
+    return losses.avg, top1_known[-1].avg, top3_known[-1].avg, top5_known[-1].avg, \
+           top1_unknown[-1].avg, top3_unknown[-1].avg, top5_unknown[-1].avg, running_lr
+
+
+
+
+def valid_known_unknown_in_order(valid_loader_known,
+                                 valid_loader_unknown,
+                                 model,
+                                 criterion,
+                                 epoch,
+                                 penalty_factors_known,
+                                 penalty_factors_unknown,
+                                 base_step):
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion_known:
+    :param criterion_unknown:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    # Initialize the accuracy for known and unknown respectively
+    top1_known, top3_known, top5_known = [], [], []
+    for i in range(args.nBlocks):
+        top1_known.append(AverageMeter())
+        top3_known.append(AverageMeter())
+        top5_known.append(AverageMeter())
+
+    top1_unknown, top3_unknown, top5_unknown = [], [], []
+    for i in range(args.nBlocks):
+        top1_unknown.append(AverageMeter())
+        top3_unknown.append(AverageMeter())
+        top5_unknown.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_known_txt_path = os.path.join(args.save, "valid_known_stats_epoch_" + str(epoch) + ".txt")
+
+    with torch.no_grad():
+        with open(save_known_txt_path, 'w') as valid_known_f:
+            for i, batch in enumerate(valid_loader_known):
+                data_time.update(time.time() - end)
+
+                loss = 0.0
+
+                ###################################################
+                # training known data: no RT, just normal training
+                ###################################################
+                # print("Training the first batch")
+                known_input = batch["imgs"]
+                known_target = batch["labels"] - 1
+
+                known_input_var = torch.autograd.Variable(known_input)
+                known_target = known_target.cuda(async=True)
+                known_target_var = torch.autograd.Variable(known_target).long()
+
+                output_1 = model(known_input_var)
+
+                if not isinstance(output_1, list):
+                    output_1 = [output_1]
+
+                for j in range(len(output_1)):
+                    if args.use_5_weights:
+                        penalty_factor = penalty_factors_known[j]
+                        output_weighted = output_1[j] * penalty_factor
+                    else:
+                        output_weighted = output_1[j]
+
+                    loss += criterion(output_weighted, known_target_var)
+
+                losses.update(loss.item(), known_input.size(0))
+
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_1)):
+                    prec1_known, prec3_known, prec5_known = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                    top1_known[j].update(prec1_known.item(), known_input.size(0))
+                    top3_known[j].update(prec3_known.item(), known_input.size(0))
+                    top5_known[j].update(prec5_known.item(), known_input.size(0))
+
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+
+                if i % args.print_freq == 0:
+
+                    logging.info('Epoch: [{0}][{1}/{2}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc known@1 {top1.val:.4f}\t'
+                          'Acc known@3 {top3.val:.4f}\t'
+                          'Acc known@5 {top5.val:.4f}\n'.format(
+                            epoch, i + 1, len(valid_loader_known),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+                    valid_known_f.write('Epoch: [{0}][{1}/{2}]\t'
+                                  'Time {batch_time.avg:.3f}\t'
+                                  'Data {data_time.avg:.3f}\t'
+                                  'Loss {loss.val:.4f}\t'
+                                  'Acc known@1 {top1.val:.4f}\t'
+                                  'Acc known@3 {top3.val:.4f}\t'
+                                  'Acc known@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(valid_loader_known),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1_known[-1], top3=top3_known[-1], top5=top5_known[-1]))
+
+
+    ###################################################
+    # validate unknown
+    ###################################################
+    with torch.no_grad():
+        save_unknown_txt_path = os.path.join(args.save, "valid_unknown_stats_epoch_" + str(epoch) + ".txt")
+
+        with open(save_unknown_txt_path, 'w') as valid_unknown_f:
+            for i, batch in enumerate(valid_loader_unknown):
+                data_time.update(time.time() - end)
+
+                loss = 0.0
+
+                unknown_input = batch["imgs"]
+                unknown_target = batch["labels"] - 1
+                rts = batch["rts"]
+
+                unknown_input_var = torch.autograd.Variable(unknown_input)
+                unknown_target = unknown_target.cuda(async=True)
+                unknown_target_var = torch.autograd.Variable(unknown_target).long()
+
+                output_unknown = model(unknown_input_var)
+
+                if not isinstance(output_unknown, list):
+                    output_unknown = [output_unknown]
+
+                for j in range(len(output_unknown)):
+                    if args.use_5_weights:
+                        penalty_factor = penalty_factors_unknown[j]
+                        output_weighted = output_unknown[j] * penalty_factor
+                    else:
+                        output_weighted = output_unknown[j]
+
+                    if args.use_pp_loss:
+                        scale_factor = get_pp_factor(rts[j])
+                        loss += scale_factor * criterion(output_weighted, unknown_target_var)
+                    else:
+                        loss += criterion(output_weighted, unknown_target_var)
+
+                    loss += criterion(output_weighted, unknown_target_var)
+
+                losses.update(loss.item(), unknown_input.size(0))
+
+                ##########################################
+                # Evaluate model
+                ##########################################
+                for j in range(len(output_unknown)):
+                    prec1_unknown, prec3_unknown, prec5_unknown = accuracy(output_unknown[j].data, unknown_target_var, topk=(1, 3, 5))
+                    top1_unknown[j].update(prec1_unknown.item(), unknown_input.size(0))
+                    top3_unknown[j].update(prec3_unknown.item(), unknown_input.size(0))
+                    top5_unknown[j].update(prec5_unknown.item(), unknown_input.size(0))
+
+                    # measure elapsed time
+                    batch_time.update(time.time() - end)
+                    end = time.time()
+
+                    if i % args.print_freq == 0:
+                        logging.info('Epoch: [{0}][{1}/{2}]\t'
+                                     'Time {batch_time.avg:.3f}\t'
+                                     'Data {data_time.avg:.3f}\t'
+                                     'Loss {loss.val:.4f}\t'
+                                     'Acc unknown@1 {top1.val:.4f}\t'
+                                     'Acc unknown@3 {top3.val:.4f}\t'
+                                     'Acc unknown@5 {top5.val:.4f}\n'.format(
+                            epoch, i + 1, len(valid_loader_known),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1_unknown[-1], top3=top3_unknown[-1], top5=top5_unknown[-1]))
+
+                        valid_unknown_f.write('Epoch: [{0}][{1}/{2}]\t'
+                                      'Time {batch_time.avg:.3f}\t'
+                                      'Data {data_time.avg:.3f}\t'
+                                      'Loss {loss.val:.4f}\t'
+                                      'Acc unknown@1 {top1.val:.4f}\t'
+                                      'Acc unknown@3 {top3.val:.4f}\t'
+                                      'Acc unknown@5 {top5.val:.4f}\n'.format(
+                            epoch, i + 1, len(valid_loader_known),
+                            batch_time=batch_time, data_time=data_time,
+                            loss=losses, top1=top1_unknown[-1], top3=top3_unknown[-1], top5=top5_unknown[-1]))
+
+    return losses.avg, top1_known[-1].avg, top3_known[-1].avg, top5_known[-1].avg,\
+           top1_unknown[-1].avg, top3_unknown[-1].avg, top5_unknown[-1].avg
+
 
 
 
@@ -434,10 +1313,6 @@ def train_early_exit_with_pp_loss(train_loader_known,
     ###################################################
     # training process setup...
     ###################################################
-    # # Setup diff files for training known and unknown
-    # if train_unknown == False:
-    #     save_txt_path = os.path.join(args.save, "train_known_stats_epoch_" + str(epoch) + ".txt")
-    # else:
     save_txt_path = os.path.join(args.save, "train_stats_epoch_" + str(epoch) + ".txt")
 
     nb_known_batches = len(train_loader_known)
@@ -477,9 +1352,6 @@ def train_early_exit_with_pp_loss(train_loader_known,
             cate_1 = batch_1["category"]
             cate_2 = batch_2["category"]
 
-            # print(cate_1)
-            # print(cate_2)
-
             # TODO: Case 1: one batch from known_known, another batch from known_unknown
             if cate_1 == "known_known" and cate_2 == "known_unknown":
                 # print("case 1-1")
@@ -511,6 +1383,18 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     loss += criterion(output_weighted, known_target_var)
 
                 losses.update(loss.item(), known_input.size(0))
+
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                for j in range(len(output_1)):
+                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
+                    top1[j].update(prec1.item(), known_input.size(0))
+                    top3[j].update(prec3.item(), known_input.size(0))
+                    top5[j].update(prec5.item(), known_input.size(0))
+
 
                 ###################################################
                 # Training unknown data: with RT + pp-loss
@@ -544,14 +1428,11 @@ def train_early_exit_with_pp_loss(train_loader_known,
 
                 losses.update(loss.item(), unknown_input.size(0))
 
-                ##########################################
-                # Evaluate model
-                ##########################################
-                for j in range(len(output_1)):
-                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), known_input.size(0))
-                    top3[j].update(prec3.item(), known_input.size(0))
-                    top5[j].update(prec5.item(), known_input.size(0))
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
 
                 for j in range(len(output_2)):
                     prec1, prec3, prec5 = accuracy(output_2[j].data, unknown_target_var, topk=(1, 3, 5))
@@ -559,274 +1440,25 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     top3[j].update(prec3.item(), unknown_input.size(0))
                     top5[j].update(prec5.item(), unknown_input.size(0))
 
-
-            elif cate_2 == "known_known" and cate_1 == "known_unknown":
-                # print("case 1-2")
-                loss = 0.0
-                ###################################################
-                # training known data: no RT, just normal training
-                ###################################################
-                # print("Training the first batch")
-                known_input = batch_2["imgs"]
-                known_target = batch_2["labels"] - 1
-
-                known_input_var = torch.autograd.Variable(known_input)
-                known_target = known_target.cuda(async=True)
-                known_target_var = torch.autograd.Variable(known_target).long()
-
-                output_1 = model(known_input_var)
-                # print(len(output_1))
-
-                if not isinstance(output_1, list):
-                    output_1 = [output_1]
-
-                for j in range(len(output_1)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output_1[j] * penalty_factor
-
-                    loss += criterion(output_weighted, known_target_var)
-
-                losses.update(loss.item(), known_input.size(0))
-
-                ###################################################
-                # Training unknown data: with RT + pp-loss
-                ###################################################
-                # print("Training the second batch")
-                unknown_input = batch_1["imgs"]
-                unknown_target = batch_1["labels"] - 1
-                rts = batch_1["rts"]
-
-                unknown_input_var = torch.autograd.Variable(unknown_input)
-                unknown_target = unknown_target.cuda(async=True)
-                unknown_target_var = torch.autograd.Variable(unknown_target).long()
-
-                output_2 = model(unknown_input_var)
-                # print(len(output_2))
-
-                if not isinstance(output_2, list):
-                    output_2 = [output_2]
-
-                for j in range(len(output_2)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output_2[j] * penalty_factor
-
-                    if args.use_pp_loss:
-                        scale_factor = get_pp_factor(rts[j])
-                        loss += scale_factor * criterion(output_weighted, unknown_target_var)
-                    else:
-                        loss += criterion(output_weighted, unknown_target_var)
-
-                losses.update(loss.item(), unknown_input.size(0))
-
-                ##########################################
-                # Evaluate model
-                ##########################################
-                for j in range(len(output_1)):
-                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), known_input.size(0))
-                    top3[j].update(prec3.item(), known_input.size(0))
-                    top5[j].update(prec5.item(), known_input.size(0))
-
-                for j in range(len(output_2)):
-                    prec1, prec3, prec5 = accuracy(output_2[j].data, unknown_target_var, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), unknown_input.size(0))
-                    top3[j].update(prec3.item(), unknown_input.size(0))
-                    top5[j].update(prec5.item(), unknown_input.size(0))
-
-
-
-            # TODO: Case 2: both batches from known_known
-            elif cate_1 == "known_known" and cate_2 == "known_known":
-                # print("case 2")
-                loss = 0.0
-
-                ###################################################
-                # Training the first known batch
-                ###################################################
-                # print("Training the first batch")
-                known_input_1 = batch_1["imgs"]
-                known_target_1 = batch_1["labels"] - 1
-
-                known_input_var_1 = torch.autograd.Variable(known_input_1)
-                known_target_1 = known_target_1.cuda(async=True)
-                known_target_var_1 = torch.autograd.Variable(known_target_1).long()
-
-                output_1 = model(known_input_var_1)
-
-                if not isinstance(output_1, list):
-                    output_1 = [output_1]
-
-                for j in range(len(output_1)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output_1[j] * penalty_factor
-
-                    loss += criterion(output_weighted, known_target_var_1)
-
-                losses.update(loss.item(), known_input_1.size(0))
-
-                ###################################################
-                # Training the 2nd known batch
-                ###################################################
-                # print("Training the second batch")
-                known_input_2 = batch_2["imgs"]
-                known_target_2 = batch_2["labels"] - 1
-
-                known_input_var_2 = torch.autograd.Variable(known_input_2)
-                known_target_2 = known_target_2.cuda(async=True)
-                known_target_var_2 = torch.autograd.Variable(known_target_2).long()
-
-                output_2 = model(known_input_var_2)
-
-                if not isinstance(output_2, list):
-                    output_2 = [output_2]
-
-                for j in range(len(output_2)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output_2[j] * penalty_factor
-
-                    loss += criterion(output_weighted, known_target_var_2)
-
-                losses.update(loss.item(), known_input_2.size(0))
-
-                ##########################################
-                # Evaluate model
-                ##########################################
-                # try:
-                for j in range(len(output_1)):
-                    prec1, prec3, prec5 = accuracy(output_1[j].data, known_target_var_1, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), known_input_1.size(0))
-                    top3[j].update(prec3.item(), known_input_1.size(0))
-                    top5[j].update(prec5.item(), known_input_1.size(0))
-
-                for j in range(len(output_2)):
-                    prec1, prec3, prec5 = accuracy(output_2[j].data, known_target_var_2, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), known_input_2.size(0))
-                    top3[j].update(prec3.item(), known_input_2.size(0))
-                    top5[j].update(prec5.item(), known_input_2.size(0))
-
-
-
-            # TODO: Case 3: both batches from known_unknown
-            elif cate_1 == "known_unknown" and cate_2 == "known_unknown":
-                # print("case 3")
-                loss = 0.0
-
-                ###################################################
-                # training the 1st batch of unknown
-                ###################################################
-                # print("Training the first batch")
-                unknown_input_1 = batch_1["imgs"]
-                unknown_target_1 = batch_1["labels"] - 1
-                rts_1 = batch_1["rts"]
-
-                unknown_input_var_1 = torch.autograd.Variable(unknown_input_1)
-                unknown_target_1 = unknown_target_1.cuda(async=True)
-                unknown_target_var_1 = torch.autograd.Variable(unknown_target_1).long()
-
-                output_1 = model(unknown_input_var_1)
-
-                if not isinstance(output_1, list):
-                    output_1 = [output_1]
-
-                for j in range(len(output_1)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output_1[j] * penalty_factor
-
-                    if args.use_pp_loss:
-                        scale_factor = rt_max - rts_1[j]
-                        loss += scale_factor * criterion(output_weighted, unknown_target_var_1)
-                    else:
-                        loss += criterion(output_weighted, unknown_target_var_1)
-
-                losses.update(loss.item(), unknown_input.size(0))
-
-                ###################################################
-                # training the 2nd batch of unknown
-                ###################################################
-                # print("Training the second batch")
-                unknown_input_2 = batch_2["imgs"]
-                unknown_target_2 = batch_2["labels"] - 1
-                rts_2 = batch_2["rts"]
-
-                unknown_input_var_2 = torch.autograd.Variable(unknown_input_2)
-                unknown_target_2 = unknown_target_2.cuda(async=True)
-                unknown_target_var_2 = torch.autograd.Variable(unknown_target_2).long()
-
-                output_2 = model(unknown_input_var_2)
-
-                if not isinstance(output_2, list):
-                    output_2 = [output_2]
-
-                for j in range(len(output_2)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output_2[j] * penalty_factor
-
-                    if args.use_pp_loss:
-                        scale_factor = rt_max - rts_2[j]
-                        loss += scale_factor * criterion(output_weighted, unknown_target_var_2)
-                    else:
-                        loss += criterion(output_weighted, unknown_target_var_2)
-
-                losses.update(loss.item(), unknown_input.size(0))
-
-                ##########################################
-                # Evaluate model
-                ##########################################
-                for j in range(len(output_1)):
-                    prec1, prec3, prec5 = accuracy(output_1[j].data, unknown_target_var_1, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), unknown_input_1.size(0))
-                    top3[j].update(prec3.item(), unknown_input_1.size(0))
-                    top5[j].update(prec5.item(), unknown_input_1.size(0))
-
-                for j in range(len(output_2)):
-                    prec1, prec3, prec5 = accuracy(output_2[j].data, unknown_target_var_2, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), unknown_input_2.size(0))
-                    top3[j].update(prec3.item(), unknown_input_2.size(0))
-                    top5[j].update(prec5.item(), unknown_input_2.size(0))
-
-
-
-            # TODO: Case 4: something is wrong...
             else:
                 print("something is wrong...")
                 return
-
-            ###################################################
-            # BP
-            ###################################################
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
-
-            # TODO: Issue for logging - log file is empty until whole training is done. Hard to check middle status.
             if i % args.print_freq == 0:
-                # Implement TensorBoard
-                writer.add_scalar('training loss', losses.val, i*epoch+base_step)
-                writer.add_scalar('Acc top-1', top1[-1].val, i*epoch+base_step)
-                writer.add_scalar('Acc top-3', top3[-1].val, i*epoch+base_step)
-                writer.add_scalar('Acc top-5', top5[-1].val, i*epoch+base_step)
-
-
-                # Logging information and saving into txt
-                # loss.register_hook(lambda grad: logging.info(grad))
-
                 logging.info('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(long_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                             'Time {batch_time.avg:.3f}\t'
+                             'Data {data_time.avg:.3f}\t'
+                             'Loss {loss.val:.4f}\t'
+                             'Acc@1 {top1.val:.4f}\t'
+                             'Acc@3 {top3.val:.4f}\t'
+                             'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(long_loader),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                 train_f.write('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
@@ -838,6 +1470,7 @@ def train_early_exit_with_pp_loss(train_loader_known,
                     epoch, i + 1, len(long_loader),
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
 
@@ -1414,405 +2047,6 @@ def test_with_novelty_pp(data_loader,
 ############################################################
 # END
 ############################################################
-
-
-def train_early_exit_loss(train_loader,
-                          model,
-                          criterion,
-                          optimizer,
-                          epoch,
-                          penalty_factors,
-                          strategy,
-                          nb_known_classes=325,
-                          nb_known_unknown_classes=44,
-                          nb_unknown_classes=44):
-    """
-    Modify how the loss is calculated:
-    assign smaller penalties to earlier exits, and larger penalties to later exits.
-
-    :param train_loader:
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param epoch:
-    :return:
-    """
-
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-
-    # TODO: Update the evaluation metrics to top-1, top-3 and top-5
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    # switch to train mode
-    model.train()
-
-    running_lr = None
-
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
-
-            if running_lr is None:
-                running_lr = lr
-
-            input_var = torch.autograd.Variable(input)
-
-            if strategy == "simple":
-                # Implement the simple weighted loss strategy
-                # by multiplying n weights to n exits respectively
-
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-
-                # Just add the penalty factors here
-                for j in range(len(output)):
-                    # print(output[j].shape) # Shape: [batch, nb_classes]
-                    # Assign different weights to the losses
-                    penalty_factor = penalty_factors[j]
-                    output_weighted = output[j] * penalty_factor
-
-                    loss += criterion(output_weighted, target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-            # TODO: Implement the complex strategies
-            elif strategy == "complex":
-                target = target.cuda(async=True)
-                target_var = torch.autograd.Variable(target)
-
-                output = model(input_var)
-
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # TODO: Fully utilize logger instead of writing to txt
-            # TODO: Issue - log file is empty until whole training is done. Hard to check middle status.
-            if i % args.print_freq == 0:
-                logging.info('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
-                              'Time {batch_time.avg:.3f}\t'
-                              'Data {data_time.avg:.3f}\t'
-                              'Loss {loss.val:.4f}\t'
-                              'Acc@1 {top1.val:.4f}\t'
-                              'Acc@3 {top3.val:.4f}\t'
-                              'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, len(train_loader),
-                    batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
-
-
-
-
-def train_k_plus_one(train_loader, model, criterion, optimizer, epoch):
-    """
-    Training k known classes and all other classes as +1 unknown class.
-
-    :param train_loader:
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param epoch:
-    :return:
-    """
-
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-
-    # Update the evaluation metrics to top-1, top-3 and top-5
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.train()
-
-    end = time.time()
-
-    running_lr = None
-
-    with open(os.path.join(args.save, "training_stats_epoch_" + str(epoch) + ".txt"), 'w') as train_f:
-        for i, (input, target) in enumerate(train_loader):
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
-                                      nBatch=len(train_loader), method=args.lr_type)
-
-            if running_lr is None:
-                running_lr = lr
-
-            data_time.update(time.time() - end)
-
-            target = target.cuda(async=True)
-
-            # Check the labels, change the label if it belongs to "unknown"
-            # Be reminded that the label generated by data loader starts from 0
-            for k in range(len(target)):
-                if target[k] >= args.nb_training_classes - 1:
-                    target[k] = args.nb_training_classes - 1
-
-            input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
-
-            output = model(input_var)
-            if not isinstance(output, list):
-                output = [output]
-
-            loss = 0.0
-            for j in range(len(output)):
-                loss += criterion(output[j], target_var)
-
-            losses.update(loss.item(), input.size(0))
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.avg:.3f}\t'
-                      'Data {data_time.avg:.3f}\t'
-                      'Loss {loss.val:.4f}\t'
-                      'Acc@1 {top1.val:.4f}\t'
-                      'Acc@3 {top3.val:.4f}\t'
-                      'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(train_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
-
-
-
-
-
-def validate_k_plus_one(val_loader, model, criterion, epoch):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
-            for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
-                input = input.cuda()
-
-                # Check the labels, change the label if it belongs to "unknown"
-                # Be reminded that the label generated by data loader starts from 0
-                for k in range(len(target)):
-                    if target[k] >= args.nb_training_classes - 1:
-                        target[k] = args.nb_training_classes - 1
-
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
-
-                data_time.update(time.time() - end)
-
-                output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-                for j in range(len(output)):
-                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), input.size(0))
-                    top3[j].update(prec3.item(), input.size(0))
-                    top5[j].update(prec5.item(), input.size(0))
-
-                # measure elapsed time
-                batch_time.update(time.time() - end)
-                end = time.time()
-
-                if i % args.print_freq == 0:
-                    print('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top1.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top3=top3[-1],top5=top5[-1]))
-
-                    valid_f.write('Epoch: [{0}][{1}/{2}]\t'
-                                  'Time {batch_time.avg:.3f}\t'
-                                  'Data {data_time.avg:.3f}\t'
-                                  'Loss {loss.val:.4f}\t'
-                                  'Acc@1 {top1.val:.4f}\t'
-                                  'Acc@3 {top3.val:.4f}\t'
-                                  'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(val_loader),
-                        batch_time=batch_time, data_time=data_time,
-                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-
-        for j in range(args.nBlocks):
-            print(' * prec@1 {top1.avg:.3f} prec@3 {top3.avg:.3f} prec@5 {top5.avg:.3f}'.format(top1=top1[j],
-                                                                                                top3=top3[j],
-                                                                                            top5=top5[j]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
-
-
-
-
-def validate(val_loader, model, criterion, epoch=None):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    data_time = AverageMeter()
-
-    top1, top3, top5 = [], [], []
-    for i in range(args.nBlocks):
-        top1.append(AverageMeter())
-        top3.append(AverageMeter())
-        top5.append(AverageMeter())
-
-    model.eval()
-
-    end = time.time()
-    with torch.no_grad():
-        with open(os.path.join(args.save, "validation_stats_epoch_" + str(epoch) + ".txt"), 'w') as valid_f:
-            for i, (input, target) in enumerate(val_loader):
-                target = target.cuda(async=True)
-                input = input.cuda()
-
-                input_var = torch.autograd.Variable(input)
-                target_var = torch.autograd.Variable(target)
-
-                data_time.update(time.time() - end)
-
-                output = model(input_var)
-                if not isinstance(output, list):
-                    output = [output]
-
-                loss = 0.0
-                for j in range(len(output)):
-                    loss += criterion(output[j], target_var)
-
-                losses.update(loss.item(), input.size(0))
-
-                for j in range(len(output)):
-                    prec1, prec3, prec5 = accuracy(output[j].data, target, topk=(1, 3, 5))
-                    top1[j].update(prec1.item(), input.size(0))
-                    top3[j].update(prec1.item(), input.size(0))
-                    top5[j].update(prec5.item(), input.size(0))
-
-                # measure elapsed time
-                batch_time.update(time.time() - end)
-                end = time.time()
-
-                if i % args.print_freq == 0:
-                    logging.info('Epoch: [{0}/{1}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top3.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}'.format(
-                            i + 1, len(val_loader),
-                            batch_time=batch_time, data_time=data_time,
-                            loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-                    valid_f.write('Epoch: [{0}][{1}/{2}]\t'
-                                  'Time {batch_time.avg:.3f}\t'
-                                  'Data {data_time.avg:.3f}\t'
-                                  'Loss {loss.val:.4f}\t'
-                                  'Acc@1 {top1.val:.4f}\t'
-                                  'Acc@3 {top3.val:.4f}\t'
-                                  'Acc@5 {top5.val:.4f}\n'.format(
-                        epoch, i + 1, len(val_loader),
-                        batch_time=batch_time, data_time=data_time,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-    for j in range(args.nBlocks):
-        logging.info(' * Validation accuracy: top-1:{top1.avg:.3f} top-3:{top3.avg:.3f} top-5:{top5.avg:.3f}'.format(top1=top1[j], top3=top3[j], top5=top5[j]))
-
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
-
-
-
-
 def test_with_novelty(val_loader,
                       model,
                       criterion):
@@ -2063,28 +2297,16 @@ def accuracy(output, target, topk=(1,)):
     try:
         correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-        # print("Here is the output for correct:")
-        # # print(correct.shape) # torch.Size([5, 64])
-        # print(correct)
-
-        # sys.exit(0)
 
         res = []
         for k in topk:
             correct_k = correct[:k].view(-1).float().sum(0)
             res.append(correct_k.mul_(100.0 / batch_size))
 
-        # print("*" * 20)
-        # print(res)
-        # print("*" * 20)
         return res
 
     except:
         print("Error occured ")
-        # print(pred.shape)
-        # print(pred)
-        # print(target)
-        # sys.exit(0)
         return [0.0, 0.0, 0.0]
 
 

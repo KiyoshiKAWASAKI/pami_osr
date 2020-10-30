@@ -9,7 +9,10 @@ arg_parser = argparse.ArgumentParser(
                 description='Image classification PK main script')
 
 exp_group = arg_parser.add_argument_group('exp', 'experiment setting')
+exp_group.add_argument('--use_first_version', type=bool)
+exp_group.add_argument('--train_known_only', default=False, type=bool)
 exp_group.add_argument('--test_with_novel', default=False, type=bool)
+exp_group.add_argument('--train_in_order', type=bool)
 exp_group.add_argument('--use_5_weights', default=False, type=bool)
 exp_group.add_argument('--use_pp_loss', default=False, type=bool)
 exp_group.add_argument('--save', default='save/default-{}'.format(time.time()),
