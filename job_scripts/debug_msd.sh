@@ -2,8 +2,8 @@
 
 #$ -M jhuang24@nd.edu
 #$ -m abe
-#$ -q gpu@@cvrl-titanxp -l gpu=1
-#$ -N debug_known_unknown_50_xp
+#$ -q gpu -l gpu=1
+#$ -N gen_debug_known_unknown_50_switch
 
 # Required modules
 module load conda
@@ -23,15 +23,10 @@ python -W ignore main.py --train_known_known_path /afs/crc.nd.edu/user/j/jhuang2
                            --batch-size 32 \
                            --use-valid \
                            --nb_training_classes 336 \
-                           --gpu 3 \
-                           --use_5_weights False \
-                           --use_pp_loss False \
-                           --train_known_only False \
-                           --train_in_order False \
-                           --use_first_version True \
-                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1025/debug_known_unknown_50 \
+                           --switch_batch True \
+                           --save /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1025/debug_known_unknown_50_switch_batch \
                            --optimizer sgd \
-                           --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1025/debug_known_unknown_50 \
+                           --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1025/debug_known_unknown_50_switch_batch \
                            --learning-rate 0.1 \
                            --epochs 50 \
                            --print-freq 1
