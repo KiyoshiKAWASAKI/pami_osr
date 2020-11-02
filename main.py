@@ -40,11 +40,6 @@ from torch.autograd import Variable
 args = arg_parser.parse_args()
 torch.manual_seed(args.seed)
 
-# TODO: Use a small json file for debugging first
-debugging_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
-
-
-
 if args.gpu:
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
@@ -64,14 +59,9 @@ logging.basicConfig(stream=sys.stdout,
                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
                     datefmt='%H:%M:%S')
 
-# Define the TensorBoard
-# writer = SummaryWriter(args.tf_board_path)
 
-use_5_weights = False
+use_5_weights = True
 use_pp_loss = False
-train_known_only = False
-train_in_order = False
-use_first_version = False
 
 
 class train_msdnet():
@@ -262,31 +252,14 @@ def main():
         model.load_state_dict(state_dict)
 
         if args.evalmode == 'anytime':
-            # Test 3 diff categories separately
-            test_with_novelty_pp(data_loader=test_known_known_loader,
-                                  model=model,
-                                  criterion=criterion)
-
-            test_with_novelty_pp(data_loader=test_known_unknown_loader,
-                                  model=model,
-                                  criterion=criterion)
-
-            test_with_novelty_pp(data_loader=test_unknown_unknown_loader,
-                                  model=model,
-                                  criterion=criterion)
+            # TODO: add test process
+            pass
 
         else:
             logging.info("Only supporting anytime prediction!")
 
         return
 
-    # scores = ['epoch\tlr\ttrain_loss\tval_loss\t'
-    #           'train_prec1_known\tval_prec1_known\t'
-    #           'train_prec3_known\tval_prec3_known\t'
-    #           'train_prec5_known\tval_prec5_known\t'
-    #           'train_prec1_unknown\tval_prec1_unknown\t'
-    #           'train_prec3_unknown\tval_prec3_unknown\t'
-    #           'train_prec5_unknown\tval_prec5_unknown\t']
     scores = ['epoch\tlr\ttrain_loss\tval_loss\t'
               'train_prec1\tval_prec1\t'
               'train_prec3\tval_prec3\t'
@@ -295,27 +268,9 @@ def main():
     ####################################################################
     # Do training and validation: known_known and known_unknown
     ####################################################################
-    # Get the step count: for logging tensor board
-    # nb_known_batches = len(train_known_known_loader)
-    # nb_unknown_batches = len(train_known_unknown_loader)
-
-    # Check which category has more samples/batches
-    # if nb_known_batches >= nb_unknown_batches:
-    #     base_step = len(train_known_known_loader)
-    # else:
-    #     base_step = len(train_known_unknown_loader)
-
-
     for epoch in range(args.start_epoch, args.epochs):
-        # Adding the option for training k+1 classes
-        if args.train_k_plus_1:
-            return
-            # logging.info("Training MSD-Net on K+1 classes.")
-            # train_loss, train_prec1, train_prec3, train_prec5, lr = train_k_plus_one(train_loader, model, criterion, optimizer, epoch)
-            # val_loss, val_prec1, val_prec3, val_prec5 = validate_k_plus_one(val_loader, model, criterion, epoch)
-
         # Adding the option for training early exits using diff penalties.
-        elif args.train_early_exit:
+        if args.train_early_exit:
             logging.info("Training with weighted loss for different classes.")
             """
             Define the penalty factors here:
@@ -330,96 +285,40 @@ def main():
             penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
             penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
-            # if args.train_in_order:
-            #     print("Training known and unknown batches in order")
-            #     pass
-
-                # train_loss, train_prec1_known, train_prec3_known, train_prec5_known, \
-                # train_prec1_unknown, train_prec3_unknown, train_prec5_unknown, lr = train_known_unknown_in_order(train_loader_known=train_known_known_loader,
-                #                                                                                      train_loader_unknown=train_known_unknown_loader,
-                #                                                                                     model=model,
-                #                                                                                     criterion=criterion,
-                #                                                                                     optimizer=optimizer,
-                #                                                                                     epoch=epoch,
-                #                                                                                     penalty_factors_known=penalty_factors_for_known,
-                #                                                                                     penalty_factors_unknown=penalty_factors_for_novel)
-                #
-                # val_loss, val_prec1_known, val_prec3_known, val_prec5_known, \
-                # val_prec1_unknown, val_prec3_unknown, val_prec5_unknown = valid_known_unknown_in_order(valid_loader_known=valid_known_known_loader,
-                #                                                                          valid_loader_unknown=valid_known_unknown_loader,
-                #                                                                          model=model,
-                #                                                                          criterion=criterion,
-                #                                                                          penalty_factors_known=penalty_factors_for_known,
-                #                                                                          penalty_factors_unknown=penalty_factors_for_novel,
-                #                                                                          epoch=epoch,
-                #                                                                          base_step=base_step)
-
-            # if args.use_first_version:
-            #     pass
-                # train_loss, train_prec1, train_prec3, train_prec5, lr = train_early_exit_with_pp_loss(train_loader_known=train_known_known_loader,
-                #                                                                                       train_loader_unknown=train_known_unknown_loader,
-                #                                                                                       model=model,
-                #                                                                                       criterion=criterion,
-                #                                                                                       optimizer=optimizer,
-                #                                                                                       epoch=epoch,
-                #                                                                                       penalty_factors_known=penalty_factors_for_known,
-                #                                                                                       penalty_factors_unknown=penalty_factors_for_novel)
-                #
-                # val_loss, val_prec1, val_prec3, val_prec5, val_prec1, val_prec3, val_prec5 = validate_early_exit_with_pp_loss(val_known_loader=valid_known_known_loader,
-                #                                                                              val_unknown_loader=valid_known_unknown_loader,
-                #                                                                              model=model,
-                #                                                                              criterion=criterion,
-                #                                                                              penalty_factors_known=penalty_factors_for_known,
-                #                                                                              penalty_factors_unknown=penalty_factors_for_novel)
 
             if args.switch_batch:
                 print("Using the latest training strategy.")
-                train_loss, train_prec1, train_prec3, train_prec5, lr = train_known_unknown_switch(train_loader_known=train_known_known_loader,
-                                                                                                   train_loader_unknown=train_known_unknown_loader,
-                                                                                                    model=model,
-                                                                                                    criterion=criterion,
-                                                                                                    optimizer=optimizer,
-                                                                                                    epoch=epoch,
-                                                                                                    penalty_factors_known=penalty_factors_for_known,
-                                                                                                   penalty_factors_unknown=penalty_factors_for_novel)
 
-                val_loss = 0.0
-                val_prec1 = 0.0
-                val_prec3 = 0.0
-                val_prec5 = 0.0
+                train_loss, train_prec1, \
+                train_prec3, train_prec5, \
+                lr = train_known_unknown_switch(train_loader_known=train_known_known_loader,
+                                               train_loader_unknown=train_known_unknown_loader,
+                                                model=model,
+                                                criterion=criterion,
+                                                optimizer=optimizer,
+                                                epoch=epoch,
+                                                penalty_factors_known=penalty_factors_for_known,
+                                               penalty_factors_unknown=penalty_factors_for_novel)
 
-            # elif args.train_known_only:
-            #     train_loss, train_prec1_known, train_prec3_known, train_prec5_known, \
-            #     train_prec1_unknown, train_prec3_unknown, train_prec5_unknown, lr = train_known_classes(train_loader_known=train_known_known_loader,
-            #                                                                                             model=model,
-            #                                                                                             criterion=criterion,
-            #                                                                                             optimizer=optimizer,
-            #                                                                                             epoch=epoch,
-            #                                                                                             penalty_factors_known=penalty_factors_for_known)
-            #
-            #     val_loss, val_prec1_known, val_prec3_known, val_prec5_known, \
-            #     val_prec1_unknown, val_prec3_unknown, val_prec5_unknown = valid_known_classes(valid_loader_known=valid_known_known_loader,
-            #                                                                                 model=model,
-            #                                                                                 criterion=criterion,
-            #                                                                                 epoch=epoch,
-            #                                                                                 base_step=base_step)
+                val_loss, val_prec1, \
+                val_prec3, val_prec5 = validate_known_unknown_switch(valid_loader_known=valid_known_known_loader,
+                                                                        valid_loader_unknown=valid_known_unknown_loader,
+                                                                        model=model,
+                                                                        criterion=criterion,
+                                                                        epoch=epoch,
+                                                                        penalty_factors_known=penalty_factors_for_known,
+                                                                        penalty_factors_unknown=penalty_factors_for_novel)
 
 
-            else:
-                pass
+
+        else:
+            pass
 
 
 
         ###################################################################
         # Update and save the result
         ###################################################################
-        # scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 14).format(epoch, lr, train_loss, val_loss,
-        #                                                      train_prec1_known, val_prec1_known,
-        #                                                      train_prec3_known, val_prec3_known,
-        #                                                      train_prec5_known, val_prec5_known,
-        #                                                      train_prec1_unknown, val_prec1_unknown,
-        #                                                      train_prec3_unknown, val_prec3_unknown,
-        #                                                      train_prec5_unknown, val_prec5_unknown))
         scores.append(('{}\t{:.3f}' + '\t{:.4f}' * 8).format(epoch, lr, train_loss, val_loss,
                                                               train_prec1, val_prec1,
                                                               train_prec3, val_prec3,
@@ -446,7 +345,7 @@ def main():
 
 
 ############################################################
-# Use these 2 for training and validation from 09/15
+# Use these 2 for training and validation from 11/01
 ############################################################
 def get_pp_factor(rt,
                   scale=1,
@@ -660,6 +559,189 @@ def train_known_unknown_switch(train_loader_known,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
+
+
+
+
+
+def validate_known_unknown_switch(valid_loader_known,
+                                  valid_loader_unknown,
+                                  model,
+                                  criterion,
+                                  epoch,
+                                  penalty_factors_known,
+                                  penalty_factors_unknown):
+
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.eval()
+    end = time.time()
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(args.save, "valid_stats_epoch_" + str(epoch) + ".txt")
+
+    # Count number of batches for known and unknown respectively
+    nb_known_batches = len(valid_loader_known)
+    nb_unknown_batches = len(valid_loader_unknown)
+    nb_total_batches = nb_known_batches + nb_unknown_batches
+
+    print("There are %d batches in known_known loader" % nb_known_batches)
+    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+
+    # Generate index for known and unknown and shuffle
+    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
+    print(all_indices)
+
+    known_indices = all_indices[:nb_known_batches]
+    print(known_indices)
+
+    unknown_indices = all_indices[nb_known_batches:]
+    print(unknown_indices)
+
+    # Create iterator
+    known_iter = iter(valid_loader_known)
+    unknown_iter = iter(valid_loader_unknown)
+
+    # Only train one batch for each step
+    with open(save_txt_path, 'w') as f:
+        for i in range(nb_total_batches):
+            ##########################################
+            # Basic setups
+            ##########################################
+            data_time.update(time.time() - end)
+            loss = 0.0
+
+            ##########################################
+            # Get a batch
+            ##########################################
+            if i in known_indices:
+                print("This is a known batch")
+                batch = next(known_iter)
+                batch_type = "known"
+
+            elif i in unknown_indices:
+                print("This is an unknown batch.")
+                batch = next(unknown_iter)
+                batch_type = "unknown"
+
+            input = batch["imgs"]
+            target = batch["labels"] - 1
+            rts = batch["rts"]
+
+            input_var = torch.autograd.Variable(input)
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            output = model(input_var)
+
+            if not isinstance(output, list):
+                output = [output]
+
+            # Case 1: known batch + 5 weights
+            if (batch_type == "known") and (use_5_weights == True):
+                print("Case 1")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 2: known batch + no 5 weights
+            if (batch_type == "known") and (use_5_weights == False):
+                print("Case 2")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 3: unknown batch + no 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
+                print("Case 3")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 4: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
+                print("Case 4")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 5: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
+                print("Case 5")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, target_var)
+
+
+            ##########################################
+            # Calculate loss
+            ##########################################
+            losses.update(loss.item(), input.size(0))
+
+            for j in range(len(output)):
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, nb_total_batches,
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                f.write('Epoch: [{0}][{1}/{2}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@3 {top3.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, nb_total_batches,
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
 
 
 

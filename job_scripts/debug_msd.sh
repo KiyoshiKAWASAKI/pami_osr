@@ -28,5 +28,5 @@ python -W ignore main.py --train_known_known_path /afs/crc.nd.edu/user/j/jhuang2
                            --optimizer sgd \
                            --log_file_path /afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/3_part_pp_loss/1025/debug_known_unknown_50_switch_batch \
                            --learning-rate 0.1 \
-                           --epochs 50 \
+                           --epochs 70 \
                            --print-freq 1
