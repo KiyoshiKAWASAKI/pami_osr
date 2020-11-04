@@ -137,9 +137,6 @@ def main():
 
     cudnn.benchmark = True
 
-    # print(model.named_parameters())
-    # sys.exit()
-
     ####################################################################
     # Define data transformation
     ####################################################################
