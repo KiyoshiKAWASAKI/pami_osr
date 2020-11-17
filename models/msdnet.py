@@ -206,12 +206,12 @@ class ClassifierModule(nn.Module):
         return self.linear(res)
 
 class MSDNet(nn.Module):
-    def __init__(self, args, nb_blocks):
+    def __init__(self, args):
         # print("Initializing the model.")
         super(MSDNet, self).__init__()
         self.blocks = nn.ModuleList()
         self.classifier = nn.ModuleList()
-        self.nBlocks = nb_blocks
+        self.nBlocks = args.nBlocks
         self.nb_training_classes = args.nb_training_classes
         self.steps = [args.base]
         self.args = args

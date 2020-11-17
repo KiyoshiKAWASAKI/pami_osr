@@ -34,6 +34,8 @@ from utils.psyphy_loss import pp_loss
 import torchvision.transforms as transforms
 from itertools import cycle
 import torchvision.models as torch_model
+import densenet
+from models import efficient_dense_net
 
 args = arg_parser.parse_args()
 torch.manual_seed(args.seed)
@@ -62,6 +64,7 @@ logging.basicConfig(stream=sys.stdout,
 
 
 using_pp_loss = False
+train_known_only = False
 
 
 def main():
@@ -74,7 +77,20 @@ def main():
     if not os.path.exists(args.save):
         os.makedirs(args.save)
 
-    model = torch_model.densenet121()
+    # Build-in Densenet
+    # model = torch_model.densenet121()
+
+    # Another pytorch implementation DenseNet
+    # model = densenet.DenseNet(growthRate=12,
+    #                           depth=100,
+    #                           reduction=0.5,
+    #                           bottleneck=True,
+    #                           nClasses=335)
+
+
+    # A time efficient DenseNet implementation
+    model = efficient_dense_net.DenseNet(num_classes=args.nb_training_classes)
+
     model = torch.nn.DataParallel(model).cuda()
 
     ####################################################################
@@ -234,25 +250,37 @@ def main():
     # Do training and validation: known_known and known_unknown
     ####################################################################
     for epoch in range(args.start_epoch, args.epochs):
+        if train_known_only:
+            print("Training known samples only")
+            train_loss, train_prec1, \
+            train_prec3, train_prec5, lr = train_known(train_loader_known=train_known_known_loader,
+                                                       model=model,
+                                                       criterion=criterion,
+                                                       optimizer=optimizer,
+                                                       epoch=epoch)
 
-        # penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
-        # penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+            val_loss = 0.0
+            val_prec1 = 0.0
+            val_prec3 = 0.0
+            val_prec5 = 0.0
 
-        # Combine the training process: train known_known and known_unknown at the same time
-        train_loss, train_prec1, \
-        train_prec3, train_prec5, lr = train_dense_net(train_loader_known=train_known_known_loader,
-                                                    train_loader_unknown=train_known_unknown_loader,
-                                                    model=model,
-                                                    criterion=criterion,
-                                                    optimizer=optimizer,
-                                                    epoch=epoch)
 
-        val_loss, val_prec1, \
-        val_prec3, val_prec5 = validate_dense_net(valid_loader_known=valid_known_known_loader,
-                                                  valid_loader_unknown=valid_known_unknown_loader,
-                                                  model=model,
-                                                  criterion=criterion,
-                                                  epoch=epoch)
+        else:
+            # Combine the training process: train known_known and known_unknown at the same time
+            train_loss, train_prec1, \
+            train_prec3, train_prec5, lr = train_dense_net(train_loader_known=train_known_known_loader,
+                                                        train_loader_unknown=train_known_unknown_loader,
+                                                        model=model,
+                                                        criterion=criterion,
+                                                        optimizer=optimizer,
+                                                        epoch=epoch)
+
+            val_loss, val_prec1, \
+            val_prec3, val_prec5 = validate_dense_net(valid_loader_known=valid_known_known_loader,
+                                                      valid_loader_unknown=valid_known_unknown_loader,
+                                                      model=model,
+                                                      criterion=criterion,
+                                                      epoch=epoch)
 
         ####################################################################
         # Update and save the result
@@ -299,6 +327,133 @@ def get_pp_factor(rt,
         return 1
     else:
         return (scale * (rt_max - rt) / rt_max + 1)
+
+
+
+
+def train_known(train_loader_known,
+                model,
+                criterion,
+                optimizer,
+                epoch):
+
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param epoch:
+    :return:
+    """
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    for i in range(args.nBlocks):
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+    model.train()
+    end = time.time()
+
+    running_lr = None
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(args.save, "train_stats_epoch_" + str(epoch) + ".txt")
+
+    # Only train one batch for each step
+    with open(save_txt_path, 'w') as train_f:
+        for i, batch in enumerate(train_loader_known):
+            ##########################################
+            # Basic setups
+            ##########################################
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=len(train_loader_known), method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            ##########################################
+            # Get a batch
+            ##########################################
+            input = batch["imgs"]
+            target = batch["labels"] - 1
+
+            input_var = torch.autograd.Variable(input)
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            output = model(input_var)
+
+            if not isinstance(output, list):
+                output = [output]
+
+            # print(len(output[0]))
+            # print(torch.argmax(output[0]))
+            # print(target)
+
+
+            for j in range(len(output)):
+                output_weighted = output[j]
+                loss += criterion(output_weighted, target_var)
+
+            ##########################################
+            # Calculate loss and BP
+            ##########################################
+            losses.update(loss.item(), input.size(0))
+
+            for j in range(len(output)):
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
+
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                logging.info('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.avg:.3f}\t'
+                      'Data {data_time.avg:.3f}\t'
+                      'Loss {loss.val:.4f}\t'
+                      'Acc@1 {top1.val:.4f}\t'
+                      'Acc@3 {top3.val:.4f}\t'
+                      'Acc@5 {top5.val:.4f}\n'.format(
+                        epoch, i + 1, len(train_loader_known),
+                        batch_time=batch_time, data_time=data_time,
+                        loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, len(train_loader_known),
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, running_lr
 
 
 
@@ -354,13 +509,13 @@ def train_dense_net(train_loader_known,
 
     # Generate index for known and unknown and shuffle
     all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
-    print(all_indices)
+    # print(all_indices)
 
     known_indices = all_indices[:nb_known_batches]
-    print(known_indices)
+    # print(known_indices)
 
     unknown_indices = all_indices[nb_known_batches:]
-    print(unknown_indices)
+    # print(unknown_indices)
 
     # Create iterator
     known_iter = iter(train_loader_known)
@@ -385,12 +540,12 @@ def train_dense_net(train_loader_known,
             # Get a batch
             ##########################################
             if i in known_indices:
-                print("This is a known batch")
+                # print("This is a known batch")
                 batch = next(known_iter)
                 batch_type = "known"
 
             elif i in unknown_indices:
-                print("This is an unknown batch.")
+                # print("This is an unknown batch.")
                 batch = next(unknown_iter)
                 batch_type = "unknown"
 
@@ -401,29 +556,31 @@ def train_dense_net(train_loader_known,
             input_var = torch.autograd.Variable(input)
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
+            # print(target_var)
 
             output = model(input_var)
 
             if not isinstance(output, list):
                 output = [output]
 
+
             # Case 1: known batch
             if (batch_type == "known"):
-                print("Case 1")
+                # print("Case 1")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 2: unknown batch + no pp loss
             elif (batch_type == "unknown") and (using_pp_loss == False):
-                print("Case 2")
+                # print("Case 2")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 4: unknown batch + pp loss
             elif (batch_type == "unknown") and (using_pp_loss == True):
-                print("Case 3")
+                # print("Case 3")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     scale_factor = get_pp_factor(rts[j])
@@ -530,13 +687,13 @@ def validate_dense_net(valid_loader_known,
 
     # Generate index for known and unknown and shuffle
     all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
-    print(all_indices)
+    # print(all_indices)
 
     known_indices = all_indices[:nb_known_batches]
-    print(known_indices)
+    # print(known_indices)
 
     unknown_indices = all_indices[nb_known_batches:]
-    print(unknown_indices)
+    # print(unknown_indices)
 
     # Create iterator
     known_iter = iter(valid_loader_known)
@@ -579,21 +736,21 @@ def validate_dense_net(valid_loader_known,
 
             # Case 1: known batch + 5 weights
             if (batch_type == "known"):
-                print("Case 1")
+                # print("Case 1")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 2: unknown batch + no pp loss
             if (batch_type == "unknown") and (using_pp_loss == False):
-                print("Case 2")
+                # print("Case 2")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 4: unknown batch + pp loss
             if (batch_type == "unknown") and (using_pp_loss == True):
-                print("Case 3")
+                # print("Case 3")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     scale_factor = get_pp_factor(rts[j])
@@ -869,11 +1026,14 @@ def accuracy(output, target, topk=(1,)):
 
     _, pred = output.topk(maxk, 1, True, True)
     # print("Here is the pred in accuracy function")
-    # print(pred.shape) # torch.Size([64, 5])
+    # print(pred.shape) # torch.Size([, 5])
+    # print(pred)
 
     pred = pred.t()
     try:
         correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        # print(correct)
 
         # print("Here is the output for correct:")
         # print(correct.shape) # torch.Size([5, 64])

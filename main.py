@@ -61,7 +61,7 @@ logging.basicConfig(stream=sys.stdout,
 
 
 use_5_weights = True
-use_pp_loss = False
+use_pp_loss = True
 
 
 class train_msdnet():
@@ -110,7 +110,7 @@ def main():
     if not os.path.exists(args.save):
         os.makedirs(args.save)
 
-    model = getattr(models, args.arch)(args, nb_blocks=5)
+    model = getattr(models, args.arch)(args)
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
@@ -266,51 +266,42 @@ def main():
     # Do training and validation: known_known and known_unknown
     ####################################################################
     for epoch in range(args.start_epoch, args.epochs):
-        # Adding the option for training early exits using diff penalties.
-        if args.train_early_exit:
-            logging.info("Training with weighted loss for different classes.")
-            """
-            Define the penalty factors here:
-                For known samples:
-                For unknown samples: came from the data distribution for RT
-                
-            Training strategy:
-                Train the model on know_known first, no psyphy-loss applied, only use the simple factors
-                Then train the model on known_unknown, use the factor from the distribution and psyphy-loss
-            """
+        logging.info("Training with weighted loss for different classes.")
 
-            penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
-            penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+        # This set does not work
+        # penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
 
+        # Setup 1
+        # penalty_factors_for_known = [0.1, 0.5, 1.0, 1.5, 2.0]
 
-            if args.switch_batch:
-                print("Using the latest training strategy.")
+        # Setup 2
+        # penalty_factors_for_known = [1.0, 3.0, 5.0, 7.0, 10.0]
 
-                train_loss, train_prec1, \
-                train_prec3, train_prec5, \
-                lr = train_known_unknown_switch(train_loader_known=train_known_known_loader,
-                                               train_loader_unknown=train_known_unknown_loader,
-                                                model=model,
-                                                criterion=criterion,
-                                                optimizer=optimizer,
-                                                epoch=epoch,
-                                                penalty_factors_known=penalty_factors_for_known,
-                                               penalty_factors_unknown=penalty_factors_for_novel)
+        # Setup 3
+        penalty_factors_for_known = [1.0, 25.0, 50.0, 75.0, 100.0]
 
-                val_loss, val_prec1, \
-                val_prec3, val_prec5 = validate_known_unknown_switch(valid_loader_known=valid_known_known_loader,
-                                                                        valid_loader_unknown=valid_known_unknown_loader,
-                                                                        model=model,
-                                                                        criterion=criterion,
-                                                                        epoch=epoch,
-                                                                        penalty_factors_known=penalty_factors_for_known,
-                                                                        penalty_factors_unknown=penalty_factors_for_novel)
+        penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
+        print("Using the latest training strategy.")
+        train_loss, train_prec1, \
+        train_prec3, train_prec5, \
+        lr = train_known_unknown_switch(train_loader_known=train_known_known_loader,
+                                       train_loader_unknown=train_known_unknown_loader,
+                                        model=model,
+                                        criterion=criterion,
+                                        optimizer=optimizer,
+                                        epoch=epoch,
+                                        penalty_factors_known=penalty_factors_for_known,
+                                        penalty_factors_unknown=penalty_factors_for_novel)
 
-
-        else:
-            pass
-
+        val_loss, val_prec1, \
+        val_prec3, val_prec5 = validate_known_unknown_switch(valid_loader_known=valid_known_known_loader,
+                                                                valid_loader_unknown=valid_known_unknown_loader,
+                                                                model=model,
+                                                                criterion=criterion,
+                                                                epoch=epoch,
+                                                                penalty_factors_known=penalty_factors_for_known,
+                                                                penalty_factors_unknown=penalty_factors_for_novel)
 
 
         ###################################################################
@@ -472,10 +463,13 @@ def train_known_unknown_switch(train_loader_known,
             if not isinstance(output, list):
                 output = [output]
 
+            # print(len(output[0]))
+
             # Case 1: known batch + 5 weights
             if (batch_type == "known") and (use_5_weights == True):
                 print("Case 1")
                 for j in range(len(output)):
+                    print(output[j])
                     penalty_factor = penalty_factors_known[j]
                     output_weighted = output[j] * penalty_factor
                     loss += criterion(output_weighted, target_var)

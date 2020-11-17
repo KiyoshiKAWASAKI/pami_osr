@@ -79,7 +79,7 @@ arch_group.add_argument('--save_rt_path', default=None, type=str)
 
 # msdnet config
 arch_group.add_argument('--nb_training_classes', type=int)
-arch_group.add_argument('--nBlocks', type=int, default=5)
+arch_group.add_argument('--nBlocks','--nb_blocks', type=int, default=5)
 arch_group.add_argument('--nChannels', type=int, default=32)
 arch_group.add_argument('--base', type=int,default=4)
 arch_group.add_argument('--stepmode', type=str, default='even', choices=['even', 'lin_grow'])
