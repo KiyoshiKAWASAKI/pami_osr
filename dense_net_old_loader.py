@@ -17,6 +17,14 @@ import models
 from op_counter import measure_model
 import densenet
 
+import torch
+import torch.nn as nn
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torch.optim
+import torchvision.models as torch_model
+from models import efficient_dense_net
+
 args = arg_parser.parse_args()
 
 if args.gpu:
@@ -38,12 +46,6 @@ elif args.data == 'cifar100':
 else:
     args.num_classes = 1000
 
-import torch
-import torch.nn as nn
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim
-import torchvision.models as torch_model
 
 torch.manual_seed(args.seed)
 
@@ -63,17 +65,15 @@ def main():
     # model = getattr(models, args.arch)(args)
     # print("Using MSD Net")
 
-    model = densenet.DenseNet(growthRate=12, depth=100, reduction=0.5,
-                            bottleneck=True, nClasses=10)
+    print("Using efficient denseNet")
+    # model = efficient_dense_net.DenseNet(num_classes=args.nb_training_classes)
 
-    # model = torch_model.densenet121()
-    # print("Using dense net")
+    # model = torch_model.densenet121(pretrained=True)
+    model = torch_model.resnet50(pretrained=True)
+    # model = torch_model.alexnet(pretrained=True)
+    # model = torch_model.vgg16(pretrained=True)
+    # model = torch_model.inception_v3(pretrained=True)
 
-    # n_flops, n_params = measure_model(model, IM_SIZE, IM_SIZE)
-    # torch.save(n_flops, os.path.join(args.save, 'flops.pth'))
-    # del (model)
-    #
-    # model = getattr(models, args.arch)(args)
 
     if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
         model.features = torch.nn.DataParallel(model.features)
