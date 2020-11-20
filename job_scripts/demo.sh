@@ -10,4 +10,4 @@ module load conda
 conda init bash
 source activate new_msd_net
 
-CUDA_VISIBLE_DEVICES=1 python demo.py
+CUDA_VISIBLE_DEVICES=3 python demo.py

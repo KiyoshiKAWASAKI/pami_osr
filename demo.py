@@ -179,10 +179,10 @@ def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
         with open(os.path.join(save, 'results.csv'), 'a') as f:
             f.write('%03d, '
                     '%0.6f, %0.6f, %0.6f, %0.6f, %0.6f, '
-                    '%0.5f, %0.5f,\n' % (
+                    '%0.5f, %0.5f, %0.6f, %0.6f, %0.6f,\n' % (
                 (epoch + 1),
                 train_loss, train_error, train_acc_top1, train_acc_top3, train_acc_top5,
-                valid_loss, valid_error,
+                valid_loss, valid_error, valid_acc_top1, valid_acc_top3, valid_acc_top5
             ))
 
     # Final test of model on test set
@@ -248,7 +248,7 @@ class AverageMeter(object):
 
 
 def demo(train_data_dir, test_data_dir, save_dir, depth=100, growth_rate=12, efficient=True, use_valid=True,
-         n_epochs=100, batch_size=8, seed=None):
+         n_epochs=100, batch_size=32, seed=None):
     """
     A demo to show off training of efficient DenseNets.
     Trains and evaluates a DenseNet-BC on CIFAR-10.
@@ -320,7 +320,7 @@ def demo(train_data_dir, test_data_dir, save_dir, depth=100, growth_rate=12, eff
         growth_rate=growth_rate,
         block_config=block_config,
         num_init_features=growth_rate * 2,
-        num_classes=7,
+        num_classes=335,
         small_inputs=True,
         efficient=efficient,
     )
@@ -357,6 +357,6 @@ Other args:
     --seed (int) - manually set the random seed (default None)
 """
 if __name__ == '__main__':
-    demo(train_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_baseline_0722/small_data_for_debug/train",
-         test_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_baseline_0722/small_data_for_debug/val",
+    demo(train_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/train_valid/known_known",
+         test_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/known_known",
          save_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup")
