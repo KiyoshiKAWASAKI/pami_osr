@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 from collections import OrderedDict
+from timeit import default_timer as timer
 
 
 def _bn_function_factory(norm, relu, conv):
@@ -148,9 +149,15 @@ class DenseNet(nn.Module):
                 param.data.fill_(0)
 
     def forward(self, x):
+        end_times = []
+
         features = self.features(x)
         out = F.relu(features, inplace=True)
         out = F.adaptive_avg_pool2d(out, (1, 1))
         out = torch.flatten(out, 1)
         out = self.classifier(out)
-        return out
+
+        end = timer()
+        end_times.append(end)
+
+        return out, end_times

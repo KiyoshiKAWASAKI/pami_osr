@@ -4,6 +4,19 @@ import time
 import torch
 from torchvision import datasets, transforms
 from models import efficient_dense_net
+import numpy as np
+from timeit import default_timer as timer
+import sys
+import warnings
+warnings.filterwarnings("ignore")
+
+run_test = True
+
+
+nb_training_classes = 334
+thresh_top_1 = 0.90
+
+model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup"
 
 
 
@@ -200,6 +213,112 @@ def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
     print('Final test error: %.4f' % test_error)
 
 
+def test_with_novelty(test_loader,
+                      model,
+                      test_unknown):
+    """
+
+    :param val_loader:
+    :param model:
+    :param criterion:
+    :return:
+    """
+
+    # Set the model to evaluation mode
+    model.cuda()
+    model.eval()
+
+    # Define the softmax - do softmax to each block.
+    sm = torch.nn.Softmax(dim=1)
+
+    # full_original_label_list = []
+    # full_prob_list = []
+    # full_target_list = []
+    # full_rt_list = []
+
+    sample_count = 0
+    total_rt_count = 0
+
+    correct_count = 0
+    wrong_count = 0
+
+
+    with torch.no_grad():
+        for i, (input, target) in enumerate(test_loader):
+            # print("*" * 50)
+
+            # original_label = target
+            # print("Correct label:")
+            # print(original_label)
+
+            sample_count += 1
+
+            # rts = []
+            input = input.cuda()
+            target = target.cuda(async=True)
+
+            # print("Correct label:")
+            # print(target)
+
+            # Save original labels to the list
+            # original_label_list = np.array(target.cpu().tolist())
+            # for label in original_label_list:
+            #     full_original_label_list.append(label)
+
+            # Check the target labels: keep or change
+            if test_unknown:
+                for k in range(len(target)):
+                    target[k] = -1
+
+            input_var = torch.autograd.Variable(input)
+            target_var = torch.autograd.Variable(target)
+
+
+            # Get the model outputs and RTs
+            # print("Timer started.")
+            start =timer()
+            output, end_time = model(input_var)
+
+            rt = end_time[0]-start
+            total_rt_count += rt
+
+            # extract the probability and apply our threshold
+            prob = sm(output)
+            prob_list = np.array(prob.cpu().tolist())
+            max_prob = np.max(prob_list)
+
+            # decide whether to do classification or reject
+            # When the probability is larger than our threshold
+            if max_prob >= thresh_top_1:
+                # print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
+
+                pred_label = torch.argmax(output)
+                # print("Predicted label:")
+                # print(pred_label)
+
+            # When the probability is smaller than our threshold
+            else:
+                pred_label = -1
+
+            if pred_label == target:
+                # print("Right prediction!")
+                correct_count += 1
+            else:
+                # print("Wrong prediction!")
+                wrong_count += 1
+
+    print("Total number of Samples: %d" % sample_count)
+    print("Number or right predictions: %d" % correct_count)
+    print("Number of wrong predictions: %d" % wrong_count)
+
+    avg_rt = total_rt_count / sample_count
+    print("Average RT: % 4f" % avg_rt)
+
+    acc = float(correct_count)/float(correct_count+wrong_count)
+    print("TOP-1 accuracy: %4f" % acc)
+
+
+
 def accuracy(output, target, topk=(1,)):
     """
 
@@ -247,7 +366,7 @@ class AverageMeter(object):
 
 
 
-def demo(train_data_dir, test_data_dir, save_dir, depth=100, growth_rate=12, efficient=True, use_valid=True,
+def demo(train_data_dir, test_known_dir, test_unknown_dir, save_dir, depth=100, growth_rate=12, efficient=True, use_valid=True,
          n_epochs=100, batch_size=32, seed=None):
     """
     A demo to show off training of efficient DenseNets.
@@ -281,39 +400,49 @@ def demo(train_data_dir, test_data_dir, save_dir, depth=100, growth_rate=12, eff
         transforms.ToTensor(),
         normalize]))
 
-    test_set = datasets.ImageFolder(test_data_dir, transforms.Compose([
+    test_set_known = datasets.ImageFolder(test_known_dir, transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        normalize]))
+
+    test_set_unknown = datasets.ImageFolder(test_unknown_dir, transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize]))
 
 
-    if use_valid:
-        valid_size = int(len(train_set) / 5)
-        indices = torch.randperm(len(train_set))
 
-        train_indices = indices[:len(indices) - valid_size]
-        valid_indices = indices[len(indices) - valid_size:]
+    valid_size = int(len(train_set) / 5)
+    indices = torch.randperm(len(train_set))
 
-        train_loader = torch.utils.data.DataLoader(train_set,
-                                                   batch_size=batch_size,
-                                                   sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
-                                                   num_workers=1,
-                                                   pin_memory=True)
+    train_indices = indices[:len(indices) - valid_size]
+    valid_indices = indices[len(indices) - valid_size:]
 
-        val_loader = torch.utils.data.DataLoader(train_set,
-                                                batch_size=batch_size,
-                                                sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
-                                                num_workers=1,
-                                                pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_set,
+                                               batch_size=1,
+                                               sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
+                                               num_workers=1,
+                                               pin_memory=True)
 
-        test_loader = torch.utils.data.DataLoader(test_set,
-                                                  batch_size=batch_size, shuffle=False,
-                                                  num_workers=1, pin_memory=True)
+    val_loader = torch.utils.data.DataLoader(train_set,
+                                            batch_size=1,
+                                            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
+                                            num_workers=1,
+                                            pin_memory=True)
 
+    # print(len(train_loader))
+    # print(len(val_loader))
+    # sys.exit()
 
-    else:
-        valid_loader = None
+    test_known_loader = torch.utils.data.DataLoader(test_set_known,
+                                              batch_size=1, shuffle=False,
+                                              num_workers=1, pin_memory=True)
+
+    test_unknown_loader = torch.utils.data.DataLoader(test_set_unknown,
+                                                    batch_size=1, shuffle=False,
+                                                    num_workers=1, pin_memory=True)
 
     # Models
     model = efficient_dense_net.DenseNet(
@@ -322,24 +451,42 @@ def demo(train_data_dir, test_data_dir, save_dir, depth=100, growth_rate=12, eff
         num_init_features=growth_rate * 2,
         num_classes=335,
         small_inputs=True,
-        efficient=efficient,
-    )
-    print(model)
+        efficient=efficient)
 
-    # Print number of parameters
-    num_params = sum(p.numel() for p in model.parameters())
-    print("Total parameters: ", num_params)
+    if run_test:
+        model.load_state_dict(torch.load(os.path.join(model_path, 'model.dat')))
 
-    # Make save directory
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    if not os.path.isdir(save_dir):
-        raise Exception('%s is not a dir' % save_dir)
+        print("*" * 50)
+        print("Testing the known samples...")
+        test_with_novelty(test_loader=test_known_loader,
+                          model=model,
+                          test_unknown=False)
 
-    # Train the model
-    train(model=model, train_loader=train_loader, valid_loader=val_loader, test_loader=test_loader, save=save_dir,
-          n_epochs=n_epochs, batch_size=batch_size, seed=seed)
-    print('Done!')
+        print("*" * 50)
+        print("testing the unknown samples...")
+        test_with_novelty(test_loader=test_unknown_loader,
+                          model=model,
+                          test_unknown=True)
+        print("*" * 50)
+
+        return
+
+
+    else:
+        # Print number of parameters
+        num_params = sum(p.numel() for p in model.parameters())
+        print("Total parameters: ", num_params)
+
+        # Make save directory
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        if not os.path.isdir(save_dir):
+            raise Exception('%s is not a dir' % save_dir)
+
+        # Train the model
+        train(model=model, train_loader=train_loader, valid_loader=val_loader, test_loader=test_loader, save=save_dir,
+              n_epochs=n_epochs, batch_size=batch_size, seed=seed)
+        print('Done!')
 
 
 """
@@ -358,5 +505,6 @@ Other args:
 """
 if __name__ == '__main__':
     demo(train_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/train_valid/known_known",
-         test_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/known_known",
+         test_known_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/known_known",
+         test_unknown_dir = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/unknown_unknown",
          save_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup")
