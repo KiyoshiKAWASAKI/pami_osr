@@ -31,14 +31,19 @@ args.nScales = len(args.grFactor)
 ###############################################
 model_name = "msd_net"
 
-use_5_weights = True
-use_pp_loss = True
-run_test = False
 use_json_data = True
+use_5_weights = False
+use_pp_loss = False
+run_test = False
 
+n_epochs = 100
+batch_size = 32
 thresh_top_1 = 0.90
-nb_training_classes = 334
+nb_training_classes = 336 # known:335, unknown:1
 nBlocks = 5
+
+penalty_factors_for_known = [1.0, 2.5, 5.0, 7.5, 10.0]
+penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
 model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup"
 
@@ -58,16 +63,16 @@ save_path = save_path_base + "/" + save_path_sub
 
 
 
-def train_one_epoch(train_loader_known,
-                    train_loader_unknown,
-                    model,
-                    criterion,
-                    optimizer,
-                    epoch,
-                    penalty_factors_known,
-                    penalty_factors_unknown,
-                    use_msd_net):
-
+def train_valid_one_epoch(known_loader,
+                         unknown_loader,
+                        model,
+                        criterion,
+                        optimizer,
+                        nb_epoch,
+                        penalty_factors_known,
+                        penalty_factors_unknown,
+                        use_msd_net,
+                        train_phase):
     """
 
     :param train_loader_known:
@@ -78,6 +83,8 @@ def train_one_epoch(train_loader_known,
     :param epoch:
     :param penalty_factors_known:
     :param penalty_factors_unknown:
+    :param use_msd_net:
+    :param train_phase:
     :return:
     """
 
@@ -99,7 +106,11 @@ def train_one_epoch(train_loader_known,
         top3 = AverageMeter()
         top5 = AverageMeter()
 
-    model.train()
+    if train_phase:
+        model.train()
+    else:
+        model.eval()
+
     end = time.time()
 
     running_lr = None
@@ -107,11 +118,14 @@ def train_one_epoch(train_loader_known,
     ###################################################
     # training process setup...
     ###################################################
-    save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(epoch) + ".txt")
+    if train_phase:
+        save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(nb_epoch) + ".txt")
+    else:
+        save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(nb_epoch) + ".txt")
 
     # Count number of batches for known and unknown respectively
-    nb_known_batches = len(train_loader_known)
-    nb_unknown_batches = len(train_loader_unknown)
+    nb_known_batches = len(known_loader)
+    nb_unknown_batches = len(unknown_loader)
     nb_total_batches = nb_known_batches + nb_unknown_batches
 
     print("There are %d batches in known_known loader" % nb_known_batches)
@@ -119,25 +133,20 @@ def train_one_epoch(train_loader_known,
 
     # Generate index for known and unknown and shuffle
     all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
-    print(all_indices)
-
     known_indices = all_indices[:nb_known_batches]
-    print(known_indices)
-
     unknown_indices = all_indices[nb_known_batches:]
-    print(unknown_indices)
 
     # Create iterator
-    known_iter = iter(train_loader_known)
-    unknown_iter = iter(train_loader_unknown)
+    known_iter = iter(known_loader)
+    unknown_iter = iter(unknown_loader)
 
     # Only train one batch for each step
-    with open(save_txt_path, 'w') as train_f:
+    with open(save_txt_path, 'w') as f:
         for i in range(nb_total_batches):
             ##########################################
             # Basic setups
             ##########################################
-            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+            lr = adjust_learning_rate(optimizer, nb_epoch, args, batch=i,
                                       nBatch=nb_total_batches, method=args.lr_type)
             if running_lr is None:
                 running_lr = lr
@@ -150,12 +159,10 @@ def train_one_epoch(train_loader_known,
             # Get a batch
             ##########################################
             if i in known_indices:
-                print("This is a known batch")
                 batch = next(known_iter)
                 batch_type = "known"
 
             elif i in unknown_indices:
-                print("This is an unknown batch.")
                 batch = next(unknown_iter)
                 batch_type = "unknown"
 
@@ -163,7 +170,7 @@ def train_one_epoch(train_loader_known,
             target = batch["labels"] - 1
             rts = batch["rts"]
 
-            input_var = torch.autograd.Variable(input)
+            input_var = torch.autograd.Variable(input).cuda()
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
 
@@ -174,30 +181,25 @@ def train_one_epoch(train_loader_known,
 
             # Case 1: known batch + 5 weights
             if (batch_type == "known") and (use_5_weights == True):
-                print("Case 1")
                 for j in range(len(output)):
-                    print(output[j])
                     penalty_factor = penalty_factors_known[j]
                     output_weighted = output[j] * penalty_factor
                     loss += criterion(output_weighted, target_var)
 
             # Case 2: known batch + no 5 weights
             if (batch_type == "known") and (use_5_weights == False):
-                print("Case 2")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 3: unknown batch + no 5 weights + no pp loss
             if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
-                print("Case 3")
                 for j in range(len(output)):
                     output_weighted = output[j]
                     loss += criterion(output_weighted, target_var)
 
             # Case 4: unknown batch + 5 weights + no pp loss
             if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
-                print("Case 4")
                 for j in range(len(output)):
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output[j] * penalty_factor
@@ -205,7 +207,6 @@ def train_one_epoch(train_loader_known,
 
             # Case 5: unknown batch + 5 weights + no pp loss
             if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
-                print("Case 5")
                 for j in range(len(output)):
                     penalty_factor = penalty_factors_unknown[j]
                     output_weighted = output[j] * penalty_factor
@@ -224,205 +225,41 @@ def train_one_epoch(train_loader_known,
                 top3[j].update(prec3.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if train_phase:
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
             if i % args.print_freq == 0:
-                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                print('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
                               'Data {data_time.avg:.3f}\t'
                               'Loss {loss.val:.4f}\t'
                               'Acc@1 {top1.val:.4f}\t'
                               'Acc@3 {top3.val:.4f}\t'
                               'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, nb_total_batches,
+                    nb_epoch, i + 1, nb_total_batches,
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
-
-
-
-
-def validate_one_epoch(valid_loader_known,
-                      valid_loader_unknown,
-                      model,
-                      criterion,
-                      epoch,
-                      use_msd_net,
-                      penalty_factors_known,
-                      penalty_factors_unknown):
-
-    """
-
-    :param train_loader_known:
-    :param train_loader_unknown:
-    :param model:
-    :param criterion:
-    :param optimizer:
-    :param epoch:
-    :param penalty_factors_known:
-    :param penalty_factors_unknown:
-    :return:
-    """
-
-    ##########################################
-    # Set up evaluation metrics
-    ##########################################
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-
-    if use_msd_net:
-        top1, top3, top5 = [], [], []
-        for i in range(nBlocks):
-            top1.append(AverageMeter())
-            top3.append(AverageMeter())
-            top5.append(AverageMeter())
-    else:
-        top1 = AverageMeter()
-        top3 = AverageMeter()
-        top5 = AverageMeter()
-
-    model.eval()
-    end = time.time()
-
-    ###################################################
-    # training process setup...
-    ###################################################
-    save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(epoch) + ".txt")
-
-    # Count number of batches for known and unknown respectively
-    nb_known_batches = len(valid_loader_known)
-    nb_unknown_batches = len(valid_loader_unknown)
-    nb_total_batches = nb_known_batches + nb_unknown_batches
-
-    print("There are %d batches in known_known loader" % nb_known_batches)
-    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
-
-    # Generate index for known and unknown and shuffle
-    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
-    print(all_indices)
-
-    known_indices = all_indices[:nb_known_batches]
-    print(known_indices)
-
-    unknown_indices = all_indices[nb_known_batches:]
-    print(unknown_indices)
-
-    # Create iterator
-    known_iter = iter(valid_loader_known)
-    unknown_iter = iter(valid_loader_unknown)
-
-    # Only train one batch for each step
-    with open(save_txt_path, 'w') as f:
-        for i in range(nb_total_batches):
-            ##########################################
-            # Basic setups
-            ##########################################
-            data_time.update(time.time() - end)
-            loss = 0.0
-
-            ##########################################
-            # Get a batch
-            ##########################################
-            if i in known_indices:
-                print("This is a known batch")
-                batch = next(known_iter)
-                batch_type = "known"
-
-            elif i in unknown_indices:
-                print("This is an unknown batch.")
-                batch = next(unknown_iter)
-                batch_type = "unknown"
-
-            input = batch["imgs"]
-            target = batch["labels"] - 1
-            rts = batch["rts"]
-
-            input_var = torch.autograd.Variable(input)
-            target = target.cuda(async=True)
-            target_var = torch.autograd.Variable(target).long()
-
-            output = model(input_var)
-
-            if not isinstance(output, list):
-                output = [output]
-
-            # Case 1: known batch + 5 weights
-            if (batch_type == "known") and (use_5_weights == True):
-                print("Case 1")
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output[j] * penalty_factor
-                    loss += criterion(output_weighted, target_var)
-
-            # Case 2: known batch + no 5 weights
-            if (batch_type == "known") and (use_5_weights == False):
-                print("Case 2")
-                for j in range(len(output)):
-                    output_weighted = output[j]
-                    loss += criterion(output_weighted, target_var)
-
-            # Case 3: unknown batch + no 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
-                print("Case 3")
-                for j in range(len(output)):
-                    output_weighted = output[j]
-                    loss += criterion(output_weighted, target_var)
-
-            # Case 4: unknown batch + 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
-                print("Case 4")
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output[j] * penalty_factor
-                    loss += criterion(output_weighted, target_var)
-
-            # Case 5: unknown batch + 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
-                print("Case 5")
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output[j] * penalty_factor
-                    scale_factor = get_pp_factor(rts[j])
-                    loss += scale_factor * criterion(output_weighted, target_var)
-
-
-            ##########################################
-            # Calculate loss
-            ##########################################
-            losses.update(loss.item(), input.size(0))
-
-            for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
                 f.write('Epoch: [{0}][{1}/{2}]\t'
-                          'Time {batch_time.avg:.3f}\t'
-                          'Data {data_time.avg:.3f}\t'
-                          'Loss {loss.val:.4f}\t'
-                          'Acc@1 {top1.val:.4f}\t'
-                          'Acc@3 {top3.val:.4f}\t'
-                          'Acc@5 {top5.val:.4f}\n'.format(
-                    epoch, i + 1, nb_total_batches,
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    nb_epoch, i + 1, nb_total_batches,
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+
 
 
 
@@ -432,8 +269,6 @@ def train(model,
           valid_known_known_loader,
           valid_known_unknown_loader,
           save,
-          n_epochs=100,
-          batch_size=2,
           lr=0.1,
           wd=0.0001,
           momentum=0.9,
@@ -475,24 +310,9 @@ def train(model,
                                                      gamma=0.1)
 
     # Start log
-    with open(os.path.join(save, 'results.csv'), 'w') as f:
-        f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
+    # with open(os.path.join(save, 'results.csv'), 'w') as f:
+    #     f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
 
-
-    # Psyphy penalty fators
-    # This set does not work
-    # penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
-
-    # Setup 1
-    # penalty_factors_for_known = [0.1, 0.5, 1.0, 1.5, 2.0]
-
-    # Setup 2
-    # penalty_factors_for_known = [1.0, 3.0, 5.0, 7.0, 10.0]
-
-    # Setup 3
-    penalty_factors_for_known = [1.0, 25.0, 50.0, 75.0, 100.0]
-
-    penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
     # Train model
     best_acc_top1 = 0.00
@@ -500,51 +320,60 @@ def train(model,
     for epoch in range(n_epochs):
         if model_name == "msd_net":
             train_loss, train_acc_top1, \
-            train_acc_top3, train_acc_top5 = train_one_epoch(train_loader_known=train_known_known_loader,
-                                                            train_loader_unknown=train_known_unknown_loader,
-                                                            model=model_wrapper,
-                                                            criterion=criterion,
-                                                            optimizer=optimizer,
-                                                            epoch=epoch,
-                                                            penalty_factors_known=penalty_factors_for_known,
-                                                            penalty_factors_unknown=penalty_factors_for_novel,
-                                                            use_msd_net=True)
+            train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
+                                                                    unknown_loader=train_known_unknown_loader,
+                                                                    model=model_wrapper,
+                                                                    criterion=criterion,
+                                                                    optimizer=optimizer,
+                                                                    nb_epoch=epoch,
+                                                                    penalty_factors_known=penalty_factors_for_known,
+                                                                    penalty_factors_unknown=penalty_factors_for_novel,
+                                                                    use_msd_net=True,
+                                                                    train_phase=True)
 
             scheduler.step()
 
             valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = validate_one_epoch(valid_loader_known=valid_known_known_loader,
-                                                                valid_loader_unknown=valid_known_unknown_loader,
+            valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
+                                                                  unknown_loader=valid_known_unknown_loader,
                                                                   model=model_wrapper,
                                                                   criterion=criterion,
-                                                                  epoch=epoch,
+                                                                  optimizer=optimizer,
+                                                                  nb_epoch=epoch,
                                                                   use_msd_net=True,
                                                                   penalty_factors_known=penalty_factors_for_known,
-                                                                  penalty_factors_unknown=penalty_factors_for_novel)
-        # TODO: add other networks
-        else:
+                                                                  penalty_factors_unknown=penalty_factors_for_novel,
+                                                                  train_phase=False)
+
+        elif model_name == "dense_net":
             train_loss, train_acc_top1, \
-            train_acc_top3, train_acc_top5 = train_one_epoch(train_loader_known=train_known_known_loader,
-                                                             train_loader_unknown=train_known_unknown_loader,
-                                                             model=model_wrapper,
-                                                             criterion=criterion,
-                                                             optimizer=optimizer,
-                                                             epoch=epoch,
-                                                             penalty_factors_known=penalty_factors_for_known,
-                                                             penalty_factors_unknown=penalty_factors_for_novel,
-                                                             use_msd_net=False)
+            train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
+                                                                   unknown_loader=train_known_unknown_loader,
+                                                                   model=model_wrapper,
+                                                                   criterion=criterion,
+                                                                   optimizer=optimizer,
+                                                                   nb_epoch=epoch,
+                                                                   penalty_factors_known=penalty_factors_for_known,
+                                                                   penalty_factors_unknown=penalty_factors_for_novel,
+                                                                   use_msd_net=False,
+                                                                   train_phase=True)
 
             scheduler.step()
 
             valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = validate_one_epoch(valid_loader_known=valid_known_known_loader,
-                                                                valid_loader_unknown=valid_known_unknown_loader,
-                                                                model=model_wrapper,
-                                                                criterion=criterion,
-                                                                epoch=epoch,
-                                                                use_msd_net=False,
-                                                                penalty_factors_known=penalty_factors_for_known,
-                                                                penalty_factors_unknown=penalty_factors_for_novel)
+            valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
+                                                                   unknown_loader=valid_known_unknown_loader,
+                                                                   model=model_wrapper,
+                                                                   criterion=criterion,
+                                                                   optimizer=optimizer,
+                                                                   nb_epoch=epoch,
+                                                                   penalty_factors_known=penalty_factors_for_known,
+                                                                   penalty_factors_unknown=penalty_factors_for_novel,
+                                                                   use_msd_net=True,
+                                                                   train_phase=False)
+
+        else:
+            return
 
 
         # Determine if model is the best
@@ -552,16 +381,15 @@ def train(model,
             if valid_acc_top1 > best_acc_top1:
                 best_acc_top1 = valid_acc_top1
                 print('New best top-1 accuracy: %.4f' % best_acc_top1)
-                torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
+                torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
         else:
-            torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
+            torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
 
         # Log results
         with open(os.path.join(save, 'results.csv'), 'a') as f:
             f.write('%03d, '
                     '%0.6f, %0.6f, %0.6f, %0.6f, '
-                    '%0.5f, %0.6f, %0.6f, %0.6f,\n' % (
-                (epoch + 1),
+                    '%0.5f, %0.6f, %0.6f, %0.6f,\n' % ((epoch + 1),
                 train_loss, train_acc_top1, train_acc_top3, train_acc_top5,
                 valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5))
 
@@ -678,10 +506,7 @@ def test_with_novelty(test_loader,
 
 def demo(depth=100,
          growth_rate=12,
-         efficient=True,
-         n_epochs=100,
-         batch_size=32,
-         seed=None):
+         efficient=True):
     """
     A demo to show off training of efficient DenseNets.
     Trains and evaluates a DenseNet-BC on CIFAR-10.
@@ -832,6 +657,8 @@ def demo(depth=100,
 
 
     # TODO: Maybe adding other networks in the future
+    else:
+        pass
 
 
 
@@ -869,13 +696,11 @@ def demo(depth=100,
 
         # Combine training all networks together
         train(model=model,
-              train_loader=train_known_known_loader,
-              valid_loader=valid_known_known_loader,
-              test_loader=None,
-              save=save_dir,
-              n_epochs=n_epochs,
-              batch_size=batch_size,
-              seed=seed)
+              train_known_known_loader=train_known_known_loader,
+              train_known_unknown_loader=train_known_unknown_loader,
+              valid_known_known_loader=valid_known_known_loader,
+              valid_known_unknown_loader=valid_known_unknown_loader,
+              save=save_path)
 
 
 
