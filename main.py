@@ -33,7 +33,7 @@ from utils import customized_dataloader
 from utils.psyphy_loss import pp_loss
 import torchvision.transforms as transforms
 from itertools import cycle
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import Variable
 
 
@@ -250,7 +250,8 @@ def main():
 
         if args.evalmode == 'anytime':
             # TODO: add test process
-            pass
+            test_with_novelty(val_loader=test_known_known_loader,
+                              model=model)
 
         else:
             logging.info("Only supporting anytime prediction!")
@@ -774,8 +775,14 @@ def test_with_novelty(val_loader,
     full_rt_list = []
 
     with torch.no_grad():
-        for i, (input, target) in enumerate(val_loader):
+        for i in range(len(val_loader)):
             print("*" * 50)
+
+            batch = next(iter(val_loader))
+
+            input = batch["imgs"]
+            target = batch["labels"] - 1
+            # rts = batch["rts"]
 
             rts = []
             input = input.cuda()

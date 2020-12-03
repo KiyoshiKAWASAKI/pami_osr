@@ -6,140 +6,456 @@ from torchvision import datasets, transforms
 from models import efficient_dense_net
 import numpy as np
 from timeit import default_timer as timer
+from utils import customized_dataloader
+from utils.customized_dataloader import msd_net_dataset
 import sys
 import warnings
 warnings.filterwarnings("ignore")
+import random
+from args import arg_parser
+import torch.nn as nn
+import models
 
-run_test = True
+args = arg_parser.parse_args()
+
+if args.gpu:
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+
+args.grFactor = list(map(int, args.grFactor.split('-')))
+args.bnFactor = list(map(int, args.bnFactor.split('-')))
+args.nScales = len(args.grFactor)
 
 
-nb_training_classes = 334
+###############################################
+# Change these parameters
+###############################################
+model_name = "msd_net"
+
+use_5_weights = True
+use_pp_loss = True
+run_test = False
+use_json_data = True
+
 thresh_top_1 = 0.90
+nb_training_classes = 334
+nBlocks = 5
 
 model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup"
 
+train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+
+# The folder path for saving everything
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
+
+save_path_sub = "combo_pipeline/1203/msd_net_no_pp"
+save_path = save_path_base + "/" + save_path_sub
 
 
-def train_epoch(model, loader, optimizer, epoch, n_epochs, print_freq=1):
+
+def train_one_epoch(train_loader_known,
+                    train_loader_unknown,
+                    model,
+                    criterion,
+                    optimizer,
+                    epoch,
+                    penalty_factors_known,
+                    penalty_factors_unknown,
+                    use_msd_net):
+
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
     batch_time = AverageMeter()
+    data_time = AverageMeter()
     losses = AverageMeter()
-    error = AverageMeter()
-    top_1 = AverageMeter()
-    top_3 = AverageMeter()
-    top_5 = AverageMeter()
 
-    # Model on train mode
+    if use_msd_net:
+        top1, top3, top5 = [], [], []
+        for i in range(nBlocks):
+            top1.append(AverageMeter())
+            top3.append(AverageMeter())
+            top5.append(AverageMeter())
+    else:
+        top1 = AverageMeter()
+        top3 = AverageMeter()
+        top5 = AverageMeter()
+
     model.train()
-
     end = time.time()
-    for batch_idx, (input, target) in enumerate(loader):
-    # for batch_idx, batch in enumerate(loader):
-        # Create vaiables
-        if torch.cuda.is_available():
-            input = input.cuda()
-            target = target.cuda()
 
-        # compute output
-        output = model(input)
-        loss = torch.nn.functional.cross_entropy(output, target)
+    running_lr = None
 
-        # measure accuracy and record loss
-        batch_size = target.size(0)
-        _, pred = output.data.cpu().topk(1, dim=1)
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(epoch) + ".txt")
 
-        error.update(torch.ne(pred.squeeze(), target.cpu()).float().sum().item() / batch_size, batch_size)
-        losses.update(loss.item(), batch_size)
+    # Count number of batches for known and unknown respectively
+    nb_known_batches = len(train_loader_known)
+    nb_unknown_batches = len(train_loader_unknown)
+    nb_total_batches = nb_known_batches + nb_unknown_batches
 
-        prec1, prec3, prec5 = accuracy(output.data, target, topk=(1, 3, 5))
-        top_1.update(prec1.item(), input.size(0))
-        top_3.update(prec3.item(), input.size(0))
-        top_5.update(prec5.item(), input.size(0))
+    print("There are %d batches in known_known loader" % nb_known_batches)
+    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
 
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    # Generate index for known and unknown and shuffle
+    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
+    print(all_indices)
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+    known_indices = all_indices[:nb_known_batches]
+    print(known_indices)
 
-        # print stats
-        if batch_idx % print_freq == 0:
-            res = '\t'.join(['Epoch: [%d/%d]' % (epoch + 1, n_epochs),
-                            'Iter: [%d/%d]' % (batch_idx + 1, len(loader)),
-                            'Time %.3f (%.3f)' % (batch_time.val, batch_time.avg),
-                            'Loss %.4f' % (losses.val),
-                            'Error %.4f' % (error.val),
-                            'TOP-1 %.4f' % (top_1.val),
-                            'TOP-3 %.4f' % (top_3.val),
-                            'TOP-5 %.4f' % (top_5.val)])
-            print(res)
+    unknown_indices = all_indices[nb_known_batches:]
+    print(unknown_indices)
 
-    # Return summary statistics
-    return batch_time.avg, losses.avg, error.avg, \
-           top_1.avg, top_3.avg, top_5.avg
+    # Create iterator
+    known_iter = iter(train_loader_known)
+    unknown_iter = iter(train_loader_unknown)
+
+    # Only train one batch for each step
+    with open(save_txt_path, 'w') as train_f:
+        for i in range(nb_total_batches):
+            ##########################################
+            # Basic setups
+            ##########################################
+            lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+                                      nBatch=nb_total_batches, method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+
+            loss = 0.0
+
+            ##########################################
+            # Get a batch
+            ##########################################
+            if i in known_indices:
+                print("This is a known batch")
+                batch = next(known_iter)
+                batch_type = "known"
+
+            elif i in unknown_indices:
+                print("This is an unknown batch.")
+                batch = next(unknown_iter)
+                batch_type = "unknown"
+
+            input = batch["imgs"]
+            target = batch["labels"] - 1
+            rts = batch["rts"]
+
+            input_var = torch.autograd.Variable(input)
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            output = model(input_var)
+
+            if not isinstance(output, list):
+                output = [output]
+
+            # Case 1: known batch + 5 weights
+            if (batch_type == "known") and (use_5_weights == True):
+                print("Case 1")
+                for j in range(len(output)):
+                    print(output[j])
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 2: known batch + no 5 weights
+            if (batch_type == "known") and (use_5_weights == False):
+                print("Case 2")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 3: unknown batch + no 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
+                print("Case 3")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 4: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
+                print("Case 4")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 5: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
+                print("Case 5")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, target_var)
 
 
-def valid_epoch(model, loader, print_freq=1, is_test=True):
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    error = AverageMeter()
-    top_1 = AverageMeter()
-    top_3 = AverageMeter()
-    top_5 = AverageMeter()
+            ##########################################
+            # Calculate loss and BP
+            ##########################################
+            losses.update(loss.item(), input.size(0))
 
-    # Model on eval mode
-    model.eval()
+            for j in range(len(output)):
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
 
-    end = time.time()
-    with torch.no_grad():
-        for batch_idx, (input, target) in enumerate(loader):
-            # Create vaiables
-            if torch.cuda.is_available():
-                input = input.cuda()
-                target = target.cuda()
-
-            # compute output
-            output = model(input)
-            loss = torch.nn.functional.cross_entropy(output, target)
-
-            # measure accuracy and record loss
-            batch_size = target.size(0)
-            _, pred = output.data.cpu().topk(1, dim=1)
-
-            error.update(torch.ne(pred.squeeze(), target.cpu()).float().sum().item() / batch_size, batch_size)
-            losses.update(loss.item(), batch_size)
-
-            prec1, prec3, prec5 = accuracy(output.data, target, topk=(1, 3, 5))
-            top_1.update(prec1.item(), input.size(0))
-            top_3.update(prec3.item(), input.size(0))
-            top_5.update(prec5.item(), input.size(0))
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
-            # print stats
-            if batch_idx % print_freq == 0:
-                res = '\t'.join([
-                    'Test' if is_test else 'Valid',
-                    'Iter: [%d/%d]' % (batch_idx + 1, len(loader)),
-                    'Time %.3f (%.3f)' % (batch_time.val, batch_time.avg),
-                    'Loss %.4f' % (losses.val),
-                    'Error %.4f' % (error.val),
-                    'TOP-1 %.4f' % (top_1.val),
-                    'TOP-3 %.4f' % (top_3.val),
-                    'TOP-5 %.4f' % (top_5.val),
-                ])
-                print(res)
+            if i % args.print_freq == 0:
+                train_f.write('Epoch: [{0}][{1}/{2}]\t'
+                              'Time {batch_time.avg:.3f}\t'
+                              'Data {data_time.avg:.3f}\t'
+                              'Loss {loss.val:.4f}\t'
+                              'Acc@1 {top1.val:.4f}\t'
+                              'Acc@3 {top3.val:.4f}\t'
+                              'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, nb_total_batches,
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
-    # Return summary statistics
-    return batch_time.avg, losses.avg, error.avg, top_1.avg, top_3.avg, top_5.avg
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
 
 
-def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
-          batch_size=2, lr=0.1, wd=0.0001, momentum=0.9, seed=None):
+
+
+def validate_one_epoch(valid_loader_known,
+                      valid_loader_unknown,
+                      model,
+                      criterion,
+                      epoch,
+                      use_msd_net,
+                      penalty_factors_known,
+                      penalty_factors_unknown):
+
+    """
+
+    :param train_loader_known:
+    :param train_loader_unknown:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param epoch:
+    :param penalty_factors_known:
+    :param penalty_factors_unknown:
+    :return:
+    """
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    if use_msd_net:
+        top1, top3, top5 = [], [], []
+        for i in range(nBlocks):
+            top1.append(AverageMeter())
+            top3.append(AverageMeter())
+            top5.append(AverageMeter())
+    else:
+        top1 = AverageMeter()
+        top3 = AverageMeter()
+        top5 = AverageMeter()
+
+    model.eval()
+    end = time.time()
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(epoch) + ".txt")
+
+    # Count number of batches for known and unknown respectively
+    nb_known_batches = len(valid_loader_known)
+    nb_unknown_batches = len(valid_loader_unknown)
+    nb_total_batches = nb_known_batches + nb_unknown_batches
+
+    print("There are %d batches in known_known loader" % nb_known_batches)
+    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+
+    # Generate index for known and unknown and shuffle
+    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
+    print(all_indices)
+
+    known_indices = all_indices[:nb_known_batches]
+    print(known_indices)
+
+    unknown_indices = all_indices[nb_known_batches:]
+    print(unknown_indices)
+
+    # Create iterator
+    known_iter = iter(valid_loader_known)
+    unknown_iter = iter(valid_loader_unknown)
+
+    # Only train one batch for each step
+    with open(save_txt_path, 'w') as f:
+        for i in range(nb_total_batches):
+            ##########################################
+            # Basic setups
+            ##########################################
+            data_time.update(time.time() - end)
+            loss = 0.0
+
+            ##########################################
+            # Get a batch
+            ##########################################
+            if i in known_indices:
+                print("This is a known batch")
+                batch = next(known_iter)
+                batch_type = "known"
+
+            elif i in unknown_indices:
+                print("This is an unknown batch.")
+                batch = next(unknown_iter)
+                batch_type = "unknown"
+
+            input = batch["imgs"]
+            target = batch["labels"] - 1
+            rts = batch["rts"]
+
+            input_var = torch.autograd.Variable(input)
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            output = model(input_var)
+
+            if not isinstance(output, list):
+                output = [output]
+
+            # Case 1: known batch + 5 weights
+            if (batch_type == "known") and (use_5_weights == True):
+                print("Case 1")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_known[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 2: known batch + no 5 weights
+            if (batch_type == "known") and (use_5_weights == False):
+                print("Case 2")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 3: unknown batch + no 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
+                print("Case 3")
+                for j in range(len(output)):
+                    output_weighted = output[j]
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 4: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
+                print("Case 4")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    loss += criterion(output_weighted, target_var)
+
+            # Case 5: unknown batch + 5 weights + no pp loss
+            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
+                print("Case 5")
+                for j in range(len(output)):
+                    penalty_factor = penalty_factors_unknown[j]
+                    output_weighted = output[j] * penalty_factor
+                    scale_factor = get_pp_factor(rts[j])
+                    loss += scale_factor * criterion(output_weighted, target_var)
+
+
+            ##########################################
+            # Calculate loss
+            ##########################################
+            losses.update(loss.item(), input.size(0))
+
+            for j in range(len(output)):
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                f.write('Epoch: [{0}][{1}/{2}]\t'
+                          'Time {batch_time.avg:.3f}\t'
+                          'Data {data_time.avg:.3f}\t'
+                          'Loss {loss.val:.4f}\t'
+                          'Acc@1 {top1.val:.4f}\t'
+                          'Acc@3 {top3.val:.4f}\t'
+                          'Acc@5 {top5.val:.4f}\n'.format(
+                    epoch, i + 1, nb_total_batches,
+                    batch_time=batch_time, data_time=data_time,
+                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+
+
+
+def train(model,
+          train_known_known_loader,
+          train_known_unknown_loader,
+          valid_known_known_loader,
+          valid_known_unknown_loader,
+          save,
+          n_epochs=100,
+          batch_size=2,
+          lr=0.1,
+          wd=0.0001,
+          momentum=0.9,
+          valid_loader=True,
+          seed=None):
+    """
+
+    :param model:
+    :param train_known_known_loader:
+    :param train_known_unknown_loader:
+    :param valid_known_known_loader:
+    :param valid_known_unknown_loader:
+    :param save:
+    :param n_epochs:
+    :param batch_size:
+    :param lr:
+    :param wd:
+    :param momentum:
+    :param seed:
+    :return:
+    """
+
     if seed is not None:
         torch.manual_seed(seed)
 
@@ -153,6 +469,7 @@ def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
         model_wrapper = torch.nn.DataParallel(model).cuda()
 
     # Optimizer
+    criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(model_wrapper.parameters(), lr=lr, momentum=momentum, nesterov=True, weight_decay=wd)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs],
                                                      gamma=0.1)
@@ -161,29 +478,80 @@ def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
     with open(os.path.join(save, 'results.csv'), 'w') as f:
         f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
 
+
+    # Psyphy penalty fators
+    # This set does not work
+    # penalty_factors_for_known = [0.2, 0.4, 0.6, 0.8, 1.0]
+
+    # Setup 1
+    # penalty_factors_for_known = [0.1, 0.5, 1.0, 1.5, 2.0]
+
+    # Setup 2
+    # penalty_factors_for_known = [1.0, 3.0, 5.0, 7.0, 10.0]
+
+    # Setup 3
+    penalty_factors_for_known = [1.0, 25.0, 50.0, 75.0, 100.0]
+
+    penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+
     # Train model
-    best_error = 1
+    best_acc_top1 = 0.00
+
     for epoch in range(n_epochs):
-        _, train_loss, train_error, train_acc_top1, \
-        train_acc_top3, train_acc_top5 = train_epoch(model=model_wrapper,
-                                                        loader=train_loader,
-                                                        optimizer=optimizer,
-                                                        epoch=epoch,
-                                                        n_epochs=n_epochs)
+        if model_name == "msd_net":
+            train_loss, train_acc_top1, \
+            train_acc_top3, train_acc_top5 = train_one_epoch(train_loader_known=train_known_known_loader,
+                                                            train_loader_unknown=train_known_unknown_loader,
+                                                            model=model_wrapper,
+                                                            criterion=criterion,
+                                                            optimizer=optimizer,
+                                                            epoch=epoch,
+                                                            penalty_factors_known=penalty_factors_for_known,
+                                                            penalty_factors_unknown=penalty_factors_for_novel,
+                                                            use_msd_net=True)
 
-        scheduler.step()
+            scheduler.step()
 
-        print("validation")
-        _, valid_loss, valid_error, valid_acc_top1, \
-        valid_acc_top3, valid_acc_top5, = valid_epoch(model=model_wrapper,
-                                                        loader=valid_loader if valid_loader else test_loader,
-                                                        is_test=(not valid_loader))
+            valid_loss, valid_acc_top1, \
+            valid_acc_top3, valid_acc_top5 = validate_one_epoch(valid_loader_known=valid_known_known_loader,
+                                                                valid_loader_unknown=valid_known_unknown_loader,
+                                                                  model=model_wrapper,
+                                                                  criterion=criterion,
+                                                                  epoch=epoch,
+                                                                  use_msd_net=True,
+                                                                  penalty_factors_known=penalty_factors_for_known,
+                                                                  penalty_factors_unknown=penalty_factors_for_novel)
+        # TODO: add other networks
+        else:
+            train_loss, train_acc_top1, \
+            train_acc_top3, train_acc_top5 = train_one_epoch(train_loader_known=train_known_known_loader,
+                                                             train_loader_unknown=train_known_unknown_loader,
+                                                             model=model_wrapper,
+                                                             criterion=criterion,
+                                                             optimizer=optimizer,
+                                                             epoch=epoch,
+                                                             penalty_factors_known=penalty_factors_for_known,
+                                                             penalty_factors_unknown=penalty_factors_for_novel,
+                                                             use_msd_net=False)
+
+            scheduler.step()
+
+            valid_loss, valid_acc_top1, \
+            valid_acc_top3, valid_acc_top5 = validate_one_epoch(valid_loader_known=valid_known_known_loader,
+                                                                valid_loader_unknown=valid_known_unknown_loader,
+                                                                model=model_wrapper,
+                                                                criterion=criterion,
+                                                                epoch=epoch,
+                                                                use_msd_net=False,
+                                                                penalty_factors_known=penalty_factors_for_known,
+                                                                penalty_factors_unknown=penalty_factors_for_novel)
+
 
         # Determine if model is the best
         if valid_loader:
-            if valid_error < best_error:
-                best_error = valid_error
-                print('New best error: %.4f' % best_error)
+            if valid_acc_top1 > best_acc_top1:
+                best_acc_top1 = valid_acc_top1
+                print('New best top-1 accuracy: %.4f' % best_acc_top1)
                 torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
         else:
             torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
@@ -191,28 +559,17 @@ def train(model, train_loader, valid_loader, test_loader, save, n_epochs=300,
         # Log results
         with open(os.path.join(save, 'results.csv'), 'a') as f:
             f.write('%03d, '
-                    '%0.6f, %0.6f, %0.6f, %0.6f, %0.6f, '
-                    '%0.5f, %0.5f, %0.6f, %0.6f, %0.6f,\n' % (
+                    '%0.6f, %0.6f, %0.6f, %0.6f, '
+                    '%0.5f, %0.6f, %0.6f, %0.6f,\n' % (
                 (epoch + 1),
-                train_loss, train_error, train_acc_top1, train_acc_top3, train_acc_top5,
-                valid_loss, valid_error, valid_acc_top1, valid_acc_top3, valid_acc_top5
-            ))
-
-    # Final test of model on test set
-    model.load_state_dict(torch.load(os.path.join(save, 'model.dat')))
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model).cuda()
-    test_results = valid_epoch(
-        model=model,
-        loader=test_loader,
-        is_test=True
-    )
-    _, _, test_error = test_results
-    with open(os.path.join(save, 'results.csv'), 'a') as f:
-        f.write(',,,,,%0.5f\n' % (test_error))
-    print('Final test error: %.4f' % test_error)
+                train_loss, train_acc_top1, train_acc_top3, train_acc_top5,
+                valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5))
 
 
+
+
+
+# TODO: This whole thing needs to be fixed
 def test_with_novelty(test_loader,
                       model,
                       test_unknown):
@@ -319,27 +676,231 @@ def test_with_novelty(test_loader,
 
 
 
-def accuracy(output, target, topk=(1,)):
+def demo(depth=100,
+         growth_rate=12,
+         efficient=True,
+         n_epochs=100,
+         batch_size=32,
+         seed=None):
+    """
+    A demo to show off training of efficient DenseNets.
+    Trains and evaluates a DenseNet-BC on CIFAR-10.
+    Args:
+        data (str) - path to directory where data should be loaded from/downloaded
+            (default $DATA_DIR)
+        save (str) - path to save the model to (default /tmp)
+        depth (int) - depth of the network (number of convolution layers) (default 40)
+        growth_rate (int) - number of features added per DenseNet layer (default 12)
+        efficient (bool) - use the memory efficient implementation? (default True)
+        valid_size (int) - size of validation set
+        n_epochs (int) - number of epochs for training (default 300)
+        batch_size (int) - size of minibatch (default 256)
+        seed (int) - manually set the random seed (default None)
     """
 
-    :param output:
-    :param target:
-    :param topk:
-    :return:
-    """
-    maxk = max(topk)
-    batch_size = target.size(0)
+    global args
 
-    _, pred = output.topk(maxk, 1, True, True)
+    # Get densenet configuration
+    if (depth - 4) % 3:
+        raise Exception('Invalid depth')
+    block_config = [(depth - 4) // 6 for _ in range(3)]
 
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
+    # Data transforms
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res
+    train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
+                                          transforms.RandomHorizontalFlip(),
+                                          transforms.ToTensor(),
+                                          normalize])
+
+    valid_transform = train_transform
+
+    test_transform = transforms.Compose([transforms.Resize(256),
+                                         transforms.CenterCrop(224),
+                                         transforms.ToTensor(),
+                                         normalize])
+
+
+    #######################################################################
+    # Create dataset and data loader
+    #######################################################################
+    if use_json_data:
+        # Training loaders
+        train_known_known_dataset = msd_net_dataset(json_path=train_known_known_path,
+                                                    transform=train_transform)
+        train_known_known_index = torch.randperm(len(train_known_known_dataset))
+
+        train_known_unknown_dataset = msd_net_dataset(json_path=train_known_unknown_path,
+                                                      transform=train_transform)
+        train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
+
+        train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
+                                                               batch_size=batch_size,
+                                                               shuffle=False,
+                                                               sampler=torch.utils.data.RandomSampler(train_known_known_index),
+                                                               collate_fn=customized_dataloader.collate,
+                                                               drop_last=True)
+        train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
+                                                                 batch_size=batch_size,
+                                                                 shuffle=False,
+                                                                 sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
+                                                                 collate_fn=customized_dataloader.collate,
+                                                                 drop_last=True)
+
+        # Validation loaders
+        valid_known_known_dataset = msd_net_dataset(json_path=valid_known_known_path,
+                                                    transform=valid_transform)
+        valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
+
+        valid_known_unknown_dataset = msd_net_dataset(json_path=valid_known_unknown_path,
+                                                      transform=valid_transform)
+        valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
+
+        valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
+                                                               batch_size=batch_size,
+                                                               shuffle=False,
+                                                               sampler=torch.utils.data.RandomSampler(valid_known_known_index),
+                                                               collate_fn=customized_dataloader.collate,
+                                                               drop_last=True)
+
+        valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
+                                                                 batch_size=batch_size,
+                                                                 shuffle=False,
+                                                                 sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
+                                                                 collate_fn=customized_dataloader.collate,
+                                                                 drop_last=True)
+
+        # Test loaders
+        test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
+                                                   transform=test_transform)
+        test_known_known_index = torch.randperm(len(test_known_known_dataset))
+
+        test_known_unknown_dataset = msd_net_dataset(json_path=test_known_unknown_path,
+                                                     transform=test_transform)
+        test_known_unknown_index = torch.randperm(len(test_known_unknown_dataset))
+
+        test_unknown_unknown_dataset = msd_net_dataset(json_path=test_unknown_unknown_path,
+                                                       transform=test_transform)
+        test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
+
+        # When doing test, set the batch size to 1 to test the time one by one accurately
+        test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+                                                              batch_size=1,
+                                                              shuffle=False,
+                                                              sampler=torch.utils.data.RandomSampler(
+                                                                  test_known_known_index),
+                                                              collate_fn=customized_dataloader.collate,
+                                                              drop_last=True)
+
+        test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
+                                                                batch_size=1,
+                                                                shuffle=False,
+                                                                sampler=torch.utils.data.RandomSampler(
+                                                                    test_known_unknown_index),
+                                                                collate_fn=customized_dataloader.collate,
+                                                                drop_last=True)
+
+        test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
+                                                                  batch_size=1,
+                                                                  shuffle=False,
+                                                                  sampler=torch.utils.data.RandomSampler(
+                                                                      test_unknown_unknown_index),
+                                                                  collate_fn=customized_dataloader.collate,
+                                                                  drop_last=True)
+
+    else:
+        return
+
+
+    ########################################################################
+    # Create model: MSD-Net or other
+    ########################################################################
+    if model_name == "dense_net":
+        print("Training DenseNet")
+        model = efficient_dense_net.DenseNet(growth_rate=growth_rate,
+                                            block_config=block_config,
+                                            num_init_features=growth_rate * 2,
+                                            num_classes=335,
+                                            small_inputs=True,
+                                            efficient=efficient)
+
+    # TODO: Add creating MSD-Net here
+    elif model_name == "msd_net":
+        model = getattr(models, args.arch)(args)
+
+
+
+    # TODO: Maybe adding other networks in the future
+
+
+
+    ########################################################################
+    # Test-only or Training + validation
+    ########################################################################
+    # TODO: Fix this testing process + add op count
+    if run_test:
+        model.load_state_dict(torch.load(os.path.join(model_path, 'model.dat')))
+
+        print("*" * 50)
+        print("Testing the known samples...")
+        test_with_novelty(test_loader=test_known_known_loader,
+                          model=model,
+                          test_unknown=False)
+
+        print("*" * 50)
+        print("testing the unknown samples...")
+        test_with_novelty(test_loader=test_unknown_unknown_loader,
+                          model=model,
+                          test_unknown=True)
+        print("*" * 50)
+
+        return
+
+
+    else:
+
+        # Make save directory
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        if not os.path.isdir(save_path):
+            raise Exception('%s is not a dir' % save_path)
+
+
+        # Combine training all networks together
+        train(model=model,
+              train_loader=train_known_known_loader,
+              valid_loader=valid_known_known_loader,
+              test_loader=None,
+              save=save_dir,
+              n_epochs=n_epochs,
+              batch_size=batch_size,
+              seed=seed)
+
+
+
+
+
+
+def adjust_learning_rate(optimizer, epoch, args, batch=None,
+                         nBatch=None, method='multistep'):
+    if method == 'cosine':
+        T_total = args.epochs * nBatch
+        T_cur = (epoch % args.epochs) * nBatch + batch
+        lr = 0.5 * args.lr * (1 + math.cos(math.pi * T_cur / T_total))
+    elif method == 'multistep':
+        if args.data.startswith('cifar'):
+            lr, decay_rate = args.lr, 0.1
+            if epoch >= args.epochs * 0.75:
+                lr *= decay_rate ** 2
+            elif epoch >= args.epochs * 0.5:
+                lr *= decay_rate
+        else:
+            lr = args.lr * (0.1 ** (epoch // 30))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    return lr
+
 
 
 
@@ -366,145 +927,47 @@ class AverageMeter(object):
 
 
 
-def demo(train_data_dir, test_known_dir, test_unknown_dir, save_dir, depth=100, growth_rate=12, efficient=True, use_valid=True,
-         n_epochs=100, batch_size=32, seed=None):
-    """
-    A demo to show off training of efficient DenseNets.
-    Trains and evaluates a DenseNet-BC on CIFAR-10.
-    Args:
-        data (str) - path to directory where data should be loaded from/downloaded
-            (default $DATA_DIR)
-        save (str) - path to save the model to (default /tmp)
-        depth (int) - depth of the network (number of convolution layers) (default 40)
-        growth_rate (int) - number of features added per DenseNet layer (default 12)
-        efficient (bool) - use the memory efficient implementation? (default True)
-        valid_size (int) - size of validation set
-        n_epochs (int) - number of epochs for training (default 300)
-        batch_size (int) - size of minibatch (default 256)
-        seed (int) - manually set the random seed (default None)
+def accuracy(output, target, topk=(1,)):
     """
 
-    # Get densenet configuration
-    if (depth - 4) % 3:
-        raise Exception('Invalid depth')
-    block_config = [(depth - 4) // 6 for _ in range(3)]
+    :param output:
+    :param target:
+    :param topk:
+    :return:
+    """
+    maxk = max(topk)
+    batch_size = target.size(0)
 
-    # Data transforms
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    _, pred = output.topk(maxk, 1, True, True)
 
-    # Datasets
-    train_set = datasets.ImageFolder(train_data_dir, transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        normalize]))
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-    test_set_known = datasets.ImageFolder(test_known_dir, transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        normalize]))
-
-    test_set_unknown = datasets.ImageFolder(test_unknown_dir, transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        normalize]))
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
 
 
 
-    valid_size = int(len(train_set) / 5)
-    indices = torch.randperm(len(train_set))
+def get_pp_factor(rt,
+                  scale=1,
+                  rt_max=20):
+    """
+    scalar * (RTmax - RTi) / RTmax + 1
 
-    train_indices = indices[:len(indices) - valid_size]
-    valid_indices = indices[len(indices) - valid_size:]
-
-    train_loader = torch.utils.data.DataLoader(train_set,
-                                               batch_size=1,
-                                               sampler=torch.utils.data.sampler.SubsetRandomSampler(train_indices),
-                                               num_workers=1,
-                                               pin_memory=True)
-
-    val_loader = torch.utils.data.DataLoader(train_set,
-                                            batch_size=1,
-                                            sampler=torch.utils.data.sampler.SubsetRandomSampler(valid_indices),
-                                            num_workers=1,
-                                            pin_memory=True)
-
-    # print(len(train_loader))
-    # print(len(val_loader))
-    # sys.exit()
-
-    test_known_loader = torch.utils.data.DataLoader(test_set_known,
-                                              batch_size=1, shuffle=False,
-                                              num_workers=1, pin_memory=True)
-
-    test_unknown_loader = torch.utils.data.DataLoader(test_set_unknown,
-                                                    batch_size=1, shuffle=False,
-                                                    num_workers=1, pin_memory=True)
-
-    # Models
-    model = efficient_dense_net.DenseNet(
-        growth_rate=growth_rate,
-        block_config=block_config,
-        num_init_features=growth_rate * 2,
-        num_classes=335,
-        small_inputs=True,
-        efficient=efficient)
-
-    if run_test:
-        model.load_state_dict(torch.load(os.path.join(model_path, 'model.dat')))
-
-        print("*" * 50)
-        print("Testing the known samples...")
-        test_with_novelty(test_loader=test_known_loader,
-                          model=model,
-                          test_unknown=False)
-
-        print("*" * 50)
-        print("testing the unknown samples...")
-        test_with_novelty(test_loader=test_unknown_loader,
-                          model=model,
-                          test_unknown=True)
-        print("*" * 50)
-
-        return
-
-
+    :param rt:
+    :param scale:
+    :param rt_max:
+    :return:
+    """
+    if rt > rt_max:
+        return 1
     else:
-        # Print number of parameters
-        num_params = sum(p.numel() for p in model.parameters())
-        print("Total parameters: ", num_params)
-
-        # Make save directory
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        if not os.path.isdir(save_dir):
-            raise Exception('%s is not a dir' % save_dir)
-
-        # Train the model
-        train(model=model, train_loader=train_loader, valid_loader=val_loader, test_loader=test_loader, save=save_dir,
-              n_epochs=n_epochs, batch_size=batch_size, seed=seed)
-        print('Done!')
+        return (scale*(rt_max-rt)/rt_max +1)
 
 
-"""
-A demo to show off training of efficient DenseNets.
-Trains and evaluates a DenseNet-BC on CIFAR-10.
-Try out the efficient DenseNet implementation:
-python demo.py --efficient True --data <path_to_data_dir> --save <path_to_save_dir>
-Try out the naive DenseNet implementation:
-python demo.py --efficient False --data <path_to_data_dir> --save <path_to_save_dir>
-Other args:
-    --depth (int) - depth of the network (number of convolution layers) (default 40)
-    --growth_rate (int) - number of features added per DenseNet layer (default 12)
-    --n_epochs (int) - number of epochs for training (default 300)
-    --batch_size (int) - size of minibatch (default 256)
-    --seed (int) - manually set the random seed (default None)
-"""
+
 if __name__ == '__main__':
-    demo(train_data_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/train_valid/known_known",
-         test_known_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/known_known",
-         test_unknown_dir = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/debug/test/unknown_unknown",
-         save_dir="/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup")
+    demo()
