@@ -30,49 +30,75 @@ args.nScales = len(args.grFactor)
 # Change these parameters
 ###############################################
 model_name = "msd_net"
+# model_name = "dense_net"
+# model_name = "inception_v4"
+# model_name = "vgg16"
 
-use_json_data = True
 use_5_weights = False
-use_pp_loss = False
-run_test = False
+use_pp_loss = True
+run_test = True
 
 n_epochs = 100
-batch_size = 32
+batch_size = 8
+
+
+model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/" \
+             "msd_base/model_epoch_9.dat"
+save_path_sub = "combo_pipeline/1203/msd_base"
+
+
+###############################################
+# Noromaly, there is no need to change these
+###############################################
+use_json_data = True
+
+nBlocks = 5
 thresh_top_1 = 0.90
 nb_training_classes = 336 # known:335, unknown:1
-nBlocks = 5
 
 penalty_factors_for_known = [1.0, 2.5, 5.0, 7.5, 10.0]
 penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
 
-model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/dense_net/1117_base_setup"
 
-train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-
-# The folder path for saving everything
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
 
-save_path_sub = "combo_pipeline/1203/msd_net_no_pp"
-save_path = save_path_base + "/" + save_path_sub
+train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
+                           "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                        "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
 
+save_path = save_path_base + "/" + save_path_sub
+save_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs.npy"
+save_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets.npy"
+save_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels.npy"
+save_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts.py"
+
+save_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs.npy"
+save_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets.npy"
+save_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels.npy"
+save_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts.npy"
 
 
 def train_valid_one_epoch(known_loader,
-                         unknown_loader,
-                        model,
-                        criterion,
-                        optimizer,
-                        nb_epoch,
-                        penalty_factors_known,
-                        penalty_factors_unknown,
-                        use_msd_net,
-                        train_phase):
+                            unknown_loader,
+                            model,
+                            criterion,
+                            optimizer,
+                            nb_epoch,
+                            penalty_factors_known,
+                            penalty_factors_unknown,
+                            use_msd_net,
+                            train_phase):
     """
 
     :param train_loader_known:
@@ -95,16 +121,17 @@ def train_valid_one_epoch(known_loader,
     data_time = AverageMeter()
     losses = AverageMeter()
 
+    top1, top3, top5 = [], [], []
+
     if use_msd_net:
-        top1, top3, top5 = [], [], []
         for i in range(nBlocks):
             top1.append(AverageMeter())
             top3.append(AverageMeter())
             top5.append(AverageMeter())
     else:
-        top1 = AverageMeter()
-        top3 = AverageMeter()
-        top5 = AverageMeter()
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
 
     if train_phase:
         model.train()
@@ -179,39 +206,63 @@ def train_valid_one_epoch(known_loader,
             if not isinstance(output, list):
                 output = [output]
 
-            # Case 1: known batch + 5 weights
-            if (batch_type == "known") and (use_5_weights == True):
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_known[j]
-                    output_weighted = output[j] * penalty_factor
-                    loss += criterion(output_weighted, target_var)
+            ##########################################
+            # Only MSD-Net
+            ##########################################
+            if model_name == "msd_net":
+                # Case 1: known batch + 5 weights
+                if (batch_type == "known") and (use_5_weights == True):
+                    for j in range(len(output)):
+                        penalty_factor = penalty_factors_known[j]
+                        output_weighted = output[j] * penalty_factor
+                        loss += criterion(output_weighted, target_var)
 
-            # Case 2: known batch + no 5 weights
-            if (batch_type == "known") and (use_5_weights == False):
-                for j in range(len(output)):
-                    output_weighted = output[j]
-                    loss += criterion(output_weighted, target_var)
+                # Case 2: known batch + no 5 weights
+                if (batch_type == "known") and (use_5_weights == False):
+                    for j in range(len(output)):
+                        output_weighted = output[j]
+                        loss += criterion(output_weighted, target_var)
 
-            # Case 3: unknown batch + no 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
-                for j in range(len(output)):
-                    output_weighted = output[j]
-                    loss += criterion(output_weighted, target_var)
+                # Case 3: unknown batch + no 5 weights + no pp loss
+                if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
+                    for j in range(len(output)):
+                        output_weighted = output[j]
+                        loss += criterion(output_weighted, target_var)
 
-            # Case 4: unknown batch + 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output[j] * penalty_factor
-                    loss += criterion(output_weighted, target_var)
+                # Case 4: unknown batch + 5 weights + no pp loss
+                if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
+                    for j in range(len(output)):
+                        penalty_factor = penalty_factors_unknown[j]
+                        output_weighted = output[j] * penalty_factor
+                        loss += criterion(output_weighted, target_var)
 
-            # Case 5: unknown batch + 5 weights + no pp loss
-            if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
-                for j in range(len(output)):
-                    penalty_factor = penalty_factors_unknown[j]
-                    output_weighted = output[j] * penalty_factor
-                    scale_factor = get_pp_factor(rts[j])
-                    loss += scale_factor * criterion(output_weighted, target_var)
+                # Case 5: unknown batch + 5 weights + no pp loss
+                if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
+                    for j in range(len(output)):
+                        penalty_factor = penalty_factors_unknown[j]
+                        output_weighted = output[j] * penalty_factor
+                        scale_factor = get_pp_factor(rts[j])
+                        loss += scale_factor * criterion(output_weighted, target_var)
+
+            else:
+                # Case 1: Known batch + no pp loss
+                if (batch_type == "known") and (use_pp_loss == False):
+                    for j in range(len(output)):
+                        output_weighted = output[j]
+                        loss += criterion(output_weighted, target_var)
+
+                # Case 3: unknown batch + no pp loss
+                if (batch_type == "unknown") and (use_pp_loss == False):
+                    for j in range(len(output)):
+                        output_weighted = output[j]
+                        loss += criterion(output_weighted, target_var)
+
+                # Case 4: unknown batch + pp loss
+                if (batch_type == "unknown") and (use_pp_loss == True):
+                    for j in range(len(output)):
+                        output_weighted = output[j]
+                        scale_factor = get_pp_factor(rts[j])
+                        loss += scale_factor * criterion(output_weighted, target_var)
 
 
             ##########################################
@@ -310,9 +361,10 @@ def train(model,
                                                      gamma=0.1)
 
     # Start log
-    # with open(os.path.join(save, 'results.csv'), 'w') as f:
-    #     f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
-
+    with open(os.path.join(save, 'results.csv'), 'w') as f:
+        f.write('epoch, '
+                'train_loss, train_acc_top1, train_acc_top3, train_acc_top5, '
+                'valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5\n')
 
     # Train model
     best_acc_top1 = 0.00
@@ -345,7 +397,7 @@ def train(model,
                                                                   penalty_factors_unknown=penalty_factors_for_novel,
                                                                   train_phase=False)
 
-        elif model_name == "dense_net":
+        else:
             train_loss, train_acc_top1, \
             train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
                                                                    unknown_loader=train_known_unknown_loader,
@@ -372,9 +424,6 @@ def train(model,
                                                                    use_msd_net=True,
                                                                    train_phase=False)
 
-        else:
-            return
-
 
         # Determine if model is the best
         if valid_loader:
@@ -400,12 +449,14 @@ def train(model,
 # TODO: This whole thing needs to be fixed
 def test_with_novelty(test_loader,
                       model,
-                      test_unknown):
+                      test_unknown,
+                      use_msd_net):
     """
 
-    :param val_loader:
+    :param test_loader:
     :param model:
-    :param criterion:
+    :param test_unknown:
+    :param use_msd_net:
     :return:
     """
 
@@ -414,93 +465,209 @@ def test_with_novelty(test_loader,
     model.eval()
 
     # Define the softmax - do softmax to each block.
-    sm = torch.nn.Softmax(dim=1)
+    if use_msd_net:
+        print("Testing MSD-Net...")
 
-    # full_original_label_list = []
-    # full_prob_list = []
-    # full_target_list = []
-    # full_rt_list = []
+        sm = torch.nn.Softmax(dim=2)
 
-    sample_count = 0
-    total_rt_count = 0
+        # For MSD-Net, save everything into npy files
+        full_original_label_list = []
+        full_prob_list = []
+        full_target_list = []
+        full_rt_list = []
 
-    correct_count = 0
-    wrong_count = 0
+        for i in range(len(test_loader)):
+            print("*" * 50)
 
+            batch = next(iter(test_loader))
 
-    with torch.no_grad():
-        for i, (input, target) in enumerate(test_loader):
-            # print("*" * 50)
+            input = batch["imgs"]
+            target = batch["labels"] - 1
 
-            # original_label = target
-            # print("Correct label:")
-            # print(original_label)
-
-            sample_count += 1
-
-            # rts = []
+            rts = []
             input = input.cuda()
             target = target.cuda(async=True)
 
-            # print("Correct label:")
-            # print(target)
-
             # Save original labels to the list
-            # original_label_list = np.array(target.cpu().tolist())
-            # for label in original_label_list:
-            #     full_original_label_list.append(label)
+            original_label_list = np.array(target.cpu().tolist())
+            for label in original_label_list:
+                full_original_label_list.append(label)
 
             # Check the target labels: keep or change
-            if test_unknown:
-                for k in range(len(target)):
+            for k in range(len(target)):
+                if target[k] >= nb_training_classes:
                     target[k] = -1
 
             input_var = torch.autograd.Variable(input)
             target_var = torch.autograd.Variable(target)
 
-
             # Get the model outputs and RTs
-            # print("Timer started.")
             start =timer()
             output, end_time = model(input_var)
 
-            rt = end_time[0]-start
-            total_rt_count += rt
+            # Save the RTs
+            for end in end_time:
+                rts.append(end-start)
+            full_rt_list.append(rts)
 
             # extract the probability and apply our threshold
-            prob = sm(output)
+            # if args.test_with_novel or args.save_probs:
+            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
             prob_list = np.array(prob.cpu().tolist())
             max_prob = np.max(prob_list)
 
             # decide whether to do classification or reject
             # When the probability is larger than our threshold
             if max_prob >= thresh_top_1:
-                # print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
+                print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
 
-                pred_label = torch.argmax(output)
-                # print("Predicted label:")
-                # print(pred_label)
+                # Get top-5 predictions from 5 classifiers
+                pred_label_list = []
+                for j in range(len(output)):
+                    _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
+                    pred_label_list.append(pred.tolist())
+
+                # Update the evaluation metrics for one sample
+                # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
+                # top_5_list = pred_label_list
+                top_1_list = []
+
+                for l in pred_label_list:
+                    top_1_list.append(l[0][0])
+
+                if target.tolist()[0] in top_1_list:
+                    pred_label = target.tolist()[0]
+                else:
+                    pred_label = top_1_list[-1]
 
             # When the probability is smaller than our threshold
             else:
+                print("Max probability smaller than threshold")
                 pred_label = -1
 
-            if pred_label == target:
-                # print("Right prediction!")
-                correct_count += 1
-            else:
-                # print("Wrong prediction!")
-                wrong_count += 1
+            # Reshape it into [batch, block, class]
+            prob_list = np.reshape(prob_list,
+                                    (prob_list.shape[1],
+                                     prob_list.shape[0],
+                                     prob_list.shape[2]))
+            target_list = np.array(target.cpu().tolist())
 
-    print("Total number of Samples: %d" % sample_count)
-    print("Number or right predictions: %d" % correct_count)
-    print("Number of wrong predictions: %d" % wrong_count)
+            for one_prob in prob_list.tolist():
+                full_prob_list.append(one_prob)
+            for one_target in target_list.tolist():
+                full_target_list.append(one_target)
 
-    avg_rt = total_rt_count / sample_count
-    print("Average RT: % 4f" % avg_rt)
+        # Save all results to npy file
+        full_prob_list_np = np.array(full_prob_list)
+        full_target_list_np = np.array(full_target_list)
+        full_rt_list_np = np.array(full_rt_list)
+        full_original_label_list_np = np.array(full_original_label_list)
 
-    acc = float(correct_count)/float(correct_count+wrong_count)
-    print("TOP-1 accuracy: %4f" % acc)
+        if test_unknown == False:
+            print("Saving probabilities to %s" % save_known_probs_path)
+            np.save(save_known_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % save_known_targets_path)
+            np.save(save_known_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % save_known_original_label_path)
+            np.save(save_known_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % save_known_rt_path)
+            np.save(save_known_rt_path, full_rt_list_np)
+
+        else:
+            print("Saving probabilities to %s" % save_unknown_probs_path)
+            np.save(save_unknown_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % save_unknown_targets_path)
+            np.save(save_unknown_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % save_unknown_original_label_path)
+            np.save(save_unknown_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % save_unknown_rt_path)
+            np.save(save_unknown_rt_path, full_rt_list_np)
+
+
+    # TODO: Fix test process for other networks
+    else:
+        sm = torch.nn.Softmax(dim=1)
+
+        # For other networks, just show acc and rt avg
+        sample_count = 0
+        total_rt_count = 0
+        correct_count = 0
+        wrong_count = 0
+
+
+        # with torch.no_grad():
+        #     for i, (input, target) in enumerate(test_loader):
+        #         # print("*" * 50)
+        #
+        #         # original_label = target
+        #         # print("Correct label:")
+        #         # print(original_label)
+        #
+        #         sample_count += 1
+        #
+        #         # rts = []
+        #         input = input.cuda()
+        #         target = target.cuda(async=True)
+        #
+        #         # print("Correct label:")
+        #         # print(target)
+        #
+        #         # Save original labels to the list
+        #         # original_label_list = np.array(target.cpu().tolist())
+        #         # for label in original_label_list:
+        #         #     full_original_label_list.append(label)
+        #
+        #         # Check the target labels: keep or change
+        #         if test_unknown:
+        #             for k in range(len(target)):
+        #                 target[k] = -1
+        #
+        #         input_var = torch.autograd.Variable(input)
+        #         target_var = torch.autograd.Variable(target)
+        #
+        #
+        #         # Get the model outputs and RTs
+        #         # print("Timer started.")
+        #         start =timer()
+        #         output, end_time = model(input_var)
+        #
+        #         rt = end_time[0]-start
+        #         total_rt_count += rt
+        #
+        #         # extract the probability and apply our threshold
+        #         prob = sm(output)
+        #         prob_list = np.array(prob.cpu().tolist())
+        #         max_prob = np.max(prob_list)
+        #
+        #         # decide whether to do classification or reject
+        #         # When the probability is larger than our threshold
+        #         if max_prob >= thresh_top_1:
+        #             # print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
+        #
+        #             pred_label = torch.argmax(output)
+        #             # print("Predicted label:")
+        #             # print(pred_label)
+        #
+        #         # When the probability is smaller than our threshold
+        #         else:
+        #             pred_label = -1
+        #
+        #         if pred_label == target:
+        #             # print("Right prediction!")
+        #             correct_count += 1
+        #         else:
+        #             # print("Wrong prediction!")
+        #             wrong_count += 1
+        #
+        # print("Total number of Samples: %d" % sample_count)
+        # print("Number or right predictions: %d" % correct_count)
+        # print("Number of wrong predictions: %d" % wrong_count)
+        #
+        # avg_rt = total_rt_count / sample_count
+        # print("Average RT: % 4f" % avg_rt)
+        #
+        # acc = float(correct_count)/float(correct_count+wrong_count)
+        # print("TOP-1 accuracy: %4f" % acc)
 
 
 
@@ -639,22 +806,21 @@ def demo(depth=100,
 
 
     ########################################################################
-    # Create model: MSD-Net or other
+    # Create model: MSD-Net or other networks
     ########################################################################
     if model_name == "dense_net":
-        print("Training DenseNet")
+        print("Creating DenseNet")
         model = efficient_dense_net.DenseNet(growth_rate=growth_rate,
                                             block_config=block_config,
                                             num_init_features=growth_rate * 2,
-                                            num_classes=335,
+                                            num_classes=nb_training_classes,
                                             small_inputs=True,
                                             efficient=efficient)
 
-    # TODO: Add creating MSD-Net here
+    # Add creating MSD-Net here
     elif model_name == "msd_net":
+        print("Creating MSD-Net")
         model = getattr(models, args.arch)(args)
-
-
 
     # TODO: Maybe adding other networks in the future
     else:
@@ -667,22 +833,44 @@ def demo(depth=100,
     ########################################################################
     # TODO: Fix this testing process + add op count
     if run_test:
-        model.load_state_dict(torch.load(os.path.join(model_path, 'model.dat')))
+        model.load_state_dict(torch.load(model_path))
 
-        print("*" * 50)
-        print("Testing the known samples...")
-        test_with_novelty(test_loader=test_known_known_loader,
-                          model=model,
-                          test_unknown=False)
+        if model_name == "msd_net":
+            print("Testing MSD-Net")
+            print("Testing the known samples...")
+            test_with_novelty(test_loader=test_known_known_loader,
+                              model=model,
+                              test_unknown=False,
+                              use_msd_net=True)
 
-        print("*" * 50)
-        print("testing the unknown samples...")
-        test_with_novelty(test_loader=test_unknown_unknown_loader,
-                          model=model,
-                          test_unknown=True)
-        print("*" * 50)
+            print("testing the unknown samples...")
+            test_with_novelty(test_loader=test_unknown_unknown_loader,
+                              model=model,
+                              test_unknown=True,
+                              use_msd_net=True)
 
-        return
+
+        else:
+            """
+            For other networks: there is only one exit,
+            so we only need classification accuracy and exit time
+            """
+            print("*" * 50)
+            print("Testing the known samples...")
+            test_with_novelty(test_loader=test_known_known_loader,
+                              model=model,
+                              test_unknown=False,
+                              use_msd_net=False)
+
+            print("*" * 50)
+            print("testing the unknown samples...")
+            test_with_novelty(test_loader=test_unknown_unknown_loader,
+                              model=model,
+                              test_unknown=True,
+                              use_msd_net=False)
+            print("*" * 50)
+
+            return
 
 
     else:
