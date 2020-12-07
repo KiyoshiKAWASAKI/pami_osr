@@ -168,14 +168,14 @@ def get_unknown_exit_stats(original_labels,
     for i in range(len(original_labels)):
         # Loop thru each sample
         # original_label = original_labels[i]
-        target_label = target_labels[i]
+        # target_label = target_labels[i]
         prob = probs[i]
         rt = rts[i]
 
         # check each classifier in order and decide when to exit
         for j in range(nb_clfs):
             one_prob = prob[j]
-            pred = np.argmax(one_prob)
+            # pred = np.argmax(one_prob)
             max_prob = np.sort(one_prob)[-1]
 
             # If this is not the last classifier
@@ -210,17 +210,12 @@ def get_unknown_exit_stats(original_labels,
                 exit_count[j] += 1
 
                 if max_prob > top_1_threshold:
-                    known_as_known_count += 1
-
-                    # Then, check whether the prediction is right
-                    if pred == target_label:
-                        nb_correct += 1
-                    else:
-                        nb_wrong += 1
+                    unknown_as_known_count += 1
+                    nb_wrong += 1
 
                 else:
-                    known_as_unknown_count += 1
-                    nb_wrong += 1
+                    unknown_as_unknown_count += 1
+                    nb_correct += 1
 
                 # Record the RT for this sample
                 exit_rt.append(rt[j])
@@ -228,8 +223,8 @@ def get_unknown_exit_stats(original_labels,
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
     print("Total number of samples: %d" % len(original_labels))
-    print("Known predicted as known: %d" % known_as_known_count)
-    print("Known predicted as unknown: %d" % known_as_unknown_count)
+    print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
+    print("Unknown predicted as known: %d" % unknown_as_unknown_count)
     print("Number of right prediction: %d" % nb_correct)
     print("Number of wrong prediction: %d" % nb_wrong)
     print("Accuracy: %4f" % acc)
@@ -239,9 +234,9 @@ def get_unknown_exit_stats(original_labels,
     # Deal with RTs
     exit_rt_np = np.asarray(exit_rt)
 
-    print("Known RT avg:")
+    print("Unknown RT avg:")
     print(np.mean(exit_rt_np))
-    print("Known RT median:")
+    print("Unknown RT median:")
     print(np.median(exit_rt_np))
 
 
@@ -310,3 +305,9 @@ if __name__ == '__main__':
                          top_1_threshold=0.80)
 
     print("*" * 50)
+
+    get_unknown_exit_stats(original_labels=unknown_original_labels,
+                             target_labels=unknown_target_labels,
+                             probs=unknown_probs,
+                             rts=unknown_rts,
+                             top_1_threshold=0.80)
