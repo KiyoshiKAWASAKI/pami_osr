@@ -8,6 +8,7 @@ import numpy as np
 from timeit import default_timer as timer
 from utils import customized_dataloader
 from utils.customized_dataloader import msd_net_dataset
+from op_counter import measure_model
 import sys
 import warnings
 warnings.filterwarnings("ignore")
@@ -34,17 +35,22 @@ model_name = "msd_net"
 # model_name = "inception_v4"
 # model_name = "vgg16"
 
-use_5_weights = False
-use_pp_loss = True
+use_5_weights = True
+use_pp_loss = False
 run_test = True
 
 n_epochs = 100
-batch_size = 8
+batch_size = 16
 
+test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
+test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
 
-model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/" \
-             "msd_base/model_epoch_9.dat"
-save_path_sub = "combo_pipeline/1203/msd_base"
+# This is the path for loading and testing model
+# model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/" \
+#              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
+
+# This is for saving training model as well as saving test npys
+save_path_sub = "combo_pipeline/1203/msd_5_weights"
 
 
 ###############################################
@@ -52,12 +58,14 @@ save_path_sub = "combo_pipeline/1203/msd_base"
 ###############################################
 use_json_data = True
 
+img_size = 224
 nBlocks = 5
 thresh_top_1 = 0.90
 nb_training_classes = 336 # known:335, unknown:1
 
 penalty_factors_for_known = [1.0, 2.5, 5.0, 7.5, 10.0]
-penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+# penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
+penalty_factors_for_novel = [22.423, 11.491, 7.420, 5.390, 3.897]
 
 
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
@@ -78,15 +86,8 @@ test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set
                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
 
 save_path = save_path_base + "/" + save_path_sub
-save_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs.npy"
-save_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets.npy"
-save_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels.npy"
-save_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts.py"
 
-save_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs.npy"
-save_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets.npy"
-save_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels.npy"
-save_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts.npy"
+
 
 
 def train_valid_one_epoch(known_loader,
@@ -206,6 +207,8 @@ def train_valid_one_epoch(known_loader,
             if not isinstance(output, list):
                 output = [output]
 
+            print(type(output))
+
             ##########################################
             # Only MSD-Net
             ##########################################
@@ -213,8 +216,10 @@ def train_valid_one_epoch(known_loader,
                 # Case 1: known batch + 5 weights
                 if (batch_type == "known") and (use_5_weights == True):
                     for j in range(len(output)):
+                        # print(type(output[j]))
                         penalty_factor = penalty_factors_known[j]
-                        output_weighted = output[j] * penalty_factor
+                        # output_weighted = output[j] * penalty_factor
+                        output_weighted = torch.add(output[j], penalty_factor)
                         loss += criterion(output_weighted, target_var)
 
                 # Case 2: known batch + no 5 weights
@@ -233,14 +238,16 @@ def train_valid_one_epoch(known_loader,
                 if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
                     for j in range(len(output)):
                         penalty_factor = penalty_factors_unknown[j]
-                        output_weighted = output[j] * penalty_factor
+                        # output_weighted = output[j] * penalty_factor
+                        output_weighted = torch.add(output[j], penalty_factor)
                         loss += criterion(output_weighted, target_var)
 
                 # Case 5: unknown batch + 5 weights + no pp loss
                 if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
                     for j in range(len(output)):
                         penalty_factor = penalty_factors_unknown[j]
-                        output_weighted = output[j] * penalty_factor
+                        # output_weighted = output[j] * penalty_factor
+                        output_weighted = torch.add(output[j], penalty_factor)
                         scale_factor = get_pp_factor(rts[j])
                         loss += scale_factor * criterion(output_weighted, target_var)
 
@@ -450,7 +457,8 @@ def train(model,
 def test_with_novelty(test_loader,
                       model,
                       test_unknown,
-                      use_msd_net):
+                      use_msd_net,
+                      epoch_index):
     """
 
     :param test_loader:
@@ -459,6 +467,16 @@ def test_with_novelty(test_loader,
     :param use_msd_net:
     :return:
     """
+    # Setup the paths
+    save_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs_epoch_" + str(epoch_index) + ".npy"
+    save_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets_epoch_" + str(epoch_index) + ".npy"
+    save_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels_epoch_" + str(epoch_index) + ".npy"
+    save_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts_epoch_" + str(epoch_index) + ".npy"
+
+    save_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts_epoch_" + str(epoch_index) + ".npy"
 
     # Set the model to evaluation mode
     model.cuda()
@@ -819,12 +837,14 @@ def demo(depth=100,
 
     # Add creating MSD-Net here
     elif model_name == "msd_net":
-        print("Creating MSD-Net")
         model = getattr(models, args.arch)(args)
 
     # TODO: Maybe adding other networks in the future
     else:
         pass
+
+    n_flops, n_params = measure_model(model, img_size, img_size)
+    print(n_flops)
 
 
 
@@ -833,21 +853,33 @@ def demo(depth=100,
     ########################################################################
     # TODO: Fix this testing process + add op count
     if run_test:
-        model.load_state_dict(torch.load(model_path))
-
         if model_name == "msd_net":
-            print("Testing MSD-Net")
-            print("Testing the known samples...")
-            test_with_novelty(test_loader=test_known_known_loader,
-                              model=model,
-                              test_unknown=False,
-                              use_msd_net=True)
+            if use_5_weights:
+                print("Using 5 weights")
+                index_list = test_msd_5_weights_epoch
+            else:
+                print("Using MSD-Net Base")
+                index_list = test_msd_base_epoch
 
-            print("testing the unknown samples...")
-            test_with_novelty(test_loader=test_unknown_unknown_loader,
-                              model=model,
-                              test_unknown=True,
-                              use_msd_net=True)
+            for index in index_list:
+                model_path = save_path_base + "/" + save_path_sub + "/model_epoch_" + str(index) + ".dat"
+                model.load_state_dict(torch.load(model_path))
+
+                print("Loading MSD-Net model:")
+                print(model_path)
+                print("Testing the known samples...")
+                test_with_novelty(test_loader=test_known_known_loader,
+                                  model=model,
+                                  test_unknown=False,
+                                  use_msd_net=True,
+                                  epoch_index=index)
+
+                print("testing the unknown samples...")
+                test_with_novelty(test_loader=test_unknown_unknown_loader,
+                                  model=model,
+                                  test_unknown=True,
+                                  use_msd_net=True,
+                                  epoch_index=index)
 
 
         else:
@@ -855,22 +887,23 @@ def demo(depth=100,
             For other networks: there is only one exit,
             so we only need classification accuracy and exit time
             """
-            print("*" * 50)
-            print("Testing the known samples...")
-            test_with_novelty(test_loader=test_known_known_loader,
-                              model=model,
-                              test_unknown=False,
-                              use_msd_net=False)
+            # print("*" * 50)
+            # print("Testing the known samples...")
+            # test_with_novelty(test_loader=test_known_known_loader,
+            #                   model=model,
+            #                   test_unknown=False,
+            #                   use_msd_net=False)
+            #
+            # print("*" * 50)
+            # print("testing the unknown samples...")
+            # test_with_novelty(test_loader=test_unknown_unknown_loader,
+            #                   model=model,
+            #                   test_unknown=True,
+            #                   use_msd_net=False)
+            # print("*" * 50)
+            pass
 
-            print("*" * 50)
-            print("testing the unknown samples...")
-            test_with_novelty(test_loader=test_unknown_unknown_loader,
-                              model=model,
-                              test_unknown=True,
-                              use_msd_net=False)
-            print("*" * 50)
-
-            return
+        return
 
 
     else:

@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N dense_net_pp
+#$ -N msd_base
 
 # Required modules
 module load conda

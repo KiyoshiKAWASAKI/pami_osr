@@ -1,11 +1,14 @@
 import numpy as np
-
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 
 
 # This is the path that needs to be changed
-save_path_sub = "combo_pipeline/1203/msd_base"
+save_path_sub = "combo_pipeline/1203/msd_5_weights_pp"
+csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/results.csv"
+fig_save_base_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/test"
 
 
 # Normally, no need to change these paths
@@ -20,6 +23,9 @@ unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs
 unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets.npy"
 unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels.npy"
 unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts.npy"
+
+
+
 
 
 
@@ -286,28 +292,33 @@ def get_unknown_exit_stats(original_labels,
 
 
 
+def
+
+
+
+
 if __name__ == '__main__':
     # Load all the npy files
-    known_original_labels = np.load(known_original_label_path)
-    known_target_labels = np.load(known_targets_path)
-    known_probs = np.load(known_probs_path)
-    known_rts = np.load(known_rt_path)
-
-    unknown_original_labels = np.load(unknown_original_label_path)
-    unknown_target_labels = np.load(unknown_targets_path)
-    unknown_probs = np.load(unknown_probs_path)
-    unknown_rts = np.load(unknown_rt_path)
-
-    get_known_exit_stats(original_labels=known_original_labels,
-                         target_labels=known_target_labels,
-                         probs=known_probs,
-                         rts=known_rts,
-                         top_1_threshold=0.80)
-
-    print("*" * 50)
-
-    get_unknown_exit_stats(original_labels=unknown_original_labels,
-                             target_labels=unknown_target_labels,
-                             probs=unknown_probs,
-                             rts=unknown_rts,
-                             top_1_threshold=0.80)
+    # known_original_labels = np.load(known_original_label_path)
+    # known_target_labels = np.load(known_targets_path)
+    # known_probs = np.load(known_probs_path)
+    # known_rts = np.load(known_rt_path)
+    #
+    # unknown_original_labels = np.load(unknown_original_label_path)
+    # unknown_target_labels = np.load(unknown_targets_path)
+    # unknown_probs = np.load(unknown_probs_path)
+    # unknown_rts = np.load(unknown_rt_path)
+    #
+    # get_known_exit_stats(original_labels=known_original_labels,
+    #                      target_labels=known_target_labels,
+    #                      probs=known_probs,
+    #                      rts=known_rts,
+    #                      top_1_threshold=0.90)
+    #
+    # print("*" * 50)
+    #
+    # get_unknown_exit_stats(original_labels=unknown_original_labels,
+    #                          target_labels=unknown_target_labels,
+    #                          probs=unknown_probs,
+    #                          rts=unknown_rts,
+    #                          top_1_threshold=0.90)
