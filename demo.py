@@ -37,20 +37,30 @@ model_name = "msd_net"
 
 use_5_weights = True
 use_pp_loss = False
+
 run_test = True
 
 n_epochs = 100
 batch_size = 16
 
-test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
-test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
+# This is for multiplication
+# test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
+# test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
+
+# This is for addition
+test_msd_base_epoch = [0, 10, 22, 30, 40, 51, 60, 71, 80, 99]
+# test_msd_5_weights_epoch = [0, 11, 46, 50, 60, 70, 80, 90, 95]
+test_msd_5_weights_epoch = [91, 98]
+
+# test_msd_base_epoch = [94]
+# test_msd_5_weights_epoch = [95]
 
 # This is the path for loading and testing model
 # model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/" \
 #              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
 
 # This is for saving training model as well as saving test npys
-save_path_sub = "combo_pipeline/1203/msd_5_weights"
+save_path_sub = "combo_pipeline/1205_use_addition/msd_5_weights"
 
 
 ###############################################
@@ -472,11 +482,13 @@ def test_with_novelty(test_loader,
     save_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets_epoch_" + str(epoch_index) + ".npy"
     save_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels_epoch_" + str(epoch_index) + ".npy"
     save_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts_epoch_" + str(epoch_index) + ".npy"
+    save_known_flops_path = save_path_base + "/" + save_path_sub + "/test/known/flops_epoch_" + str(epoch_index) + ".npy"
 
     save_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs_epoch_" + str(epoch_index) + ".npy"
     save_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets_epoch_" + str(epoch_index) + ".npy"
     save_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels_epoch_" + str(epoch_index) + ".npy"
     save_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_flops_path = save_path_base + "/" + save_path_sub + "/test/unknown/flops_epoch_" + str(epoch_index) + ".npy"
 
     # Set the model to evaluation mode
     model.cuda()
@@ -493,6 +505,7 @@ def test_with_novelty(test_loader,
         full_prob_list = []
         full_target_list = []
         full_rt_list = []
+        full_flops_list = []
 
         for i in range(len(test_loader)):
             print("*" * 50)
@@ -522,6 +535,13 @@ def test_with_novelty(test_loader,
             # Get the model outputs and RTs
             start =timer()
             output, end_time = model(input_var)
+
+            # TODO: Get the flops for a test image
+            flops, _ = measure_model(model, input_var)
+            full_flops_list.append(flops)
+            # print("HERE")
+            # print(flops)
+            # sys.exit()
 
             # Save the RTs
             for end in end_time:
@@ -843,8 +863,8 @@ def demo(depth=100,
     else:
         pass
 
-    n_flops, n_params = measure_model(model, img_size, img_size)
-    print(n_flops)
+    # n_flops, n_params = measure_model(model, img_size, img_size)
+    # print(n_flops)
 
 
 

@@ -1,12 +1,22 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
 
+
+use_5_weight = True
+
+
+# The epoch index of the models
+# test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
+# test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
+
+test_msd_base_epoch = [0, 10, 22, 30, 40, 51, 60, 71, 80, 99]
+test_msd_5_weights_epoch = [0, 11, 46, 50, 60, 70, 80, 91]
 
 
 # This is the path that needs to be changed
-save_path_sub = "combo_pipeline/1203/msd_5_weights_pp"
+save_path_sub = "combo_pipeline/1205_use_addition/msd_5_weights"
 csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/results.csv"
 fig_save_base_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/test"
 
@@ -14,17 +24,15 @@ fig_save_base_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models
 # Normally, no need to change these paths
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
 
-known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs.npy"
-known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets.npy"
-known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels.npy"
-known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts.npy"
-
-unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs.npy"
-unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets.npy"
-unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels.npy"
-unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts.npy"
-
-
+# known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs.npy"
+# known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets.npy"
+# known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels.npy"
+# known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts.npy"
+#
+# unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs.npy"
+# unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets.npy"
+# unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels.npy"
+# unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts.npy"
 
 
 
@@ -124,22 +132,22 @@ def get_known_exit_stats(original_labels,
 
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
-    print("Total number of samples: %d" % len(original_labels))
-    print("Known predicted as known: %d" % known_as_known_count)
-    print("Known predicted as unknown: %d" % known_as_unknown_count)
-    print("Number of right prediction: %d" % nb_correct)
-    print("Number of wrong prediction: %d" % nb_wrong)
-    print("Accuracy: %4f" % acc)
-    print("Exit counts")
+    # print("Total number of samples: %d" % len(original_labels))
+    # print("Known predicted as known: %d" % known_as_known_count)
+    # print("Known predicted as unknown: %d" % known_as_unknown_count)
+    # print("Number of right prediction: %d" % nb_correct)
+    # print("Number of wrong prediction: %d" % nb_wrong)
+    # print("Accuracy: %4f" % acc)
+    print("Known exit counts")
     print(exit_count)
 
     # Deal with RTs
     exit_rt_np = np.asarray(exit_rt)
 
-    print("Known RT avg:")
-    print(np.mean(exit_rt_np))
-    print("Known RT median:")
-    print(np.median(exit_rt_np))
+    # print("Known RT avg:")
+    # print(np.mean(exit_rt_np))
+    # print("Known RT median:")
+    # print(np.median(exit_rt_np))
 
 
 
@@ -228,22 +236,22 @@ def get_unknown_exit_stats(original_labels,
 
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
-    print("Total number of samples: %d" % len(original_labels))
-    print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
-    print("Unknown predicted as known: %d" % unknown_as_unknown_count)
-    print("Number of right prediction: %d" % nb_correct)
-    print("Number of wrong prediction: %d" % nb_wrong)
-    print("Accuracy: %4f" % acc)
-    print("Exit counts")
+    # print("Total number of samples: %d" % len(original_labels))
+    # print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
+    # print("Unknown predicted as known: %d" % unknown_as_unknown_count)
+    # print("Number of right prediction: %d" % nb_correct)
+    # print("Number of wrong prediction: %d" % nb_wrong)
+    # print("Accuracy: %4f" % acc)
+    print("Unknown exit counts")
     print(exit_count)
 
     # Deal with RTs
     exit_rt_np = np.asarray(exit_rt)
 
-    print("Unknown RT avg:")
-    print(np.mean(exit_rt_np))
-    print("Unknown RT median:")
-    print(np.median(exit_rt_np))
+    # print("Unknown RT avg:")
+    # print(np.mean(exit_rt_np))
+    # print("Unknown RT median:")
+    # print(np.median(exit_rt_np))
 
 
 
@@ -292,33 +300,52 @@ def get_unknown_exit_stats(original_labels,
 
 
 
-def
+# def
 
 
 
 
 if __name__ == '__main__':
     # Load all the npy files
-    # known_original_labels = np.load(known_original_label_path)
-    # known_target_labels = np.load(known_targets_path)
-    # known_probs = np.load(known_probs_path)
-    # known_rts = np.load(known_rt_path)
-    #
-    # unknown_original_labels = np.load(unknown_original_label_path)
-    # unknown_target_labels = np.load(unknown_targets_path)
-    # unknown_probs = np.load(unknown_probs_path)
-    # unknown_rts = np.load(unknown_rt_path)
-    #
-    # get_known_exit_stats(original_labels=known_original_labels,
-    #                      target_labels=known_target_labels,
-    #                      probs=known_probs,
-    #                      rts=known_rts,
-    #                      top_1_threshold=0.90)
-    #
-    # print("*" * 50)
-    #
-    # get_unknown_exit_stats(original_labels=unknown_original_labels,
-    #                          target_labels=unknown_target_labels,
-    #                          probs=unknown_probs,
-    #                          rts=unknown_rts,
-    #                          top_1_threshold=0.90)
+    if use_5_weight:
+        epoch_index_list = test_msd_5_weights_epoch
+    else:
+        epoch_index_list = test_msd_base_epoch
+
+    for epoch_index in epoch_index_list:
+        print("Processing data for epoch %d" % epoch_index)
+
+        known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs_epoch_" + str(epoch_index) + ".npy"
+        known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets_epoch_" + str(epoch_index) + ".npy"
+        known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels_epoch_" + str(epoch_index) + ".npy"
+        known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts_epoch_" + str(epoch_index) + ".npy"
+
+        unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs_epoch_" + str(epoch_index) + ".npy"
+        unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets_epoch_" + str(epoch_index) + ".npy"
+        unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels_epoch_" + str(epoch_index) + ".npy"
+        unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts_epoch_" + str(epoch_index) + ".npy"
+
+        known_original_labels = np.load(known_original_label_path)
+        known_target_labels = np.load(known_targets_path)
+        known_probs = np.load(known_probs_path)
+        known_rts = np.load(known_rt_path)
+
+        unknown_original_labels = np.load(unknown_original_label_path)
+        unknown_target_labels = np.load(unknown_targets_path)
+        unknown_probs = np.load(unknown_probs_path)
+        unknown_rts = np.load(unknown_rt_path)
+
+        get_known_exit_stats(original_labels=known_original_labels,
+                             target_labels=known_target_labels,
+                             probs=known_probs,
+                             rts=known_rts,
+                             top_1_threshold=0.90)
+
+
+        get_unknown_exit_stats(original_labels=unknown_original_labels,
+                                 target_labels=unknown_target_labels,
+                                 probs=unknown_probs,
+                                 rts=unknown_rts,
+                                 top_1_threshold=0.90)
+
+        print("*" * 50)

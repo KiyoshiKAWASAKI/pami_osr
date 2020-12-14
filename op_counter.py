@@ -10,7 +10,7 @@ from functools import reduce
 import operator
 
 '''
-    Calculate the   of each exit without lazy prediction pruning"
+    Calculate the flops of each exit without lazy prediction pruning"
 '''
 
 count_ops = 0
@@ -94,19 +94,19 @@ def measure_layer(layer, x):
     count_ops += delta_ops
     count_params += delta_params
     if type_name == 'Linear':
-        print('---------------------')
-        print('FLOPs: %.2fM, Params: %.2fM' % (count_ops / 1e6, count_params / 1e6))
+        # print('---------------------')
+        # print('FLOPs: %.2fM, Params: %.2fM' % (count_ops / 1e6, count_params / 1e6))
         cls_ops.append(count_ops)
         cls_params.append(count_params)
         
     return
 
 
-def measure_model(model, H, W):
+def measure_model(model, data):
     global count_ops, count_params, cls_ops, cls_params
     count_ops = 0
     count_params = 0
-    data = Variable(torch.zeros(1, 3, H, W))
+    # data = Variable(img_data)
 
     def should_measure(x):
         return is_leaf(x)
