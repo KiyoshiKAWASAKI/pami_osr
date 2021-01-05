@@ -38,6 +38,7 @@ model_name = "msd_net"
 use_5_weights = True
 use_pp_loss = False
 
+train_binary = False
 run_test = True
 
 n_epochs = 100
@@ -48,19 +49,17 @@ batch_size = 16
 # test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
 
 # This is for addition
-test_msd_base_epoch = [0, 10, 22, 30, 40, 51, 60, 71, 80, 99]
-# test_msd_5_weights_epoch = [0, 11, 46, 50, 60, 70, 80, 90, 95]
-test_msd_5_weights_epoch = [91, 98]
+test_msd_base_epoch = [0, 11, 21, 30, 40, 50, 60, 72, 81, 90, 99]
+test_msd_5_weights_epoch = [0, 10, 20, 30, 40, 50, 60, 70, 79]
+test_msd_pp_epoch = []
 
-# test_msd_base_epoch = [94]
-# test_msd_5_weights_epoch = [95]
 
 # This is the path for loading and testing model
 # model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/" \
 #              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
 
 # This is for saving training model as well as saving test npys
-save_path_sub = "combo_pipeline/1205_use_addition/msd_5_weights"
+save_path_sub = "combo_pipeline/1214_addition_full_set/msd_5_weights"
 
 
 ###############################################
@@ -71,7 +70,12 @@ use_json_data = True
 img_size = 224
 nBlocks = 5
 thresh_top_1 = 0.90
-nb_training_classes = 336 # known:335, unknown:1
+nb_classes = 336
+
+if train_binary:
+    nb_training_classes = 2
+else:
+    nb_training_classes = 336 # known_known:335, unknown_unknown:1
 
 penalty_factors_for_known = [1.0, 2.5, 5.0, 7.5, 10.0]
 # penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
@@ -80,20 +84,39 @@ penalty_factors_for_novel = [22.423, 11.491, 7.420, 5.390, 3.897]
 
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
 
+# Debug set paths
+# train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+# train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
+#                            "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+# valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+# valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+# test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+# test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                           "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+# test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+#                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+
+
+# Full set paths
 train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                         "/derivatives/dataset_v1_3_partition/npy_json_files/train_known_known.json"
 train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-                           "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                           "t/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
 valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                         "/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known.json"
 valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
 test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                        "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                        "/derivatives/dataset_v1_3_partition/npy_json_files/test_known_known.json"
 test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                          "/derivatives/dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
 test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
+
 
 save_path = save_path_base + "/" + save_path_sub
 
@@ -205,8 +228,20 @@ def train_valid_one_epoch(known_loader,
                 batch_type = "unknown"
 
             input = batch["imgs"]
-            target = batch["labels"] - 1
             rts = batch["rts"]
+            target = batch["labels"] - 1
+
+            # Change label into binary
+            if train_binary:
+                for i in range(len(target)):
+                    one_target = target[i]
+
+                    if one_target < nb_classes:
+                        target[i] = 0
+                    else:
+                        target[i] = 1
+
+            # print(target)
 
             input_var = torch.autograd.Variable(input).cuda()
             target = target.cuda(async=True)
@@ -217,7 +252,7 @@ def train_valid_one_epoch(known_loader,
             if not isinstance(output, list):
                 output = [output]
 
-            print(type(output))
+            # print(type(output))
 
             ##########################################
             # Only MSD-Net
@@ -525,6 +560,7 @@ def test_with_novelty(test_loader,
                 full_original_label_list.append(label)
 
             # Check the target labels: keep or change
+            # TODO: nb_training_classes or nb_classes?
             for k in range(len(target)):
                 if target[k] >= nb_training_classes:
                     target[k] = -1

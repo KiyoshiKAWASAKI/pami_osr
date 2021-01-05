@@ -4,21 +4,24 @@ import numpy as np
 
 
 
-use_5_weight = True
+use_5_weight = False
 
 
 # The epoch index of the models
 # test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
 # test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
 
-test_msd_base_epoch = [0, 10, 22, 30, 40, 51, 60, 71, 80, 99]
-test_msd_5_weights_epoch = [0, 11, 46, 50, 60, 70, 80, 91]
+# test_msd_base_epoch = [0, 10, 22, 30, 40, 51, 60, 71, 80, 99]
+# test_msd_5_weights_epoch = [0, 11, 46, 50, 60, 70, 80, 91]
+
+test_msd_base_epoch = [0, 11, 21, 30, 40, 50, 60, 72, 81, 90, 99]
+test_msd_5_weights_epoch = [0, 10, 20, 30, 40, 50, 60, 70, 79]
 
 
 # This is the path that needs to be changed
-save_path_sub = "combo_pipeline/1205_use_addition/msd_5_weights"
-csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/results.csv"
-fig_save_base_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1203/msd_base/test"
+save_path_sub = "combo_pipeline/1214_addition_full_set/msd_base"
+csv_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1214_addition_full_set/msd_base/results.csv"
+fig_save_base_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/combo_pipeline/1214_addition_full_set/msd_base/msd_base/test"
 
 
 # Normally, no need to change these paths
@@ -132,22 +135,30 @@ def get_known_exit_stats(original_labels,
 
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
-    # print("Total number of samples: %d" % len(original_labels))
-    # print("Known predicted as known: %d" % known_as_known_count)
-    # print("Known predicted as unknown: %d" % known_as_unknown_count)
-    # print("Number of right prediction: %d" % nb_correct)
-    # print("Number of wrong prediction: %d" % nb_wrong)
-    # print("Accuracy: %4f" % acc)
+    print("Total number of samples: %d" % len(original_labels))
+    print("Known predicted as known: %d" % known_as_known_count)
+    print("Known predicted as unknown: %d" % known_as_unknown_count)
+    print("Number of right prediction: %d" % nb_correct)
+    print("Number of wrong prediction: %d" % nb_wrong)
+    print("Accuracy: %4f" % acc)
     print("Known exit counts")
     print(exit_count)
+
+    exit_count_percentage = []
+    for one_count in exit_count:
+        one_percentage = one_count/len(original_labels)
+        exit_count_percentage.append(round(one_percentage, 2))
+
+    print(exit_count_percentage)
+
 
     # Deal with RTs
     exit_rt_np = np.asarray(exit_rt)
 
-    # print("Known RT avg:")
-    # print(np.mean(exit_rt_np))
-    # print("Known RT median:")
-    # print(np.median(exit_rt_np))
+    print("Known RT avg:")
+    print(np.mean(exit_rt_np))
+    print("Known RT median:")
+    print(np.median(exit_rt_np))
 
 
 
@@ -236,22 +247,29 @@ def get_unknown_exit_stats(original_labels,
 
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
-    # print("Total number of samples: %d" % len(original_labels))
-    # print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
-    # print("Unknown predicted as known: %d" % unknown_as_unknown_count)
-    # print("Number of right prediction: %d" % nb_correct)
-    # print("Number of wrong prediction: %d" % nb_wrong)
-    # print("Accuracy: %4f" % acc)
+    print("Total number of samples: %d" % len(original_labels))
+    print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
+    print("Unknown predicted as known: %d" % unknown_as_unknown_count)
+    print("Number of right prediction: %d" % nb_correct)
+    print("Number of wrong prediction: %d" % nb_wrong)
+    print("Accuracy: %4f" % acc)
     print("Unknown exit counts")
     print(exit_count)
+
+    exit_count_percentage = []
+    for one_count in exit_count:
+        one_percentage = one_count / len(original_labels)
+        exit_count_percentage.append(round(one_percentage*100, 2))
+
+    print(exit_count_percentage)
 
     # Deal with RTs
     exit_rt_np = np.asarray(exit_rt)
 
-    # print("Unknown RT avg:")
-    # print(np.mean(exit_rt_np))
-    # print("Unknown RT median:")
-    # print(np.median(exit_rt_np))
+    print("Unknown RT avg:")
+    print(np.mean(exit_rt_np))
+    print("Unknown RT median:")
+    print(np.median(exit_rt_np))
 
 
 
