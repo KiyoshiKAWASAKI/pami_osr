@@ -153,7 +153,7 @@ def generate_three_partitions(source_dir,
                               cp_known_unknown=False,
                               cp_unknown_unknown=False,
                               make_debug_set=False,
-                              extract_ratio=0.01,
+                              extract_ratio=0.03,
                               nb_total_classes=413):
     """
     Make copy of data and partition into 3 parts as follows:
@@ -314,12 +314,14 @@ def generate_three_partitions(source_dir,
 
 
 if __name__ == "__main__":
-    # generate_three_partitions(source_dir=original_413_path,
-    #                           target_dir=target_path,
-    #                           known_unknown_classes=first_round_40_classes,
-    #                           unknown_unknown_classes=second_round_38_classes,
-    #                           cp_unknown_unknown=True,
-    #                           make_debug_set=True)
+    generate_three_partitions(source_dir=original_413_path,
+                              target_dir=target_path,
+                              known_unknown_classes=first_round_40_classes,
+                              unknown_unknown_classes=second_round_38_classes,
+                              cp_known_known=True,
+                              cp_known_unknown=True,
+                              cp_unknown_unknown=True,
+                              make_debug_set=True)
 
     # generate_sub_training_set(source_data_path=validation_data_path,
     #                           target_data_path=small_test_413_path,
@@ -339,6 +341,6 @@ if __name__ == "__main__":
     # generate_csv(data_dir=test_data_path,
     #                        csv_path=test_csv_save_path)
 
-    gen_label_match(first_round=first_round_40_classes,
-                    second_round=second_round_38_classes,
-                    nb_total_classes=413)
+    # gen_label_match(first_round=first_round_40_classes,
+    #                 second_round=second_round_38_classes,
+    #                 nb_total_classes=413)
