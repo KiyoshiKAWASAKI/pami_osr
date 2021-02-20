@@ -30,28 +30,33 @@ args.nScales = len(args.grFactor)
 ###############################################
 # Change these parameters
 ###############################################
-model_name = "msd_net"
-# model_name = "dense_net"
+# model_name = "msd_net"
+model_name = "dense_net"
 # model_name = "inception_v4"
 # model_name = "vgg16"
 
-use_5_weights = True
+use_pre_train = False
+train_binary = False
+run_test = False
+
+
+use_5_weights = False
 use_pp_loss = False
 
-train_binary = False
-run_test = True
-
-n_epochs = 100
-batch_size = 16
 
 # This is for multiplication
 # test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
 # test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
 
 # This is for addition
-test_msd_base_epoch = [0, 11, 21, 30, 40, 50, 60, 72, 81, 90, 99]
-test_msd_5_weights_epoch = [0, 10, 20, 30, 40, 50, 60, 70, 79]
-test_msd_pp_epoch = []
+# test_msd_base_epoch = [0, 11, 21, 30, 40, 50, 60, 72, 81, 90, 99]
+# test_msd_5_weights_epoch = [0, 10, 20, 30, 40, 50, 60, 70, 79]
+# test_msd_pp_epoch = []
+
+# This is for the binary classifier
+test_msd_base_epoch = [0]
+test_msd_5_weights_epoch = [0]
+test_msd_pp_epoch = [0]
 
 
 # This is the path for loading and testing model
@@ -59,13 +64,20 @@ test_msd_pp_epoch = []
 #              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
 
 # This is for saving training model as well as saving test npys
-save_path_sub = "combo_pipeline/1214_addition_full_set/msd_5_weights"
+save_path_sub = "combo_pipeline/0104_binary/msd_pp"
+
+# This is the path for the pre-train model used for continue training
+pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/" \
+                       "sail-on/combo_pipeline/1214_addition_full_set/msd_base/model_epoch_99.dat"
 
 
 ###############################################
 # Noromaly, there is no need to change these
 ###############################################
 use_json_data = True
+
+n_epochs = 250
+batch_size = 16
 
 img_size = 224
 nBlocks = 5
@@ -409,8 +421,14 @@ def train(model,
     # Optimizer
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(model_wrapper.parameters(), lr=lr, momentum=momentum, nesterov=True, weight_decay=wd)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs],
-                                                     gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs], gamma=0.1)
+
+    if use_pre_train:
+        print("Keep training on a pre-train 100 epoch model")
+        checkpoint = torch.load(pre_train_model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
 
     # Start log
     with open(os.path.join(save, 'results.csv'), 'w') as f:
@@ -483,6 +501,7 @@ def train(model,
                 best_acc_top1 = valid_acc_top1
                 print('New best top-1 accuracy: %.4f' % best_acc_top1)
                 torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
+                torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
         else:
             torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
 
@@ -499,11 +518,11 @@ def train(model,
 
 
 # TODO: This whole thing needs to be fixed
-def test_with_novelty(test_loader,
-                      model,
-                      test_unknown,
-                      use_msd_net,
-                      epoch_index):
+def test_and_save_probs(test_loader,
+                        model,
+                        test_type,
+                        use_msd_net,
+                        epoch_index):
     """
 
     :param test_loader:
@@ -513,17 +532,21 @@ def test_with_novelty(test_loader,
     :return:
     """
     # Setup the paths
-    save_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known/probs_epoch_" + str(epoch_index) + ".npy"
-    save_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known/targets_epoch_" + str(epoch_index) + ".npy"
-    save_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known/labels_epoch_" + str(epoch_index) + ".npy"
-    save_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known/rts_epoch_" + str(epoch_index) + ".npy"
-    save_known_flops_path = save_path_base + "/" + save_path_sub + "/test/known/flops_epoch_" + str(epoch_index) + ".npy"
+    save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known/probs_epoch_" + str(epoch_index) + ".npy"
+    save_known_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known_known/targets_epoch_" + str(epoch_index) + ".npy"
+    save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known/labels_epoch_" + str(epoch_index) + ".npy"
+    save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known/rts_epoch_" + str(epoch_index) + ".npy"
 
-    save_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown/probs_epoch_" + str(epoch_index) + ".npy"
-    save_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown/targets_epoch_" + str(epoch_index) + ".npy"
-    save_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown/labels_epoch_" + str(epoch_index) + ".npy"
-    save_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown/rts_epoch_" + str(epoch_index) + ".npy"
-    save_unknown_flops_path = save_path_base + "/" + save_path_sub + "/test/unknown/flops_epoch_" + str(epoch_index) + ".npy"
+    save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/probs_epoch_" + str(epoch_index) + ".npy"
+    save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
+    save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/labels_epoch_" + str(epoch_index) + ".npy"
+    save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/rts_epoch_" + str(epoch_index) + ".npy"
+
+    save_unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/probs_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/targets_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/labels_epoch_" + str(epoch_index) + ".npy"
+    save_unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/rts_epoch_" + str(epoch_index) + ".npy"
+
 
     # Set the model to evaluation mode
     model.cuda()
@@ -637,111 +660,41 @@ def test_with_novelty(test_loader,
         full_rt_list_np = np.array(full_rt_list)
         full_original_label_list_np = np.array(full_original_label_list)
 
-        if test_unknown == False:
-            print("Saving probabilities to %s" % save_known_probs_path)
-            np.save(save_known_probs_path, full_prob_list_np)
-            print("Saving target labels to %s" % save_known_targets_path)
-            np.save(save_known_targets_path, full_target_list_np)
-            print("Saving original labels to %s" % save_known_original_label_path)
-            np.save(save_known_original_label_path, full_original_label_list_np)
-            print("Saving RTs to %s" % save_known_rt_path)
-            np.save(save_known_rt_path, full_rt_list_np)
+        if test_type == "known_known":
+            print("Saving probabilities to %s" % save_known_known_probs_path)
+            np.save(save_known_known_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % save_known_known_targets_path)
+            np.save(save_known_known_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % save_known_known_original_label_path)
+            np.save(save_known_known_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % save_known_known_rt_path)
+            np.save(save_known_known_rt_path, full_rt_list_np)
+
+        elif test_type == "known_unknown":
+            print("Saving probabilities to %s" % save_known_unknown_probs_path)
+            np.save(save_known_unknown_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % save_known_unknown_targets_path)
+            np.save(save_known_unknown_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % save_known_unknown_original_label_path)
+            np.save(save_known_unknown_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % save_known_unknown_rt_path)
+            np.save(save_known_unknown_rt_path, full_rt_list_np)
 
         else:
-            print("Saving probabilities to %s" % save_unknown_probs_path)
-            np.save(save_unknown_probs_path, full_prob_list_np)
-            print("Saving target labels to %s" % save_unknown_targets_path)
-            np.save(save_unknown_targets_path, full_target_list_np)
-            print("Saving original labels to %s" % save_unknown_original_label_path)
-            np.save(save_unknown_original_label_path, full_original_label_list_np)
-            print("Saving RTs to %s" % save_unknown_rt_path)
-            np.save(save_unknown_rt_path, full_rt_list_np)
+            print("Saving probabilities to %s" % save_unknown_unknown_probs_path)
+            np.save(save_unknown_unknown_probs_path, full_prob_list_np)
+            print("Saving target labels to %s" % save_unknown_unknown_targets_path)
+            np.save(save_unknown_unknown_targets_path, full_target_list_np)
+            print("Saving original labels to %s" % save_unknown_unknown_original_label_path)
+            np.save(save_unknown_unknown_original_label_path, full_original_label_list_np)
+            print("Saving RTs to %s" % save_unknown_unknown_rt_path)
+            np.save(save_unknown_unknown_rt_path, full_rt_list_np)
 
 
     # TODO: Fix test process for other networks
     else:
-        sm = torch.nn.Softmax(dim=1)
+        pass
 
-        # For other networks, just show acc and rt avg
-        sample_count = 0
-        total_rt_count = 0
-        correct_count = 0
-        wrong_count = 0
-
-
-        # with torch.no_grad():
-        #     for i, (input, target) in enumerate(test_loader):
-        #         # print("*" * 50)
-        #
-        #         # original_label = target
-        #         # print("Correct label:")
-        #         # print(original_label)
-        #
-        #         sample_count += 1
-        #
-        #         # rts = []
-        #         input = input.cuda()
-        #         target = target.cuda(async=True)
-        #
-        #         # print("Correct label:")
-        #         # print(target)
-        #
-        #         # Save original labels to the list
-        #         # original_label_list = np.array(target.cpu().tolist())
-        #         # for label in original_label_list:
-        #         #     full_original_label_list.append(label)
-        #
-        #         # Check the target labels: keep or change
-        #         if test_unknown:
-        #             for k in range(len(target)):
-        #                 target[k] = -1
-        #
-        #         input_var = torch.autograd.Variable(input)
-        #         target_var = torch.autograd.Variable(target)
-        #
-        #
-        #         # Get the model outputs and RTs
-        #         # print("Timer started.")
-        #         start =timer()
-        #         output, end_time = model(input_var)
-        #
-        #         rt = end_time[0]-start
-        #         total_rt_count += rt
-        #
-        #         # extract the probability and apply our threshold
-        #         prob = sm(output)
-        #         prob_list = np.array(prob.cpu().tolist())
-        #         max_prob = np.max(prob_list)
-        #
-        #         # decide whether to do classification or reject
-        #         # When the probability is larger than our threshold
-        #         if max_prob >= thresh_top_1:
-        #             # print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
-        #
-        #             pred_label = torch.argmax(output)
-        #             # print("Predicted label:")
-        #             # print(pred_label)
-        #
-        #         # When the probability is smaller than our threshold
-        #         else:
-        #             pred_label = -1
-        #
-        #         if pred_label == target:
-        #             # print("Right prediction!")
-        #             correct_count += 1
-        #         else:
-        #             # print("Wrong prediction!")
-        #             wrong_count += 1
-        #
-        # print("Total number of Samples: %d" % sample_count)
-        # print("Number or right predictions: %d" % correct_count)
-        # print("Number of wrong predictions: %d" % wrong_count)
-        #
-        # avg_rt = total_rt_count / sample_count
-        # print("Average RT: % 4f" % avg_rt)
-        #
-        # acc = float(correct_count)/float(correct_count+wrong_count)
-        # print("TOP-1 accuracy: %4f" % acc)
 
 
 
@@ -910,12 +863,17 @@ def demo(depth=100,
     # TODO: Fix this testing process + add op count
     if run_test:
         if model_name == "msd_net":
-            if use_5_weights:
-                print("Using 5 weights")
-                index_list = test_msd_5_weights_epoch
-            else:
+            if (use_5_weights==False) and (use_pp_loss==False):
                 print("Using MSD-Net Base")
                 index_list = test_msd_base_epoch
+
+            if (use_5_weights==True) and (use_pp_loss==False):
+                print("Using 5 weights")
+                index_list = test_msd_5_weights_epoch
+
+            if (use_5_weights==True) and (use_pp_loss==True):
+                print("Using psyphy loss")
+                index_list = test_msd_pp_epoch
 
             for index in index_list:
                 model_path = save_path_base + "/" + save_path_sub + "/model_epoch_" + str(index) + ".dat"
@@ -923,19 +881,27 @@ def demo(depth=100,
 
                 print("Loading MSD-Net model:")
                 print(model_path)
-                print("Testing the known samples...")
-                test_with_novelty(test_loader=test_known_known_loader,
-                                  model=model,
-                                  test_unknown=False,
-                                  use_msd_net=True,
-                                  epoch_index=index)
 
-                print("testing the unknown samples...")
-                test_with_novelty(test_loader=test_unknown_unknown_loader,
-                                  model=model,
-                                  test_unknown=True,
-                                  use_msd_net=True,
-                                  epoch_index=index)
+                # print("Testing the known_known samples...")
+                # test_and_save_probs(test_loader=test_known_known_loader,
+                #                       model=model,
+                #                       test_type="known_known",
+                #                       use_msd_net=True,
+                #                       epoch_index=index)
+
+                print("Testing the known_unknown samples...")
+                test_and_save_probs(test_loader=test_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index)
+
+                # print("testing the unknown samples...")
+                # test_and_save_probs(test_loader=test_unknown_unknown_loader,
+                #                       model=model,
+                #                       test_type="unknown_unknown",
+                #                       use_msd_net=True,
+                #                       epoch_index=index)
 
 
         else:
