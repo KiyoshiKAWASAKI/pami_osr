@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N test_5_weights_0104
+#$ -N test_binary_msd_pp
 
 # Required modules
 module load conda

@@ -12,13 +12,32 @@ import pickle
 
 
 
-first_round_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/turk_results/instance_rt_processed_first_round.npy"
+first_round_unknown_rt_path = ""
+second_round_unknown_rt_path = ""
+known_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/0212_with_known/known_rt_processed.npy"
+
 
 """
 Split the data and generate json files:
 
 RT for 1st round 40 classes: will be used as training and validation for known_unknown
 RT for 2nd round 38 classes: will be used as test for unknown_unknown
+Other 335 classes are known_known
+
+How to prepare the data:
+1. Split the first round rt instances into 8:2 according to their class label for training and validation,
+    to make sure we have them in both phases.
+2. For each class in those 335, split the data into 8:2 for training and validation.
+3. Combine step 1 and step 2 => training and validation json
+4. Process the second round alone and make the test json
+
+==========================================================================================================
+
+02/12/2021 - Split the data and generate json files with known RTs:
+
+RT for 1st round 40 unknown classes: will be used as known_unknown
+RT for 40 known classes: will be used as training and validation for known_known
+
 Other 335 classes are known_known
 
 How to prepare the data:
@@ -36,10 +55,12 @@ save_valid_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/
 
 # Data directories.
 # Reminder: Data switched for train_valid and test, because we did data collection on val folder.
-known_known_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/train_valid/known_known"
-known_known_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/known_known"
+known_known_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/known_known"
+known_known_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/train_valid/known_known"
+
 known_unknown_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/known_unknown"
 known_unknown_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/train_valid/known_unknown"
+
 unknown_unknown_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/derivatives/dataset_v1_3_partition/test/unknown_unknown"
 
 # Json save path
@@ -771,8 +792,6 @@ def combine_json(train_known_known_path,
         print("Saving file to %s" % save_valid_json_path)
 
 
-    # TODO: no need to merge the test files at this point
-
 
 
 
@@ -835,6 +854,7 @@ def adjust_json_index(train_json_path,
     with open(valid_json_path, 'w') as f:
         json.dump(valid_dict, f)
         print("Saving file to %s" % valid_json_path)
+
 
 
 def gen_debug_jsons(train_known_known_json_path,
@@ -925,15 +945,64 @@ def gen_debug_jsons(train_known_known_json_path,
 
 
 if __name__ == '__main__':
-    # class_labels, image_names, rts = remove_outliers(instance_rt_path=first_round_rt_path)
-
+    # class_labels, image_names, rts = remove_outliers(instance_rt_path=known_rt_path)
+    #
     # make_data_dict(class_labels=class_labels,
     #                image_names=image_names,
     #                rts=rts,
     #                category="known_unknown",
     #                save_train_dict_path=save_train_npy_path,
     #                save_valid_dict_path=save_valid_npy_path)
+    #
+    gen_known_known_json(train_valid_known_known_dir=known_known_train_val_path,
+                         test_known_known_dir=known_known_test_path,
+                         save_train_path=train_known_known_json_path,
+                         save_valid_path=valid_known_known_json_path,
+                         save_test_path=test_known_known_json_path,
+                         gen_train_valid=False,
+                         gen_test=True)
 
+    # process_npy(training_rt_dict_path=save_train_npy_path,
+    #             valid_rt_dict_path=save_valid_npy_path,
+    #             save_train_txt_path=save_train_txt_path,
+    #             save_valid_txt_path=save_valid_txt_path)
+
+    gen_known_unknown_json(train_list_path=save_train_txt_path,
+                           valid_list_path=save_valid_txt_path,
+                           train_valid_known_unknown_dir=known_unknown_train_val_path,
+                           test_known_unknown_dir=known_unknown_test_path,
+                           save_train_path=train_known_unknown_json_path,
+                           save_valid_path=valid_known_unknown_json_path,
+                           save_test_path=test_known_unknown_json_path,
+                           gen_train_valid=True,
+                           gen_test=False)
+
+    gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
+                        save_test_path=test_unknown_unknown_json_path)
+
+    combine_json(train_known_known_path=train_known_known_json_path,
+                 train_known_unknown_path=train_known_unknown_json_path,
+                 valid_known_known_path=valid_known_known_json_path,
+                 valid_known_unknown_path=valid_known_unknown_json_path,
+                 test_known_known_path=test_known_known_json_path,
+                 test_known_unknown_path=test_known_unknown_json_path,
+                 test_unknown_unknown_path=test_unknown_unknown_json_path,
+                 save_training_json_path=save_training_json_path,
+                 save_valid_json_path=save_valid_json_path,
+                 save_test_json_path=save_test_json_path)
+
+    adjust_json_index(train_json_path=save_training_json_path,
+                      valid_json_path=save_valid_json_path)
+
+    # class_labels, image_names, rts = remove_outliers(instance_rt_path=first_round_unknown_rt_path)
+    #
+    # make_data_dict(class_labels=class_labels,
+    #                image_names=image_names,
+    #                rts=rts,
+    #                category="known_unknown",
+    #                save_train_dict_path=save_train_npy_path,
+    #                save_valid_dict_path=save_valid_npy_path)
+    #
     # gen_known_known_json(train_valid_known_known_dir=known_known_train_val_path,
     #                      test_known_known_dir=known_known_test_path,
     #                      save_train_path=train_known_known_json_path,
@@ -941,12 +1010,12 @@ if __name__ == '__main__':
     #                      save_test_path=test_known_known_json_path,
     #                      gen_train_valid=False,
     #                      gen_test=True)
-
+    #
     # process_npy(training_rt_dict_path=save_train_npy_path,
     #             valid_rt_dict_path=save_valid_npy_path,
     #             save_train_txt_path=save_train_txt_path,
     #             save_valid_txt_path=save_valid_txt_path)
-
+    #
     # gen_known_unknown_json(train_list_path=save_train_txt_path,
     #                        valid_list_path=save_valid_txt_path,
     #                        train_valid_known_unknown_dir=known_unknown_train_val_path,
@@ -956,11 +1025,11 @@ if __name__ == '__main__':
     #                        save_test_path=test_known_unknown_json_path,
     #                        gen_train_valid=True,
     #                        gen_test=False)
-
+    #
     # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
     #                     save_test_path=test_unknown_unknown_json_path)
-
-
+    #
+    #
     # combine_json(train_known_known_path=train_known_known_json_path,
     #              train_known_unknown_path=train_known_unknown_json_path,
     #              valid_known_known_path=valid_known_known_json_path,
@@ -975,7 +1044,7 @@ if __name__ == '__main__':
     # adjust_json_index(train_json_path=save_training_json_path,
     #                   valid_json_path=save_valid_json_path)
 
-    gen_debug_jsons(train_known_known_json_path=train_known_known_json_path,
-                    train_known_unknown_json_path=train_known_unknown_json_path,
-                    save_known_path=save_known_debug_path,
-                    save_unknown_path=save_unknown_debug_path)
+    # gen_debug_jsons(train_known_known_json_path=train_known_known_json_path,
+    #                 train_known_unknown_json_path=train_known_unknown_json_path,
+    #                 save_known_path=save_known_debug_path,
+    #                 save_unknown_path=save_unknown_debug_path)
