@@ -16,6 +16,10 @@ import random
 from args import arg_parser
 import torch.nn as nn
 import models
+import logging
+from torch.utils.tensorboard import SummaryWriter
+from torch.autograd import Variable
+
 
 args = arg_parser.parse_args()
 
@@ -26,32 +30,38 @@ args.grFactor = list(map(int, args.grFactor.split('-')))
 args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
 
+# logging.basicConfig(filename=log_file_path,
+#                     level=logging.INFO,
+#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+#                     datefmt='%H:%M:%S')
+
+# logging.basicConfig(stream=sys.stdout,
+#                     level=logging.INFO,
+#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+#                     datefmt='%H:%M:%S')
+#
+#
+# log_file_path = args.log_file_path
+
+# Define the TensorBoard
+# writer = SummaryWriter()
+# writer = SummaryWriter(args.tf_board_path)
+
 
 ###############################################
 # Change these parameters
 ###############################################
-# model_name = "msd_net"
-model_name = "dense_net"
+model_name = "msd_net"
+# model_name = "dense_net"
 # model_name = "inception_v4"
 # model_name = "vgg16"
+debug = False
+use_pp_loss = True
 
 use_pre_train = False
 train_binary = False
 run_test = False
 
-
-use_5_weights = False
-use_pp_loss = False
-
-
-# This is for multiplication
-# test_msd_base_epoch = [0, 10, 20, 30, 40, 51, 60, 70, 83, 94]
-# test_msd_5_weights_epoch = [0, 10, 46, 50, 60, 70, 80, 90, 95]
-
-# This is for addition
-# test_msd_base_epoch = [0, 11, 21, 30, 40, 50, 60, 72, 81, 90, 99]
-# test_msd_5_weights_epoch = [0, 10, 20, 30, 40, 50, 60, 70, 79]
-# test_msd_pp_epoch = []
 
 # This is for the binary classifier
 test_msd_base_epoch = [0]
@@ -64,7 +74,7 @@ test_msd_pp_epoch = [0]
 #              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
 
 # This is for saving training model as well as saving test npys
-save_path_sub = "combo_pipeline/0104_binary/msd_pp"
+save_path_sub = "0225/pp_loss"
 
 # This is the path for the pre-train model used for continue training
 pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/" \
@@ -75,60 +85,66 @@ pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/mode
 # Noromaly, there is no need to change these
 ###############################################
 use_json_data = True
+save_training_prob = False
 
-n_epochs = 250
+n_epochs = 200
 batch_size = 16
 
 img_size = 224
 nBlocks = 5
 thresh_top_1 = 0.90
-nb_classes = 336
+
+if debug:
+    nb_classes = 336
+else:
+    nb_classes = 296
 
 if train_binary:
     nb_training_classes = 2
 else:
-    nb_training_classes = 336 # known_known:335, unknown_unknown:1
-
-penalty_factors_for_known = [1.0, 2.5, 5.0, 7.5, 10.0]
-# penalty_factors_for_novel = [3.897, 5.390, 7.420, 11.491, 22.423]
-penalty_factors_for_novel = [22.423, 11.491, 7.420, 5.390, 3.897]
-
-
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on"
-
-# Debug set paths
-# train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-# train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-#                            "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-# valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-# valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-# test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                         "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-# test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                           "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-# test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-#                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    if debug:
+        nb_training_classes = 336  # known_known:335, unknown_unknown:1
+    else:
+        nb_training_classes = 296 # known_known:295, unknown_unknown:1
 
 
-# Full set paths
-train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                         "/derivatives/dataset_v1_3_partition/npy_json_files/train_known_known.json"
-train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-                           "t/derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
-valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                         "/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known.json"
-valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
-test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                        "/derivatives/dataset_v1_3_partition/npy_json_files/test_known_known.json"
-test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                          "/derivatives/dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
-test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
 
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+
+if debug:
+    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
+                               "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+    valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                                "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+    test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                              "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+
+
+else:
+    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                             "dataset_v1_3_partition/npy_json_files/train_known_known.json"
+    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                               "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+
+    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                             "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+    valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+
+    test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                            "dataset_v1_3_partition/npy_json_files/test_known_known_without_rt.json"
+    test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                              "dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
+    test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                "dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
 
 save_path = save_path_base + "/" + save_path_sub
 
@@ -141,8 +157,6 @@ def train_valid_one_epoch(known_loader,
                             criterion,
                             optimizer,
                             nb_epoch,
-                            penalty_factors_known,
-                            penalty_factors_unknown,
                             use_msd_net,
                             train_phase):
     """
@@ -193,8 +207,11 @@ def train_valid_one_epoch(known_loader,
     ###################################################
     if train_phase:
         save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(nb_epoch) + ".txt")
+        # save_prob_path = os.path.join(save_path, "train_probs_epoch_" + str(nb_epoch) + ".npy")
+        # save_label_path =
     else:
         save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(nb_epoch) + ".txt")
+        # save_prob_path = os.path.join(save_path, "valid_probs_epoch_" + str(nb_epoch) + ".npy")
 
     # Count number of batches for known and unknown respectively
     nb_known_batches = len(known_loader)
@@ -203,6 +220,13 @@ def train_valid_one_epoch(known_loader,
 
     print("There are %d batches in known_known loader" % nb_known_batches)
     print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+
+    # TODO: Add this part for tensorboard
+    # Check which category has more samples/batches
+    if nb_known_batches >= nb_unknown_batches:
+        base_step = len(known_loader)
+    else:
+        base_step = len(unknown_loader)
 
     # Generate index for known and unknown and shuffle
     all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
@@ -233,15 +257,15 @@ def train_valid_one_epoch(known_loader,
             ##########################################
             if i in known_indices:
                 batch = next(known_iter)
-                batch_type = "known"
+                # batch_type = "known"
 
             elif i in unknown_indices:
                 batch = next(unknown_iter)
-                batch_type = "unknown"
+                # batch_type = "unknown"
 
             input = batch["imgs"]
             rts = batch["rts"]
-            target = batch["labels"] - 1
+            target = batch["labels"]
 
             # Change label into binary
             if train_binary:
@@ -270,63 +294,21 @@ def train_valid_one_epoch(known_loader,
             # Only MSD-Net
             ##########################################
             if model_name == "msd_net":
-                # Case 1: known batch + 5 weights
-                if (batch_type == "known") and (use_5_weights == True):
+                # Case 1: Not using pp loss
+                if use_pp_loss == False:
                     for j in range(len(output)):
-                        # print(type(output[j]))
-                        penalty_factor = penalty_factors_known[j]
-                        # output_weighted = output[j] * penalty_factor
-                        output_weighted = torch.add(output[j], penalty_factor)
-                        loss += criterion(output_weighted, target_var)
+                        loss += criterion(output[j], target_var)
 
-                # Case 2: known batch + no 5 weights
-                if (batch_type == "known") and (use_5_weights == False):
+                # Case 2: Using pp loss
+                if use_pp_loss == True:
+                    print("Using psyphy loss")
                     for j in range(len(output)):
-                        output_weighted = output[j]
-                        loss += criterion(output_weighted, target_var)
-
-                # Case 3: unknown batch + no 5 weights + no pp loss
-                if (batch_type == "unknown") and (use_5_weights == False) and (use_pp_loss == False):
-                    for j in range(len(output)):
-                        output_weighted = output[j]
-                        loss += criterion(output_weighted, target_var)
-
-                # Case 4: unknown batch + 5 weights + no pp loss
-                if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == False):
-                    for j in range(len(output)):
-                        penalty_factor = penalty_factors_unknown[j]
-                        # output_weighted = output[j] * penalty_factor
-                        output_weighted = torch.add(output[j], penalty_factor)
-                        loss += criterion(output_weighted, target_var)
-
-                # Case 5: unknown batch + 5 weights + no pp loss
-                if (batch_type == "unknown") and (use_5_weights == True) and (use_pp_loss == True):
-                    for j in range(len(output)):
-                        penalty_factor = penalty_factors_unknown[j]
-                        # output_weighted = output[j] * penalty_factor
-                        output_weighted = torch.add(output[j], penalty_factor)
                         scale_factor = get_pp_factor(rts[j])
-                        loss += scale_factor * criterion(output_weighted, target_var)
+                        loss += scale_factor * criterion(output[j], target_var)
 
             else:
-                # Case 1: Known batch + no pp loss
-                if (batch_type == "known") and (use_pp_loss == False):
-                    for j in range(len(output)):
-                        output_weighted = output[j]
-                        loss += criterion(output_weighted, target_var)
-
-                # Case 3: unknown batch + no pp loss
-                if (batch_type == "unknown") and (use_pp_loss == False):
-                    for j in range(len(output)):
-                        output_weighted = output[j]
-                        loss += criterion(output_weighted, target_var)
-
-                # Case 4: unknown batch + pp loss
-                if (batch_type == "unknown") and (use_pp_loss == True):
-                    for j in range(len(output)):
-                        output_weighted = output[j]
-                        scale_factor = get_pp_factor(rts[j])
-                        loss += scale_factor * criterion(output_weighted, target_var)
+                # TODO: other networks - may be the same with MSD Net cause 5 weights are gone?
+                pass
 
 
             ##########################################
@@ -351,6 +333,12 @@ def train_valid_one_epoch(known_loader,
             end = time.time()
 
             if i % args.print_freq == 0:
+                # TODO: Implement TensorBoard
+                # writer.add_scalar('training loss', losses.val, i * nb_epoch + base_step)
+                # writer.add_scalar('Acc top-1', top1[-1].val, i * nb_epoch + base_step)
+                # writer.add_scalar('Acc top-3', top3[-1].val, i * nb_epoch + base_step)
+                # writer.add_scalar('Acc top-5', top5[-1].val, i * nb_epoch + base_step)
+
                 print('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
                               'Data {data_time.avg:.3f}\t'
@@ -372,6 +360,12 @@ def train_valid_one_epoch(known_loader,
                     nb_epoch, i + 1, nb_total_batches,
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+        # TODO: Get probability and save after each epoch (??)
+
+
+
+
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
 
@@ -448,8 +442,6 @@ def train(model,
                                                                     criterion=criterion,
                                                                     optimizer=optimizer,
                                                                     nb_epoch=epoch,
-                                                                    penalty_factors_known=penalty_factors_for_known,
-                                                                    penalty_factors_unknown=penalty_factors_for_novel,
                                                                     use_msd_net=True,
                                                                     train_phase=True)
 
@@ -463,36 +455,35 @@ def train(model,
                                                                   optimizer=optimizer,
                                                                   nb_epoch=epoch,
                                                                   use_msd_net=True,
-                                                                  penalty_factors_known=penalty_factors_for_known,
-                                                                  penalty_factors_unknown=penalty_factors_for_novel,
                                                                   train_phase=False)
 
         else:
-            train_loss, train_acc_top1, \
-            train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
-                                                                   unknown_loader=train_known_unknown_loader,
-                                                                   model=model_wrapper,
-                                                                   criterion=criterion,
-                                                                   optimizer=optimizer,
-                                                                   nb_epoch=epoch,
-                                                                   penalty_factors_known=penalty_factors_for_known,
-                                                                   penalty_factors_unknown=penalty_factors_for_novel,
-                                                                   use_msd_net=False,
-                                                                   train_phase=True)
-
-            scheduler.step()
-
-            valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
-                                                                   unknown_loader=valid_known_unknown_loader,
-                                                                   model=model_wrapper,
-                                                                   criterion=criterion,
-                                                                   optimizer=optimizer,
-                                                                   nb_epoch=epoch,
-                                                                   penalty_factors_known=penalty_factors_for_known,
-                                                                   penalty_factors_unknown=penalty_factors_for_novel,
-                                                                   use_msd_net=True,
-                                                                   train_phase=False)
+            pass
+            # train_loss, train_acc_top1, \
+            # train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
+            #                                                        unknown_loader=train_known_unknown_loader,
+            #                                                        model=model_wrapper,
+            #                                                        criterion=criterion,
+            #                                                        optimizer=optimizer,
+            #                                                        nb_epoch=epoch,
+            #                                                        penalty_factors_known=penalty_factors_for_known,
+            #                                                        penalty_factors_unknown=penalty_factors_for_novel,
+            #                                                        use_msd_net=False,
+            #                                                        train_phase=True)
+            #
+            # scheduler.step()
+            #
+            # valid_loss, valid_acc_top1, \
+            # valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
+            #                                                        unknown_loader=valid_known_unknown_loader,
+            #                                                        model=model_wrapper,
+            #                                                        criterion=criterion,
+            #                                                        optimizer=optimizer,
+            #                                                        nb_epoch=epoch,
+            #                                                        penalty_factors_known=penalty_factors_for_known,
+            #                                                        penalty_factors_unknown=penalty_factors_for_novel,
+            #                                                        use_msd_net=True,
+            #                                                        train_phase=False)
 
 
         # Determine if model is the best
@@ -863,24 +854,25 @@ def demo(depth=100,
     # TODO: Fix this testing process + add op count
     if run_test:
         if model_name == "msd_net":
-            if (use_5_weights==False) and (use_pp_loss==False):
-                print("Using MSD-Net Base")
-                index_list = test_msd_base_epoch
-
-            if (use_5_weights==True) and (use_pp_loss==False):
-                print("Using 5 weights")
-                index_list = test_msd_5_weights_epoch
-
-            if (use_5_weights==True) and (use_pp_loss==True):
-                print("Using psyphy loss")
-                index_list = test_msd_pp_epoch
-
-            for index in index_list:
-                model_path = save_path_base + "/" + save_path_sub + "/model_epoch_" + str(index) + ".dat"
-                model.load_state_dict(torch.load(model_path))
-
-                print("Loading MSD-Net model:")
-                print(model_path)
+            pass
+            # if (use_5_weights==False) and (use_pp_loss==False):
+            #     print("Using MSD-Net Base")
+            #     index_list = test_msd_base_epoch
+            #
+            # if (use_5_weights==True) and (use_pp_loss==False):
+            #     print("Using 5 weights")
+            #     index_list = test_msd_5_weights_epoch
+            #
+            # if (use_5_weights==True) and (use_pp_loss==True):
+            #     print("Using psyphy loss")
+            #     index_list = test_msd_pp_epoch
+            #
+            # for index in index_list:
+            #     model_path = save_path_base + "/" + save_path_sub + "/model_epoch_" + str(index) + ".dat"
+            #     model.load_state_dict(torch.load(model_path))
+            #
+            #     print("Loading MSD-Net model:")
+            #     print(model_path)
 
                 # print("Testing the known_known samples...")
                 # test_and_save_probs(test_loader=test_known_known_loader,
@@ -889,12 +881,12 @@ def demo(depth=100,
                 #                       use_msd_net=True,
                 #                       epoch_index=index)
 
-                print("Testing the known_unknown samples...")
-                test_and_save_probs(test_loader=test_known_unknown_loader,
-                                    model=model,
-                                    test_type="known_unknown",
-                                    use_msd_net=True,
-                                    epoch_index=index)
+                # print("Testing the known_unknown samples...")
+                # test_and_save_probs(test_loader=test_known_unknown_loader,
+                #                     model=model,
+                #                     test_type="known_unknown",
+                #                     use_msd_net=True,
+                #                     epoch_index=index)
 
                 # print("testing the unknown samples...")
                 # test_and_save_probs(test_loader=test_unknown_unknown_loader,

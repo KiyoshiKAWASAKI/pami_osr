@@ -101,11 +101,11 @@ save_unknown_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_s
 
 # Combined Jsons
 save_training_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                          "dataset_v1_3_partition/npy_json_files/train.json"
+                          "dataset_v1_3_partition/npy_json_files/train_known_known.json"
 save_valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                       "dataset_v1_3_partition/npy_json_files/valid.json"
-save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                      "dataset_v1_3_partition/npy_json_files/test.json"
+                       "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+# save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+#                       "dataset_v1_3_partition/npy_json_files/test.json"
 
 
 # Known classes that have RTs
@@ -1031,15 +1031,15 @@ def combine_json(train_known_known_with_rt_path,
         train_known_known_with_rt_json = json.load(train_known_known_with_rt)
     with open(train_known_known_without_rt_path) as train_known_known_without_rt:
         train_known_known_without_rt_json = json.load(train_known_known_without_rt)
-    with open(train_known_unknown_path) as train_known_unknown:
-        train_known_unknown_json = json.load(train_known_unknown)
+    # with open(train_known_unknown_path) as train_known_unknown:
+    #     train_known_unknown_json = json.load(train_known_unknown)
 
     with open(valid_known_known_with_rt_path) as valid_known_known_with_rt:
         valid_known_known_with_rt_json = json.load(valid_known_known_with_rt)
     with open(valid_known_known_without_rt_path) as valid_known_known_without_rt:
         valid_known_known_without_rt_json = json.load(valid_known_known_without_rt)
-    with open(valid_known_unknown_path) as valid_known_unknown:
-        valid_known_unknown_json = json.load(valid_known_unknown)
+    # with open(valid_known_unknown_path) as valid_known_unknown:
+    #     valid_known_unknown_json = json.load(valid_known_unknown)
 
 
     # Merge Training Jsons
@@ -1047,9 +1047,9 @@ def combine_json(train_known_known_with_rt_path,
     for i in range(1, len(train_known_known_without_rt_json)+1):
         one_entry = train_known_known_without_rt_json[str(i)]
         train_known_known_with_rt_json[len(train_known_known_with_rt_json)+i] = one_entry
-    for i in range(1, len(train_known_unknown_json)+1):
-        one_entry = train_known_unknown_json[str(i)]
-        train_known_known_with_rt_json[len(train_known_known_with_rt_json)+i] = one_entry
+    # for i in range(1, len(train_known_unknown_json)+1):
+    #     one_entry = train_known_unknown_json[str(i)]
+    #     train_known_known_with_rt_json[len(train_known_known_with_rt_json)+i] = one_entry
     print("Training json after combining json has %d entries." % len(train_known_known_with_rt_json))
 
     with open(save_training_json_path, 'w') as f:
@@ -1061,9 +1061,9 @@ def combine_json(train_known_known_with_rt_path,
     for i in range(1, len(valid_known_known_without_rt_json) + 1):
         one_entry = valid_known_known_without_rt_json[str(i)]
         valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
-    for i in range(1, len(valid_known_unknown_json) + 1):
-        one_entry = valid_known_unknown_json[str(i)]
-        valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
+    # for i in range(1, len(valid_known_unknown_json) + 1):
+    #     one_entry = valid_known_unknown_json[str(i)]
+    #     valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
     print("Valid json after combining json has %d entries." % len(valid_known_known_with_rt_json))
 
     with open(save_valid_json_path, 'w') as f:
@@ -1248,14 +1248,14 @@ if __name__ == '__main__':
     #                         training_ratio=0.80)
 
     # Combine Json files and adjust the indices
-    # combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
-    #              train_known_known_without_rt_path=train_known_known_without_rt_json_path,
-    #              train_known_unknown_path=train_known_unknown_json_path,
-    #              valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
-    #              valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
-    #              valid_known_unknown_path=valid_known_unknown_json_path,
-    #              save_training_json_path=save_training_json_path,
-    #              save_valid_json_path=save_valid_json_path)
+    combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
+                 train_known_known_without_rt_path=train_known_known_without_rt_json_path,
+                 train_known_unknown_path=train_known_unknown_json_path,
+                 valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
+                 valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
+                 valid_known_unknown_path=valid_known_unknown_json_path,
+                 save_training_json_path=save_training_json_path,
+                 save_valid_json_path=save_valid_json_path)
 
     adjust_json_index(train_json_path=save_training_json_path,
                       valid_json_path=save_valid_json_path)
