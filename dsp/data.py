@@ -1,5 +1,6 @@
 """Data utilities for psychophysics oddball experiments using ImageNet."""
 import csv
+from dataclasses import dataclass
 import json
 import logging
 import os
@@ -8,12 +9,42 @@ import torch
 
 from exputils.data import ConfusionMatrix
 
+@dataclass
+class ContinuousSummaryStats:
+    mean: float
+    max: float
+    min: float
+    median: float = None
+    quantiles: float = None
+    num_samples: int = None
+
+@dataclass
+class PsychophysicsLabel:
+    """Class for managing label information per image sample."""
+    label: object
+    reaction_time: ContinuousSummaryStats # instance reaction time
+    class_reaction_time: ContinuousSummaryStats # Label Class reaction time
+    #prob_vector: np.ndarray # possibly should be a 1d Torch tensor
+    # pairwise_RT, perhaps class_reaction_time can contain this? or this could
+    # be accessed by using the label index.
+
+class PsychophysicsStats(object):
+    """The psychophysics statistics and information."""
+
+    # Annotator Confusion Matrix
+
+    # Annotator Reaction Time pairwise stats (mean, sd, min, max, quantiles,...)
+
+
 class ImageNetPsychophysics(object):
     """Dataloader for ImageNet with optional labels derived from the
     psychophysics oddball experiment that used ImageNet.
     More statistical information is available per class and sample to better
     inform the loss or for observation of relationships, if any between, the
     variables.
+
+    Attributes
+    ----------
     """
 
     # TODO load from csv, tsv, json, postgresql db
@@ -21,6 +52,11 @@ class ImageNetPsychophysics(object):
     # TODO save to csv, tsv, json, postgresql db
 
     # TODO get_item
+
+    # Dataloader hsa everything needed for psychophysics:
+    #   all Annotator RT info separate from instance level
+    #   all Annotator confusion info separate from instance level
+    #       class confusion matrix
 
 # AssignmentId
 # survey_index
@@ -79,6 +115,18 @@ def process_raw_csv(
     some information about the annotator, such as their performance on control
     questions.
 
+    This should output to similar format as existing once modified, but also
+    save the following:
+        - Annotator Confusion Tensor with shape [Classes, Classes, Annotators,
+          Ordering], where ordering is the class as known and class as unknown.
+          Flattening on the ordering dim is probably the end result.
+        - Annotator Reaction Time Tensor with shape [Classes, Classes,
+          Annotators, Ordering].
+        - Annotator Control Question Accuracy
+
+    Ideally, all the above w/ annotators will order the annotators by their
+    control question accuracy first, then date time by occurrence.
+
     [Args]
     raw_csv_path : str
         Input filepath for the raw, unprocessed csv of experiment
@@ -92,6 +140,8 @@ def process_raw_csv(
         Output filepath for the resulting processed csv
     worker_id_col : str, optional
     """
+    raise NotImplementedError()
+
     # Load the raw csv
     raw_data = pd.read_csv(raw_csv_path)
 
