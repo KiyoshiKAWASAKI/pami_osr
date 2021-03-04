@@ -30,23 +30,6 @@ args.grFactor = list(map(int, args.grFactor.split('-')))
 args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
 
-# logging.basicConfig(filename=log_file_path,
-#                     level=logging.INFO,
-#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-#                     datefmt='%H:%M:%S')
-
-# logging.basicConfig(stream=sys.stdout,
-#                     level=logging.INFO,
-#                     format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-#                     datefmt='%H:%M:%S')
-#
-#
-# log_file_path = args.log_file_path
-
-# Define the TensorBoard
-# writer = SummaryWriter()
-# writer = SummaryWriter(args.tf_board_path)
-
 
 ###############################################
 # Change these parameters
@@ -57,6 +40,7 @@ model_name = "msd_net"
 # model_name = "vgg16"
 debug = False
 use_pp_loss = True
+use_addition = True
 
 use_pre_train = False
 train_binary = False
@@ -74,7 +58,7 @@ test_msd_pp_epoch = [0]
 #              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
 
 # This is for saving training model as well as saving test npys
-save_path_sub = "0225/pp_loss"
+save_path_sub = "0225/pp_loss_add"
 
 # This is the path for the pre-train model used for continue training
 pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/" \
@@ -304,7 +288,10 @@ def train_valid_one_epoch(known_loader,
                     print("Using psyphy loss")
                     for j in range(len(output)):
                         scale_factor = get_pp_factor(rts[j])
-                        loss += scale_factor * criterion(output[j], target_var)
+                        if use_addition:
+                            loss += scale_factor + criterion(output[j], target_var)
+                        else:
+                            loss += scale_factor * criterion(output[j], target_var)
 
             else:
                 # TODO: other networks - may be the same with MSD Net cause 5 weights are gone?
@@ -333,12 +320,6 @@ def train_valid_one_epoch(known_loader,
             end = time.time()
 
             if i % args.print_freq == 0:
-                # TODO: Implement TensorBoard
-                # writer.add_scalar('training loss', losses.val, i * nb_epoch + base_step)
-                # writer.add_scalar('Acc top-1', top1[-1].val, i * nb_epoch + base_step)
-                # writer.add_scalar('Acc top-3', top3[-1].val, i * nb_epoch + base_step)
-                # writer.add_scalar('Acc top-5', top5[-1].val, i * nb_epoch + base_step)
-
                 print('Epoch: [{0}][{1}/{2}]\t'
                               'Time {batch_time.avg:.3f}\t'
                               'Data {data_time.avg:.3f}\t'
