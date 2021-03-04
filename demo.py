@@ -1,4 +1,3 @@
-import fire
 import os
 import time
 import torch
@@ -8,7 +7,6 @@ import numpy as np
 from timeit import default_timer as timer
 from utils import customized_dataloader
 from utils.customized_dataloader import msd_net_dataset
-from op_counter import measure_model
 import sys
 import warnings
 warnings.filterwarnings("ignore")
@@ -16,9 +14,6 @@ import random
 from args import arg_parser
 import torch.nn as nn
 import models
-import logging
-from torch.utils.tensorboard import SummaryWriter
-from torch.autograd import Variable
 
 
 args = arg_parser.parse_args()
@@ -41,23 +36,19 @@ model_name = "msd_net"
 debug = False
 use_pp_loss = True
 use_addition = True
+scale = 3.0
 
 use_pre_train = False
 train_binary = False
-run_test = False
 
 
 # This is for the binary classifier
-test_msd_base_epoch = [0]
-test_msd_5_weights_epoch = [0]
-test_msd_pp_epoch = [0]
+run_test = True
+# test_epoch_list = [141] # for original
+# test_epoch_list = [168] # for pp mul
+test_epoch_list = [111] # for pp add
 
-
-# This is the path for loading and testing model
-# model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/" \
-#              "combo_pipeline/1203/msd_5_weights_pp/model_epoch_14.dat"
-
-# This is for saving training model as well as saving test npys
+# This is for saving training model as well as getting test model and saving test npy files
 save_path_sub = "0225/pp_loss_add"
 
 # This is the path for the pre-train model used for continue training
@@ -66,13 +57,17 @@ pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/mode
 
 
 ###############################################
-# Noromaly, there is no need to change these
+# Normally, there is no need to change these
 ###############################################
 use_json_data = True
 save_training_prob = False
 
 n_epochs = 200
-batch_size = 16
+
+if run_test:
+    batch_size = 1
+else:
+    batch_size = 16
 
 img_size = 224
 nBlocks = 5
@@ -287,7 +282,7 @@ def train_valid_one_epoch(known_loader,
                 if use_pp_loss == True:
                     print("Using psyphy loss")
                     for j in range(len(output)):
-                        scale_factor = get_pp_factor(rts[j])
+                        scale_factor = get_pp_factor(rts[j], scale)
                         if use_addition:
                             loss += scale_factor + criterion(output[j], target_var)
                         else:
@@ -489,13 +484,13 @@ def train(model,
 
 
 
-# TODO: This whole thing needs to be fixed
 def test_and_save_probs(test_loader,
                         model,
                         test_type,
                         use_msd_net,
                         epoch_index):
     """
+    batch size is always one for testing.
 
     :param test_loader:
     :param model:
@@ -505,17 +500,14 @@ def test_and_save_probs(test_loader,
     """
     # Setup the paths
     save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known/probs_epoch_" + str(epoch_index) + ".npy"
-    save_known_known_targets_path = save_path_base + "/" + save_path_sub + "/test/known_known/targets_epoch_" + str(epoch_index) + ".npy"
     save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known/labels_epoch_" + str(epoch_index) + ".npy"
     save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known/rts_epoch_" + str(epoch_index) + ".npy"
 
-    save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/probs_epoch_" + str(epoch_index) + ".npy"
-    save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
+    save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/probs_epoch_" + str(epoch_index) + ".npy"    # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
     save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/labels_epoch_" + str(epoch_index) + ".npy"
     save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/rts_epoch_" + str(epoch_index) + ".npy"
 
     save_unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/probs_epoch_" + str(epoch_index) + ".npy"
-    save_unknown_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/targets_epoch_" + str(epoch_index) + ".npy"
     save_unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/labels_epoch_" + str(epoch_index) + ".npy"
     save_unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/rts_epoch_" + str(epoch_index) + ".npy"
 
@@ -527,19 +519,15 @@ def test_and_save_probs(test_loader,
     # Define the softmax - do softmax to each block.
     if use_msd_net:
         print("Testing MSD-Net...")
-
         sm = torch.nn.Softmax(dim=2)
 
         # For MSD-Net, save everything into npy files
         full_original_label_list = []
         full_prob_list = []
-        full_target_list = []
         full_rt_list = []
-        full_flops_list = []
+
 
         for i in range(len(test_loader)):
-            print("*" * 50)
-
             batch = next(iter(test_loader))
 
             input = batch["imgs"]
@@ -554,89 +542,39 @@ def test_and_save_probs(test_loader,
             for label in original_label_list:
                 full_original_label_list.append(label)
 
-            # Check the target labels: keep or change
-            # TODO: nb_training_classes or nb_classes?
-            for k in range(len(target)):
-                if target[k] >= nb_training_classes:
-                    target[k] = -1
-
             input_var = torch.autograd.Variable(input)
-            target_var = torch.autograd.Variable(target)
 
             # Get the model outputs and RTs
             start =timer()
             output, end_time = model(input_var)
 
-            # TODO: Get the flops for a test image
-            flops, _ = measure_model(model, input_var)
-            full_flops_list.append(flops)
-            # print("HERE")
-            # print(flops)
-            # sys.exit()
-
             # Save the RTs
             for end in end_time:
+                print("Processes one sample in %f sec" % (end - start))
                 rts.append(end-start)
             full_rt_list.append(rts)
 
             # extract the probability and apply our threshold
-            # if args.test_with_novel or args.save_probs:
             prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
             prob_list = np.array(prob.cpu().tolist())
-            max_prob = np.max(prob_list)
-
-            # decide whether to do classification or reject
-            # When the probability is larger than our threshold
-            if max_prob >= thresh_top_1:
-                print("Max top-1 probability is %f, larger than threshold %f" % (max_prob, thresh_top_1))
-
-                # Get top-5 predictions from 5 classifiers
-                pred_label_list = []
-                for j in range(len(output)):
-                    _, pred = output[j].data.topk(5, 1, True, True) # pred is a tensor
-                    pred_label_list.append(pred.tolist())
-
-                # Update the evaluation metrics for one sample
-                # Top-1 and top-5: if any of the 5 classifiers makes a right prediction, consider correct
-                # top_5_list = pred_label_list
-                top_1_list = []
-
-                for l in pred_label_list:
-                    top_1_list.append(l[0][0])
-
-                if target.tolist()[0] in top_1_list:
-                    pred_label = target.tolist()[0]
-                else:
-                    pred_label = top_1_list[-1]
-
-            # When the probability is smaller than our threshold
-            else:
-                print("Max probability smaller than threshold")
-                pred_label = -1
 
             # Reshape it into [batch, block, class]
             prob_list = np.reshape(prob_list,
                                     (prob_list.shape[1],
                                      prob_list.shape[0],
                                      prob_list.shape[2]))
-            target_list = np.array(target.cpu().tolist())
 
             for one_prob in prob_list.tolist():
                 full_prob_list.append(one_prob)
-            for one_target in target_list.tolist():
-                full_target_list.append(one_target)
 
-        # Save all results to npy file
-        full_prob_list_np = np.array(full_prob_list)
-        full_target_list_np = np.array(full_target_list)
-        full_rt_list_np = np.array(full_rt_list)
+        # Save all results to npy
         full_original_label_list_np = np.array(full_original_label_list)
+        full_prob_list_np = np.array(full_prob_list)
+        full_rt_list_np = np.array(full_rt_list)
 
         if test_type == "known_known":
             print("Saving probabilities to %s" % save_known_known_probs_path)
             np.save(save_known_known_probs_path, full_prob_list_np)
-            print("Saving target labels to %s" % save_known_known_targets_path)
-            np.save(save_known_known_targets_path, full_target_list_np)
             print("Saving original labels to %s" % save_known_known_original_label_path)
             np.save(save_known_known_original_label_path, full_original_label_list_np)
             print("Saving RTs to %s" % save_known_known_rt_path)
@@ -645,8 +583,6 @@ def test_and_save_probs(test_loader,
         elif test_type == "known_unknown":
             print("Saving probabilities to %s" % save_known_unknown_probs_path)
             np.save(save_known_unknown_probs_path, full_prob_list_np)
-            print("Saving target labels to %s" % save_known_unknown_targets_path)
-            np.save(save_known_unknown_targets_path, full_target_list_np)
             print("Saving original labels to %s" % save_known_unknown_original_label_path)
             np.save(save_known_unknown_original_label_path, full_original_label_list_np)
             print("Saving RTs to %s" % save_known_unknown_rt_path)
@@ -655,15 +591,13 @@ def test_and_save_probs(test_loader,
         else:
             print("Saving probabilities to %s" % save_unknown_unknown_probs_path)
             np.save(save_unknown_unknown_probs_path, full_prob_list_np)
-            print("Saving target labels to %s" % save_unknown_unknown_targets_path)
-            np.save(save_unknown_unknown_targets_path, full_target_list_np)
             print("Saving original labels to %s" % save_unknown_unknown_original_label_path)
             np.save(save_unknown_unknown_original_label_path, full_original_label_list_np)
             print("Saving RTs to %s" % save_unknown_unknown_rt_path)
             np.save(save_unknown_unknown_rt_path, full_rt_list_np)
 
 
-    # TODO: Fix test process for other networks
+    # TODO: Test process for other networks - is it different??
     else:
         pass
 
@@ -824,10 +758,6 @@ def demo(depth=100,
     else:
         pass
 
-    # n_flops, n_params = measure_model(model, img_size, img_size)
-    # print(n_flops)
-
-
 
     ########################################################################
     # Test-only or Training + validation
@@ -835,46 +765,33 @@ def demo(depth=100,
     # TODO: Fix this testing process + add op count
     if run_test:
         if model_name == "msd_net":
-            pass
-            # if (use_5_weights==False) and (use_pp_loss==False):
-            #     print("Using MSD-Net Base")
-            #     index_list = test_msd_base_epoch
-            #
-            # if (use_5_weights==True) and (use_pp_loss==False):
-            #     print("Using 5 weights")
-            #     index_list = test_msd_5_weights_epoch
-            #
-            # if (use_5_weights==True) and (use_pp_loss==True):
-            #     print("Using psyphy loss")
-            #     index_list = test_msd_pp_epoch
-            #
-            # for index in index_list:
-            #     model_path = save_path_base + "/" + save_path_sub + "/model_epoch_" + str(index) + ".dat"
-            #     model.load_state_dict(torch.load(model_path))
-            #
-            #     print("Loading MSD-Net model:")
-            #     print(model_path)
+            for index in test_epoch_list:
+                model_path = save_path_base + "/" + save_path_sub + \
+                             "/model_epoch_" + str(index) + ".dat"
+                model.load_state_dict(torch.load(model_path))
 
-                # print("Testing the known_known samples...")
-                # test_and_save_probs(test_loader=test_known_known_loader,
-                #                       model=model,
-                #                       test_type="known_known",
-                #                       use_msd_net=True,
-                #                       epoch_index=index)
+                print("Loading MSD-Net model: %s" % model_path)
 
-                # print("Testing the known_unknown samples...")
-                # test_and_save_probs(test_loader=test_known_unknown_loader,
-                #                     model=model,
-                #                     test_type="known_unknown",
-                #                     use_msd_net=True,
-                #                     epoch_index=index)
+                print("Testing the known_known samples...")
+                test_and_save_probs(test_loader=test_known_known_loader,
+                                      model=model,
+                                      test_type="known_known",
+                                      use_msd_net=True,
+                                      epoch_index=index)
 
-                # print("testing the unknown samples...")
-                # test_and_save_probs(test_loader=test_unknown_unknown_loader,
-                #                       model=model,
-                #                       test_type="unknown_unknown",
-                #                       use_msd_net=True,
-                #                       epoch_index=index)
+                print("Testing the known_unknown samples...")
+                test_and_save_probs(test_loader=test_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index)
+
+                print("testing the unknown samples...")
+                test_and_save_probs(test_loader=test_unknown_unknown_loader,
+                                      model=model,
+                                      test_type="unknown_unknown",
+                                      use_msd_net=True,
+                                      epoch_index=index)
 
 
         else:
@@ -882,20 +799,6 @@ def demo(depth=100,
             For other networks: there is only one exit,
             so we only need classification accuracy and exit time
             """
-            # print("*" * 50)
-            # print("Testing the known samples...")
-            # test_with_novelty(test_loader=test_known_known_loader,
-            #                   model=model,
-            #                   test_unknown=False,
-            #                   use_msd_net=False)
-            #
-            # print("*" * 50)
-            # print("testing the unknown samples...")
-            # test_with_novelty(test_loader=test_unknown_unknown_loader,
-            #                   model=model,
-            #                   test_unknown=True,
-            #                   use_msd_net=False)
-            # print("*" * 50)
             pass
 
         return
@@ -993,7 +896,7 @@ def accuracy(output, target, topk=(1,)):
 
 
 def get_pp_factor(rt,
-                  scale=1,
+                  scale,
                   rt_max=20):
     """
     scalar * (RTmax - RTi) / RTmax + 1

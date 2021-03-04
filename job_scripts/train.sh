@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N msd_0225_pp_add
+#$ -N msd_pp_add_s_3.0
 
 # Required modules
 module load conda
