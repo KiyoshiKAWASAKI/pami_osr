@@ -2,13 +2,14 @@
 
 import torch
 
-class PsychophysicsLoss(torch.nn.
+
+class PsychophysicsLoss(torch.nn.Module):
     """Loss for classification using psychophysics."""
     def __init__(self, loss_id, psychophysics_stats):
         loss_id = loss_id.lower()
 
         if loss_id in ['norm_diff_to_overall_max_rt', 'grieggs']:
-            return
+            return norm_diff_to_max_rt(psychophysics_stats
         elif loss_id in ['norm_diff_to_overall_max_rt', 'grieggs']:
         elif loss_id in ['cumulative_gaussian']:
 
@@ -17,8 +18,6 @@ class PsychophysicsLoss(torch.nn.
 
     def forward(self, input: Tensor, target: Tensor) -> Tensor:
         return
-
-# Think cumulative distrib function, so it is monotonically increasing
 
 # TODO normalized difference to image max
 class norm_diff_to_max_rt(input, max_rt, scale=1, bias=1):
@@ -44,3 +43,12 @@ class norm_diff_to_max_rt(input, max_rt, scale=1, bias=1):
 # TODO normalized difference to class max
 
 # TODO normalized difference to class max
+
+# Think cumulative distrib function, so it is monotonically increasing
+
+# TODO  Reaction Time Weibull Cumulative Distribution
+#   Using scipy.stats.weibull_min.fit(data) to get Weibull params and then the
+#   cdf scaled by the max RT value will give the psycho physics loss wrt RT.
+#   TODO  pairwise classes Reaction Time Weibull Cumulative Distribution
+#   TODO Overall, class, class pairs: mixture distribution
+

@@ -7,7 +7,7 @@ import os
 
 import torch
 
-from exputils.data import ConfusionMatrix
+from exputils.data import ConfusionMatrices
 
 @dataclass
 class ContinuousSummaryStats:
@@ -231,3 +231,49 @@ def process_raw_csv(
         raw_data.shape[0],
     )
     raw_data.reset_index(drop=True).to_csv(path_or_buf=processed_csv_save_path)
+
+
+def annotator_control_question_score():
+    csv_path,
+    control_filepath,
+    output_path,
+    start_row=0,
+    output_path=None,
+    worker_id_col='AssignmentId',
+):
+    """Given the annotation csv and control questions, calculates each
+    annotator's control question score, which is an integer between [0, 5].
+    """
+    # TODO load csv
+
+    # TODO load control questions
+
+    # TODO Get only the entries that are control questions
+
+    # TODO Get the control question score of each unique annotator
+
+    # TODO Save the resulting csv w/ header:
+    #   worker_id_col, control_question_score
+
+    raise NotImplementedError()
+
+
+def annotator_confusion_matrices():
+    csv_path,
+    output_path,
+    start_row=0,
+    output_path=None,
+    worker_id_col='AssignmentId',
+):
+    """Given the annotation csv and control questions, calculates each
+    annotator's control question score, which is an integer between [0, 5].
+    """
+    raise NotImplementedError()
+
+    # TODO load csv
+
+    # TODO Per unique annotator, get confusion matrix when class is known /
+    # unknown or host / imposter.
+    # TODO Save the resulting confusion tensor w/ the ordered labels:
+    ConfusionMatrices(targets, preds, labels, dim_vars).save(output_path)
+    # Technically it is still a tensor, but not a complete confusion tensor.
