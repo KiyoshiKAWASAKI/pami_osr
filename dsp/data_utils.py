@@ -44,6 +44,9 @@ def process_raw_csv(
     rm_top_rt=False,
     rm_control=False,
     rm_lt_control=3,
+    record_response_counts=None,
+    low_response_thresh=25,
+    high_response_thresh=27,
 ):
     """Process the raw CSV version of the Amazon Turk annotators, but preserve
     some information about the annotator, such as their performance on control
@@ -83,7 +86,7 @@ def process_raw_csv(
     if os.path.splitext(control_filepath)[1] == '.npy':
         control_img_list = [
             question['image_paths'] for question in
-            np.load(control_filepath, allow_pickle='TRUE').item().values()
+            np.load(control_filepath, allow_pickle=True).item().values()
         ]
     elif os.path.splitext(control_filepath)[1] == '.yaml':
         # TODO
@@ -137,6 +140,13 @@ def process_raw_csv(
     annotator_df['total_responses'] = 0
     annotator_df['in_rt_top_percent'] = raw_data['in_rt_top_percent']
 
+    if record_response_counts:
+        response_counts = annotator_df[[
+            'total_responses',
+            'in_rt_top_percent',
+        ]].copy()
+
+    # TODO parallelize the following:
     # Check the data for each worker
     for worker_id in worker_ids:
         # Get all the responses for one worker
@@ -151,20 +161,38 @@ def process_raw_csv(
         # responses.
 
         # The number of responses should be 25, but we allow 2 more entries
-        if nb_responses >= 27:
+        if nb_responses >= high_response_thresh:
             logging.info(
-                'Annotator: `%s` removed for having 27 or more answers.'
+                'Annotator: `%s` removed for having %d or more answers: %d',
+                worker_id,
+                high_response_thresh,
+                nb_responses,
             )
+
+            if record_response_counts:
+                response_counts['total_responses', worker_id] = nb_responses
+                response_counts['in_rt_top_percent', worker_id] = \
+                    worker_response['in_rt_top_percent'].any()
+
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
                 inplace=True,
             )
             annotator_df.drop(worker_id, inplace=True)
             continue
-        elif nb_responses < 25:
+        elif nb_responses < low_response_thresh:
             logging.info(
-                'Annotator: `%s` removed for having less than 25 answers.'
+                'Annotator: `%s` removed for having less than %d answers: %d',
+                worker_id,
+                low_response_thresh,
+                nb_responses,
             )
+
+            if record_response_counts:
+                response_counts['total_responses', worker_id] = nb_responses
+                response_counts['in_rt_top_percent', worker_id] = \
+                    worker_response['in_rt_top_percent'].any()
+
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
                 inplace=True,
@@ -229,6 +257,12 @@ def process_raw_csv(
 
     raw_data.to_csv(create_filepath(output_path), index=False)
     annotator_df.to_csv(create_filepath(annotator_output_path), index=False)
+
+    if record_response_counts:
+        response_counts.to_csv(
+            create_filepath(record_response_counts),
+            index=False,
+        )
 
 
 def annotator_confusion_matrices(
