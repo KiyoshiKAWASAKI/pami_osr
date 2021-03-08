@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from exputils.data import ConfusionMatrices
+from exputils.io import create_filepath
 
 
 def save_img_ids(json_path, output_path, img_key='image'):
@@ -34,12 +35,15 @@ def save_img_ids(json_path, output_path, img_key='image'):
 def process_raw_csv(
     raw_csv_path,
     control_filepath,
+    output_path,
+    annotator_output_path,
     start_row=0,
-    output_path=None,
     worker_id_col='AssignmentId',
+    rt_key='ResponseTime',
     top_rt_percent=0.05,
-    rm_top_rt=True,
-    rm_control=True,
+    rm_top_rt=False,
+    rm_control=False,
+    rm_lt_control=3,
 ):
     """Process the raw CSV version of the Amazon Turk annotators, but preserve
     some information about the annotator, such as their performance on control
@@ -68,24 +72,20 @@ def process_raw_csv(
     if start_row > 0:
         raw_data = raw_data.iloc[start_row:]
 
-    logging.info('There are %d entries (rows) to be processed.', raw_data)
-
-    # TODO save csv of annotator control question performance
-
-    # TODO save "csv"/tensor of individual annotator confusion
-
-    # TODO save csv of macro mean annotator class confusion
-    # TODO save "csv"/tensor of macro mean annotator class RT
-    #   stat summary: mean, sd, median, quantiles, min, max
-
+    logging.info('There are %d entries (rows) to be processed.', len(raw_data))
 
     worker_ids = raw_data[worker_id_col].unique()
+
+    logging.info(
+        'There are %d unique annotators prior to processing.',
+        len(worker_ids),
+    )
 
     # Get the control questions' image paths
     if os.path.splitext(control_filepath)[1] == 'npy':
         control_img_list = [
             question['image_paths'] for question in
-            np.load(control_file_path, allow_pickle='TRUE').item()
+            np.load(control_filepath, allow_pickle='TRUE').item()
         ]
     elif os.path.splitext(control_filepath)[1] == 'yaml':
         # TODO
@@ -96,7 +96,48 @@ def process_raw_csv(
     # Get rid of the "[" and "]" in the image list
     raw_data['ImageList'] = raw_data['ImageList'].apply(lambda x: x[1:-1])
 
-    control_scores = np.zeros([worker_ids.shape[0], len(control_img_list)])
+    #Find top percent and either mark em or remove em.
+    sorted_raw = raw_data.sort_values(rt_key)
+
+    # Remove any negative reaction times.
+    first_pos_idx = -1
+    for i, row in enumerate(sorted_raw[rt_key]):
+        if row >= 0:
+            first_pos_idx = i
+            break
+    if first_pos_idx == -1:
+        raise ValueError(
+            f'No positive reaction times under rt_key = `{rt_key}`!',
+        )
+    elif first_pos_idx != 0:
+        sorted_raw = sorted_raw.iloc[first_pos_idx:]
+
+    # Mark the questions whose samples are in the top percent
+    raw_data['in_rt_top_percent'] = False
+    raw_data['in_rt_top_percent'][
+        sorted_raw[rt_key].iloc[
+            :-np.floor(len(sorted_raw) * top_rt_percent).astype(int)
+        ].index
+    ] = True
+
+
+    if rm_top_rt:
+        # Remove the questions whose samples are in the top percent
+        raw_data.drop(sorted_raw['in_rt_top_percent'], inplace=True)
+
+
+    # Create placeholder df for unique annotator control scores etc...
+    num_control_qs = len(control_img_list)
+    annotator_df = pd.DataFrame(
+        np.full([worker_ids.shape[0], num_control_qs], False),
+        columns=
+            [f'control_q{i + 1}' for i in range(num_control_qs)]
+            + ['total_responses', 'in_rt_top_percent']
+        ,
+        index=worker_ids,
+    )
+    annotator_df['total_responses'] = 0
+    annotator_df['in_rt_top_percent'] = raw_data['in_rt_top_percent']
 
     # Check the data for each worker
     for worker_id in worker_ids:
@@ -112,24 +153,33 @@ def process_raw_csv(
         # responses.
 
         # The number of responses should be 25, but we allow 2 more entries
-        if nb_responses >= 27 or nb_responses < 25:
-            if nb_responses >= 27:
-                logging.info(
-                    'Annotator: `%s` removed for having 27 or more answers.'
-                )
-            elif nb_responses < 25:
-                logging.info(
-                    'Annotator: `%s` removed for having less than 25 answers.'
-                )
-            raw_data = raw_data.drop(
-                raw_data[raw_data[worker_id_col] == worker_id].index
+        if nb_responses >= 27:
+            logging.info(
+                'Annotator: `%s` removed for having 27 or more answers.'
             )
+            raw_data.drop(
+                raw_data[raw_data[worker_id_col] == worker_id].index,
+                inpalce=True,
+            )
+            annotator_df.drop(worker_id, inplace=True)
             continue
+        elif nb_responses < 25:
+            logging.info(
+                'Annotator: `%s` removed for having less than 25 answers.'
+            )
+            raw_data.drop(
+                raw_data[raw_data[worker_id_col] == worker_id].index,
+                inpalce=True,
+            )
+            annotator_df.drop(worker_id, inplace=True)
+            continue
+
+        annotator_df['total_responses', worker_id] = nb_responses
+        annotator_df['in_rt_top_percent', worker_id] = \
+            worker_response['in_rt_top_percent'].any()
 
         # Drop the rows from the workers who answred more than 2 control
         # questions wrong
-        nb_control_wrong = 0
-
         for question in worker_response.itertuples(index=True, name="Pandas"):
             image_list = [x.strip() for x in question.ImageList.split(',')]
 
@@ -140,22 +190,29 @@ def process_raw_csv(
             question_index = question.Index
 
             if image_list_formatted in control_img_list:
-                if question.ImposterFound == 0:
-                    nb_control_wrong += 1
+                idx = control_img_list.index(image_list_formatted)
 
-                    # TODO here add which it is to update table
+                if question.ImposterFound == 1:
+                    annotator_df[f'control_q{idx + 1}', worker_id] = True
 
-                # No matter what, drop this line of record (cause it is a
-                # control question)
-                raw_data = raw_data.drop(
-                    raw_data[raw_data.index == question_index].index
-                )
+                if rm_control:
+                    # No matter what, drop this line of record (cause it is a
+                    # control question)
+                    raw_data.drop(
+                        raw_data[raw_data.index == question_index].index,
+                        inplace=True,
+                    )
 
-        if nb_control_wrong >= 3:
+        if (
+            rm_lt_control > 0
+            and annotator_df.loc[worker_id].iloc[:num_control_qs].sum()
+                < rm_lt_control
+        ):
             # Dropping entries from a worker who answered 3 or more control
             # questions wrong.
-            raw_data = raw_data.drop(
-                raw_data[raw_data[worker_id_col] == worker_id].index
+            raw_data.drop(
+                raw_data[raw_data[worker_id_col] == worker_id].index,
+                inplace=True,
             )
 
     # Check the number of entries after processing and save it into csv file
@@ -163,57 +220,17 @@ def process_raw_csv(
         "There are %d entries after processing the data.",
         raw_data.shape[0],
     )
-    raw_data.reset_index(drop=True).to_csv(path_or_buf=processed_csv_save_path)
+
+    logging.info(
+        "There are %d unique annotators after processing the data.",
+        annotator_df.shape[0],
+    )
+
+    raw_data.to_csv(create_filepath(output_path), index=False)
+    annotator_df.to_csv(create_filepath(annotator_output_path), index=False)
 
 
-def annotator_control_question_score(
-    csv_path,
-    control_filepath,
-    output_path,
-    start_row=0,
-    output_path=None,
-    worker_id_col='AssignmentId',
-):
-    """Given the annotation csv and control questions, calculates each
-    annotator's control question score, which is an integer between [0, 5].
-    """
-    # Load annotation csv
-    data = pd.read_csv(csv_path)
-
-    # Drop initial rows being skipped
-    if start_row > 0:
-        data = data.iloc[start_row:]
-
-    logging.info('There are %d entries (rows) to be processed.', data)
-
-    # TODO save csv of annotator control question performance
-    worker_ids = raw_data[worker_id_col].unique()
-
-    # TODO save "csv"/tensor of individual annotator confusion
-
-    # TODO save csv of macro mean annotator class confusion
-    # TODO save "csv"/tensor of macro mean annotator class RT
-    #   stat summary: mean, sd, median, quantiles, min, max
-
-
-
-
-    # Get rid of the "[" and "]" in the image list
-    data['ImageList'] = data['ImageList'].apply(lambda x: x[1:-1])
-
-    # TODO load control questions
-
-    # TODO Get only the entries that are control questions
-
-    # TODO Get the control question score of each unique annotator
-
-    # TODO Save the resulting csv w/ header:
-    #   worker_id_col, control_question_score
-
-    raise NotImplementedError()
-
-
-def annotator_confusion_matrices():
+def annotator_confusion_matrices(
     csv_path,
     output_path,
     start_row=0,
@@ -243,5 +260,5 @@ def annotator_confusion_matrices():
     # TODO Per unique annotator, get confusion matrix when class is known /
     # unknown or host / imposter.
     # TODO Save the resulting confusion tensor w/ the ordered labels:
-    ConfusionMatrices(targets, preds, labels, dim_vars).save(output_path)
+    #ConfusionMatrices(targets, preds, labels, dim_vars).save(output_path)
     # Technically it is still a tensor, but not a complete confusion tensor.
