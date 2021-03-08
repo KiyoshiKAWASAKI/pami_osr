@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from exputils.data import ConfusionMatrices
+#from exputils.data import ConfusionMatrices
 from exputils.io import create_filepath
 
 
@@ -63,8 +63,6 @@ def process_raw_csv(
         Output filepath for the resulting processed csv
     worker_id_col : str, optional
     """
-    raise NotImplementedError()
-
     # Load the raw csv
     raw_data = pd.read_csv(raw_csv_path)
 
@@ -82,12 +80,12 @@ def process_raw_csv(
     )
 
     # Get the control questions' image paths
-    if os.path.splitext(control_filepath)[1] == 'npy':
+    if os.path.splitext(control_filepath)[1] == '.npy':
         control_img_list = [
             question['image_paths'] for question in
-            np.load(control_filepath, allow_pickle='TRUE').item()
+            np.load(control_filepath, allow_pickle='TRUE').item().values()
         ]
-    elif os.path.splitext(control_filepath)[1] == 'yaml':
+    elif os.path.splitext(control_filepath)[1] == '.yaml':
         # TODO
         raise NotImplementedError()
     else:
@@ -129,7 +127,7 @@ def process_raw_csv(
     # Create placeholder df for unique annotator control scores etc...
     num_control_qs = len(control_img_list)
     annotator_df = pd.DataFrame(
-        np.full([worker_ids.shape[0], num_control_qs], False),
+        np.full([worker_ids.shape[0], num_control_qs + 2], False),
         columns=
             [f'control_q{i + 1}' for i in range(num_control_qs)]
             + ['total_responses', 'in_rt_top_percent']
@@ -159,7 +157,7 @@ def process_raw_csv(
             )
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
-                inpalce=True,
+                inplace=True,
             )
             annotator_df.drop(worker_id, inplace=True)
             continue
@@ -169,7 +167,7 @@ def process_raw_csv(
             )
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
-                inpalce=True,
+                inplace=True,
             )
             annotator_df.drop(worker_id, inplace=True)
             continue
@@ -203,11 +201,14 @@ def process_raw_csv(
                         inplace=True,
                     )
 
-        if (
-            rm_lt_control > 0
-            and annotator_df.loc[worker_id].iloc[:num_control_qs].sum()
-                < rm_lt_control
-        ):
+        control_score = annotator_df.loc[worker_id].iloc[:num_control_qs].sum()
+        if control_score == 0:
+            raw_data.drop(
+                raw_data[raw_data[worker_id_col] == worker_id].index,
+                inplace=True,
+            )
+            annotator_df.drop(worker_id, inplace=True)
+        elif control_score < rm_lt_control:
             # Dropping entries from a worker who answered 3 or more control
             # questions wrong.
             raw_data.drop(
@@ -234,7 +235,6 @@ def annotator_confusion_matrices(
     csv_path,
     output_path,
     start_row=0,
-    output_path=None,
     worker_id_col='AssignmentId',
 ):
     """Given the annotation csv and control questions, calculates each
