@@ -159,6 +159,10 @@ def process_raw_csv(
 
         # If this worker answered more than 27 questions, then we ignore his
         # responses.
+        if record_response_counts:
+            response_counts.at[worker_id, 'total_responses'] = nb_responses
+            response_counts.at[worker_id, 'in_rt_top_percent'] = \
+                worker_response['in_rt_top_percent'].any()
 
         # The number of responses should be 25, but we allow 2 more entries
         if nb_responses >= high_response_thresh:
@@ -168,11 +172,6 @@ def process_raw_csv(
                 high_response_thresh,
                 nb_responses,
             )
-
-            if record_response_counts:
-                response_counts.at[worker_id, 'total_responses'] = nb_responses
-                response_counts.at[worker_id, 'in_rt_top_percent'] = \
-                    worker_response['in_rt_top_percent'].any()
 
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
@@ -187,11 +186,6 @@ def process_raw_csv(
                 low_response_thresh,
                 nb_responses,
             )
-
-            if record_response_counts:
-                response_counts.at[worker_id, 'total_responses'] = nb_responses
-                response_counts.at[worker_id, 'in_rt_top_percent'] = \
-                    worker_response['in_rt_top_percent'].any()
 
             raw_data.drop(
                 raw_data[raw_data[worker_id_col] == worker_id].index,
@@ -219,7 +213,7 @@ def process_raw_csv(
                 idx = control_img_list.index(image_list_formatted)
 
                 if question.ImposterFound == 1:
-                    annotator_df[f'control_q{idx + 1}', worker_id] = True
+                    annotator_df.at[worker_id, f'control_q{idx + 1}'] = True
 
                 if rm_control:
                     # No matter what, drop this line of record (cause it is a
@@ -259,10 +253,7 @@ def process_raw_csv(
     annotator_df.to_csv(create_filepath(annotator_output_path), index=False)
 
     if record_response_counts:
-        response_counts.to_csv(
-            create_filepath(record_response_counts),
-            index=False,
-        )
+        response_counts.to_csv(create_filepath(record_response_counts))
 
 
 def annotator_confusion_matrices(
