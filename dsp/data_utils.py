@@ -170,8 +170,8 @@ def process_raw_csv(
             )
 
             if record_response_counts:
-                response_counts['total_responses', worker_id] = nb_responses
-                response_counts['in_rt_top_percent', worker_id] = \
+                response_counts.at[worker_id, 'total_responses'] = nb_responses
+                response_counts.at[worker_id, 'in_rt_top_percent'] = \
                     worker_response['in_rt_top_percent'].any()
 
             raw_data.drop(
