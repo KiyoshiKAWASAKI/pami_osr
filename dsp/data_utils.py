@@ -252,10 +252,16 @@ def process_raw_csv(
     )
 
     raw_data.to_csv(create_filepath(output_path), index=False)
-    annotator_df.to_csv(create_filepath(annotator_output_path))
+    annotator_df.to_csv(
+        create_filepath(annotator_output_path),
+        index_label=worker_id_col,
+    )
 
     if record_response_counts:
-        response_counts.to_csv(create_filepath(record_response_counts))
+        response_counts.to_csv(
+            create_filepath(record_response_counts),
+            index_label=worker_id_col,
+        )
 
 
 def annotator_confusion_matrices(
