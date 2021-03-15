@@ -103,7 +103,7 @@ def process_raw_csv(
     # Remove any negative reaction times.
     first_pos_idx = -1
     for i, row in enumerate(sorted_raw[rt_key]):
-        if row >= 0:
+        if row > 0:
             first_pos_idx = i
             break
     if first_pos_idx == -1:
@@ -111,21 +111,21 @@ def process_raw_csv(
             f'No positive reaction times under rt_key = `{rt_key}`!',
         )
     elif first_pos_idx != 0:
-        sorted_raw = sorted_raw.iloc[first_pos_idx:]
+        # Discard all negative response times. They are errors.
+        raw_data.drop(sorted_raw.iloc[:first_pos_idx].index, inplace=True)
+        sorted_raw.drop(sorted_raw.iloc[:first_pos_idx].index, inplace=True)
 
     # Mark the questions whose samples are in the top percent
     raw_data['in_rt_top_percent'] = False
     raw_data['in_rt_top_percent'][
         sorted_raw[rt_key].iloc[
-            :-np.floor(len(sorted_raw) * top_rt_percent).astype(int)
+            -np.floor(len(sorted_raw) * top_rt_percent).astype(int):
         ].index
     ] = True
-
 
     if rm_top_rt:
         # Remove the questions whose samples are in the top percent
         raw_data.drop(sorted_raw['in_rt_top_percent'], inplace=True)
-
 
     # Create placeholder df for unique annotator control scores etc...
     num_control_qs = len(control_img_list)
