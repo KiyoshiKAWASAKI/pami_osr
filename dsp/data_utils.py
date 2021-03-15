@@ -137,6 +137,7 @@ def process_raw_csv(
         ,
         index=worker_ids,
     )
+    annotator_df.rename_axis(worker_ids)
     annotator_df['total_responses'] = 0
     annotator_df['in_rt_top_percent'] = raw_data['in_rt_top_percent']
 
@@ -145,6 +146,7 @@ def process_raw_csv(
             'total_responses',
             'in_rt_top_percent',
         ]].copy()
+        response_counts.rename_axis(worker_ids)
 
     # TODO parallelize the following:
     # Check the data for each worker
@@ -250,7 +252,7 @@ def process_raw_csv(
     )
 
     raw_data.to_csv(create_filepath(output_path), index=False)
-    annotator_df.to_csv(create_filepath(annotator_output_path), index=False)
+    annotator_df.to_csv(create_filepath(annotator_output_path))
 
     if record_response_counts:
         response_counts.to_csv(create_filepath(record_response_counts))
