@@ -3,12 +3,12 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N 0221_debug_msd
+#$ -N 0317_debug_loss
 
 # Required modules
 module load conda
 conda init bash
-source activate msd_net
+source activate new_msd_net
 
 CUDA_VISIBLE_DEVICES=3 python demo.py --arch msdnet \
                                        --batch-size 16 \
