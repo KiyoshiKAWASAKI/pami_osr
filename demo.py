@@ -33,27 +33,30 @@ model_name = "msd_net"
 # model_name = "dense_net"
 # model_name = "inception_v4"
 # model_name = "vgg16"
-debug = False
+debug = True
 use_pp_loss = True
 use_addition = True
-scale = 3.0
+scale = 2.5
+thresh = 0.7
 
 use_pre_train = False
 train_binary = False
 
+perform_loss_weight = 1.0
+cross_entropy_weight = 1.0
+
 
 # This is for the binary classifier
-run_test = True
+run_test = False
 # test_epoch_list = [141] # for original
 # test_epoch_list = [168] # for pp mul
-test_epoch_list = [111] # for pp add
+test_epoch_list = [129] # for pp add
 
 # This is for saving training model as well as getting test model and saving test npy files
-save_path_sub = "0225/pp_loss_add"
+save_path_sub = "0309/pp_add_2.5"
 
 # This is the path for the pre-train model used for continue training
-pre_train_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/" \
-                       "sail-on/combo_pipeline/1214_addition_full_set/msd_base/model_epoch_99.dat"
+# pre_train_model_path = ""
 
 
 ###############################################
@@ -71,7 +74,6 @@ else:
 
 img_size = 224
 nBlocks = 5
-thresh_top_1 = 0.90
 
 if debug:
     nb_classes = 336
@@ -86,6 +88,8 @@ else:
     else:
         nb_training_classes = 296 # known_known:295, unknown_unknown:1
 
+known_exit_rt = []
+unknown_exit_rt = []
 
 
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
@@ -186,11 +190,8 @@ def train_valid_one_epoch(known_loader,
     ###################################################
     if train_phase:
         save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(nb_epoch) + ".txt")
-        # save_prob_path = os.path.join(save_path, "train_probs_epoch_" + str(nb_epoch) + ".npy")
-        # save_label_path =
     else:
         save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(nb_epoch) + ".txt")
-        # save_prob_path = os.path.join(save_path, "valid_probs_epoch_" + str(nb_epoch) + ".npy")
 
     # Count number of batches for known and unknown respectively
     nb_known_batches = len(known_loader)
@@ -199,13 +200,6 @@ def train_valid_one_epoch(known_loader,
 
     print("There are %d batches in known_known loader" % nb_known_batches)
     print("There are %d batches in known_unknown loader" % nb_unknown_batches)
-
-    # TODO: Add this part for tensorboard
-    # Check which category has more samples/batches
-    if nb_known_batches >= nb_unknown_batches:
-        base_step = len(known_loader)
-    else:
-        base_step = len(unknown_loader)
 
     # Generate index for known and unknown and shuffle
     all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
@@ -236,11 +230,11 @@ def train_valid_one_epoch(known_loader,
             ##########################################
             if i in known_indices:
                 batch = next(known_iter)
-                # batch_type = "known"
+                batch_type = "known"
 
             elif i in unknown_indices:
                 batch = next(unknown_iter)
-                # batch_type = "unknown"
+                batch_type = "unknown"
 
             input = batch["imgs"]
             rts = batch["rts"]
@@ -270,6 +264,42 @@ def train_valid_one_epoch(known_loader,
             # print(type(output))
 
             ##########################################
+            # TODO: Get exits for each sample
+            ##########################################
+            target_exit = []
+            pred_exit = []
+
+            # Define the RT cuts for known and unknown
+            if batch_type == "known":
+                exit_rt_cut = known_exit_rt
+            elif batch_type == "unknown":
+                exit_rt_cut = unknown_exit_rt
+            else:
+                print("unknown batch type!!")
+                sys.exit()
+
+            # Find the target exit for each sample according to its RT
+            for one_rt in rts:
+                # TODO: Is there an efficient way to decide RT??
+
+
+            # TODO: Find the actual/predicted RT for each sample
+            """
+            Case 1: 
+                prob > threshold - exit right away
+            Case 2:
+                prob < threshold && not at the last exit - check next exit
+            Case 3:
+                prob < threshold && at the last exit - exit from the last clf
+            """
+            for one_output in output:
+                # TODO: logits to probs
+
+                # TODO: thresholding - check for each exit
+
+
+
+            ##########################################
             # Only MSD-Net
             ##########################################
             if model_name == "msd_net":
@@ -282,14 +312,25 @@ def train_valid_one_epoch(known_loader,
                 if use_pp_loss == True:
                     print("Using psyphy loss")
                     for j in range(len(output)):
-                        scale_factor = get_pp_factor(rts[j], scale)
+                        # Part 1: Cross-entropy loss
+                        ce_loss = cross_entropy_weight * criterion(output[j], target_var)
+
+                        # Part 2: Performance psyphy loss
+                        perform_loss = perform_loss_weight * get_perform_loss(rt=rts[j], rt_max=20)
+
+                        # Part 3: Exit psyphy loss
+                        # TODO: Define the "exit psyphy loss"
+                        # TODO: Element wise? just add? how does it map with 5 clfs?
+
                         if use_addition:
-                            loss += scale_factor + criterion(output[j], target_var)
+                            # TODO: Complete the full loss funtion
+                            loss += perform_loss + ce_loss +
+
                         else:
                             loss += scale_factor * criterion(output[j], target_var)
 
             else:
-                # TODO: other networks - may be the same with MSD Net cause 5 weights are gone?
+                # TODO(low priority): other networks - may be the same with MSD Net cause 5 weights are gone?
                 pass
 
 
@@ -435,32 +476,6 @@ def train(model,
 
         else:
             pass
-            # train_loss, train_acc_top1, \
-            # train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
-            #                                                        unknown_loader=train_known_unknown_loader,
-            #                                                        model=model_wrapper,
-            #                                                        criterion=criterion,
-            #                                                        optimizer=optimizer,
-            #                                                        nb_epoch=epoch,
-            #                                                        penalty_factors_known=penalty_factors_for_known,
-            #                                                        penalty_factors_unknown=penalty_factors_for_novel,
-            #                                                        use_msd_net=False,
-            #                                                        train_phase=True)
-            #
-            # scheduler.step()
-            #
-            # valid_loss, valid_acc_top1, \
-            # valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
-            #                                                        unknown_loader=valid_known_unknown_loader,
-            #                                                        model=model_wrapper,
-            #                                                        criterion=criterion,
-            #                                                        optimizer=optimizer,
-            #                                                        nb_epoch=epoch,
-            #                                                        penalty_factors_known=penalty_factors_for_known,
-            #                                                        penalty_factors_unknown=penalty_factors_for_novel,
-            #                                                        use_msd_net=True,
-            #                                                        train_phase=False)
-
 
         # Determine if model is the best
         if valid_loader:
@@ -895,9 +910,8 @@ def accuracy(output, target, topk=(1,)):
 
 
 
-def get_pp_factor(rt,
-                  scale,
-                  rt_max=20):
+def get_perform_loss(rt,
+                     rt_max):
     """
     scalar * (RTmax - RTi) / RTmax + 1
 
@@ -909,7 +923,10 @@ def get_pp_factor(rt,
     if rt > rt_max:
         return 1
     else:
-        return (scale*(rt_max-rt)/rt_max +1)
+        if use_addition:
+            return ((rt_max-rt)/rt_max)
+        else:
+            return ((rt_max-rt)/rt_max + 1)
 
 
 
