@@ -14,6 +14,7 @@ import random
 from args import arg_parser
 import torch.nn as nn
 import models
+import math
 
 
 args = arg_parser.parse_args()
@@ -36,7 +37,7 @@ model_name = "msd_net"
 debug = True
 use_pp_loss = True
 use_addition = True
-scale = 2.5
+scale = 1.0
 thresh = 0.7
 
 use_pre_train = False
@@ -44,6 +45,7 @@ train_binary = False
 
 perform_loss_weight = 1.0
 cross_entropy_weight = 1.0
+exit_loss_weight = 1.0
 
 
 # This is for the binary classifier
@@ -53,7 +55,7 @@ run_test = False
 test_epoch_list = [129] # for pp add
 
 # This is for saving training model as well as getting test model and saving test npy files
-save_path_sub = "0309/pp_add_2.5"
+save_path_sub = "models/0320/debug"
 
 # This is the path for the pre-train model used for continue training
 # pre_train_model_path = ""
@@ -66,6 +68,7 @@ use_json_data = True
 save_training_prob = False
 
 n_epochs = 200
+nb_clfs = 5
 
 if run_test:
     batch_size = 1
@@ -88,8 +91,8 @@ else:
     else:
         nb_training_classes = 296 # known_known:295, unknown_unknown:1
 
-known_exit_rt = []
-unknown_exit_rt = []
+known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
+unknown_exit_rt = [4,2550, 5.9220, 8.2368, 13.0090, 28.1661]
 
 
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
@@ -135,13 +138,13 @@ save_path = save_path_base + "/" + save_path_sub
 
 
 def train_valid_one_epoch(known_loader,
-                            unknown_loader,
-                            model,
-                            criterion,
-                            optimizer,
-                            nb_epoch,
-                            use_msd_net,
-                            train_phase):
+                          unknown_loader,
+                          model,
+                          criterion,
+                          optimizer,
+                          nb_epoch,
+                          use_msd_net,
+                          train_phase):
     """
 
     :param train_loader_known:
@@ -256,19 +259,28 @@ def train_valid_one_epoch(known_loader,
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
 
-            output = model(input_var)
+            start = timer()
+            output, end_time = model(input_var)
+
+            # This part is right, len(output[0])=16
+            # print("output")
+            # print(len(output[0]))
+
+            print("end time")
+            print(end_time)
+
+            # Save the RTs
+            full_rt_list = []
+
+            for end in end_time:
+                full_rt_list.append(end-start)
 
             if not isinstance(output, list):
                 output = [output]
 
-            # print(type(output))
-
             ##########################################
             # TODO: Get exits for each sample
             ##########################################
-            target_exit = []
-            pred_exit = []
-
             # Define the RT cuts for known and unknown
             if batch_type == "known":
                 exit_rt_cut = known_exit_rt
@@ -278,25 +290,88 @@ def train_valid_one_epoch(known_loader,
                 print("unknown batch type!!")
                 sys.exit()
 
-            # Find the target exit for each sample according to its RT
+            # Find the target exit RT for each sample according to its RT
+            target_exit_rt = []
+
+            print("full_rt_list")
+            print(full_rt_list)
+
             for one_rt in rts:
-                # TODO: Is there an efficient way to decide RT??
+                if (one_rt<exit_rt_cut[0]):
+                    target_exit_rt.append(exit_rt_cut[0])
+                if (one_rt>=exit_rt_cut[0]) and (one_rt<exit_rt_cut[1]):
+                    target_exit_rt.append(exit_rt_cut[1])
+                if (one_rt>=exit_rt_cut[1]) and (one_rt<exit_rt_cut[2]):
+                    target_exit_rt.append(exit_rt_cut[2])
+                if (one_rt>=exit_rt_cut[2]) and (one_rt<exit_rt_cut[3]):
+                    target_exit_rt.append(exit_rt_cut[3])
+                if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
+                    target_exit_rt.append(exit_rt_cut[4])
 
 
             # TODO: Find the actual/predicted RT for each sample
             """
-            Case 1: 
+            Case 1:
                 prob > threshold - exit right away
             Case 2:
                 prob < threshold && not at the last exit - check next exit
             Case 3:
                 prob < threshold && at the last exit - exit from the last clf
             """
-            for one_output in output:
-                # TODO: logits to probs
+            full_prob_list = []
 
-                # TODO: thresholding - check for each exit
+            # Logits to probs: Extract the probability and apply our threshold
+            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+            prob_list = np.array(prob.cpu().tolist())
 
+            # Reshape it into [batch, block, class]
+            prob_list = np.reshape(prob_list,
+                                   (prob_list.shape[1],
+                                    prob_list.shape[0],
+                                    prob_list.shape[2]))
+
+            for one_prob in prob_list.tolist():
+                full_prob_list.append(one_prob)
+
+            # TODO: thresholding - check for each exit
+            pred_exit_rt = []
+
+            for i in len(full_prob_list):
+                # TODO(???): Find the label: known or unknown
+                if target[i] < nb_training_classes-1:
+                    target_label = target[i]
+                else:
+                    target_label = -1
+
+                prob = full_prob_list[i]
+
+                # check each classifier in order and decide when to exit
+                for j in range(nb_clfs):
+                    one_prob = prob[j]
+                    pred = np.argmax(one_prob)
+                    max_prob = np.sort(one_prob)[-1]
+
+                    # If this is not the last classifier
+                    if j != nb_clfs - 1:
+                        # Only consider top-1 if it is not the last classifier
+                        if (max_prob > top_1_threshold) and (pred == target_label):
+                            # TODO: Get the RT here
+                            pred_rt = full_rt_list[j]
+                            pred_exit_rt.append(pred_rt)
+
+                            # If top-1 is larger than threshold,
+                            # then directly go to next sample
+                            break
+
+                        else:
+                            # If the max prob is smaller than threshold, check next clf
+                            continue
+
+                    # If this is the last classifier
+                    else:
+                        # TODO: RT for last exit
+                        pred_rt = full_rt_list[-1]
+                        pred_exit_rt.append(pred_rt)
 
 
             ##########################################
@@ -320,11 +395,12 @@ def train_valid_one_epoch(known_loader,
 
                         # Part 3: Exit psyphy loss
                         # TODO: Define the "exit psyphy loss"
-                        # TODO: Element wise? just add? how does it map with 5 clfs?
+                        exit_loss = exit_loss_weight * get_exit_loss(pred_exit_rt=pred_exit_rt,
+                                                                     target_exit_rt=target_exit_rt)
 
                         if use_addition:
                             # TODO: Complete the full loss funtion
-                            loss += perform_loss + ce_loss +
+                            loss += perform_loss + ce_loss + exit_loss
 
                         else:
                             loss += scale_factor * criterion(output[j], target_var)
@@ -377,12 +453,6 @@ def train_valid_one_epoch(known_loader,
                     nb_epoch, i + 1, nb_total_batches,
                     batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
-
-        # TODO: Get probability and save after each epoch (??)
-
-
-
-
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
 
@@ -769,7 +839,7 @@ def demo(depth=100,
     elif model_name == "msd_net":
         model = getattr(models, args.arch)(args)
 
-    # TODO: Maybe adding other networks in the future
+    # TODO (low priority): Maybe adding other networks in the future
     else:
         pass
 
@@ -777,7 +847,6 @@ def demo(depth=100,
     ########################################################################
     # Test-only or Training + validation
     ########################################################################
-    # TODO: Fix this testing process + add op count
     if run_test:
         if model_name == "msd_net":
             for index in test_epoch_list:
@@ -927,6 +996,24 @@ def get_perform_loss(rt,
             return ((rt_max-rt)/rt_max)
         else:
             return ((rt_max-rt)/rt_max + 1)
+
+
+def get_exit_loss(pred_exit_rt,
+                  target_exit_rt):
+    """
+
+    """
+    exit_loss = 0.0
+
+    for i in range(len(pred_exit_rt)):
+        one_pred = pred_exit_rt[i]
+        one_target = target_exit_rt[i]
+
+        one_loss = math.abs(one_pred-one_target)
+        exit_loss += one_loss
+
+    return exit_loss
+
 
 
 

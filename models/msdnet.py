@@ -216,10 +216,6 @@ class MSDNet(nn.Module):
         self.steps = [args.base]
         self.args = args
 
-        # Adding reaction time from inside the model
-        # self.start_time = timer()
-        # self.end_times = []
-        # self.rts = []
         
         n_layers_all, n_layer_curr = args.base, 0
         for i in range(1, self.nBlocks):
@@ -251,12 +247,6 @@ class MSDNet(nn.Module):
             elif args.data == 'ImageNet':
                 self.classifier.append(self._build_classifier_imagenet(nIn * args.grFactor[-1], self.nb_training_classes ))
 
-                # Adding RT after each classifier
-                # end_time = timer()
-                # rt = end_time - self.start_time
-                #
-                # self.end_times.append(end_time)
-                # self.rts.append(rt)
 
             else:
                 raise NotImplementedError
@@ -360,6 +350,9 @@ class MSDNet(nn.Module):
             # print("Calling forward function")
             res = []
             end_times = []
+            all_end_times = []
+
+            print("One sample")
             for i in range(self.nBlocks):
                 x = self.blocks[i](x)
                 logit = self.classifier[i](x)
@@ -368,7 +361,9 @@ class MSDNet(nn.Module):
                 end_times.append(end)
                 res.append(logit)
 
-            return res, end_times
+            all_end_times.append(end_times)
+
+            return res, all_end_times
     else:
         def forward(self, x):
             res = []

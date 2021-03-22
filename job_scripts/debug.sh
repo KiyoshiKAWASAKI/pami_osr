@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N 0317_debug_loss
+#$ -N 0321_debug_loss
 
 # Required modules
 module load conda
@@ -11,11 +11,11 @@ conda init bash
 source activate new_msd_net
 
 CUDA_VISIBLE_DEVICES=3 python demo.py --arch msdnet \
-                                       --batch-size 16 \
+                                       --batch-size 4 \
                                        --nb_training_classes 336 \
                                        --optimizer sgd \
                                        --learning-rate 0.1 \
                                        --gpu 1 \
                                        --epochs 5 \
                                        --print-freq 1 \
-                                       --tf_board_path /afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0220_debug/tf
+                                       --test_with_novel True

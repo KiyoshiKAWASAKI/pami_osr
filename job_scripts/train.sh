@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N msd_pp_add_s_3.0
+#$ -N msd_pp_modified
 
 # Required modules
 module load conda
@@ -17,4 +17,5 @@ CUDA_VISIBLE_DEVICES=3 python demo.py --arch msdnet \
                                        --learning-rate 0.1 \
                                        --gpu 1 \
                                        --epochs 200 \
+                                       --test_with_novel True \
                                        --print-freq 1
