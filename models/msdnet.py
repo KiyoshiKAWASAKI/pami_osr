@@ -352,7 +352,7 @@ class MSDNet(nn.Module):
             end_times = []
             all_end_times = []
 
-            print("One sample")
+            # print("One sample")
             for i in range(self.nBlocks):
                 x = self.blocks[i](x)
                 logit = self.classifier[i](x)
