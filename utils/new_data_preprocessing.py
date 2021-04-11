@@ -1009,10 +1009,8 @@ def gen_known_known_rt_json(train_list_path,
 
 def combine_json(train_known_known_with_rt_path,
                  train_known_known_without_rt_path,
-                 train_known_unknown_path,
                  valid_known_known_with_rt_path,
                  valid_known_known_without_rt_path,
-                 valid_known_unknown_path,
                  save_training_json_path,
                  save_valid_json_path):
     """
@@ -1133,7 +1131,196 @@ def adjust_json_index(train_json_path,
 
 
 
+
+
+def group_json_with_rt(original_json_file_path,
+                       processed_json_save_path,
+                       nb_samples_per_batch):
+    """
+
+    :param json_path:
+    :return:
+    """
+    print("*" * 40)
+
+    # Load the json file
+    with open(original_json_file_path) as f_train:
+        print(original_json_file_path)
+        original_json_file = json.load(f_train)
+
+    """
+    Sort the dictionaries according to RT:
+    
+    1. Save all the RTs in order into a list
+    2. Sort the Rts in this list and return the indices
+    3. Every nb_samples_per_batch, put them into a same bacth
+    
+    P.S. There are some RTs that are None, and idk why. Just treat them as they dont have RT.
+    """
+    rt_list = []
+    rt_key_list = []
+    dict_without_rts = {}
+
+    # Index in original Json starts from "1"
+    for i in range(len(original_json_file)):
+        one_sample = original_json_file[str(i+1)]
+        one_rt = one_sample["RT"]
+
+        if one_rt != None:
+            rt_list.append(one_rt)
+            rt_key_list.append(i+1)
+        else:
+            dict_without_rts[str(len(dict_without_rts))] = one_sample
+
+    # 1. Sort the list and return indices
+    sorted_indices = sorted(range(len(rt_list)), key=lambda k: rt_list[k])
+    print(len(sorted_indices))
+    assert(len(sorted_indices)==len(rt_list))
+
+    # 2. Process the Json with Rts and cut the extra
+    dict_with_rts = {}
+
+    for one_index in sorted_indices:
+        # print("Index for an entry in the RT list: %d" % one_index)
+        # Find where this RT belongs to in the original Json string
+        index_in_json = rt_key_list[one_index]
+        # Get that dictionary in Json
+        one_dict = original_json_file[str(index_in_json)]
+        # Append this dict to the main dictionary
+        dict_with_rts[str(len(dict_with_rts))] = one_dict
+
+    # print(dict_with_rts) # This is correct
+    # print(dict_without_rts) # This is correct
+
+    # Reorganize the dicts with new index
+    dict_with_rts_organized = {}
+    dict_without_rts_organized = {}
+
+    for i in range(len(dict_with_rts)):
+        one_dict = dict_with_rts[str(i)]
+        dict_with_rts_organized[len(dict_with_rts_organized)] = one_dict
+    # print(dict_with_rts_organized) # index starts from 0, and is int not str
+
+    for i in range(len(dict_without_rts)):
+        one_dict = dict_without_rts[str(i)]
+        dict_without_rts_organized[len(dict_without_rts_organized)] = one_dict
+    # print(dict_without_rts_organized) # index starts from 0, and is int not str
+
+    # Calculate the nb of entries
+    nb_count_total = len(dict_with_rts_organized) - len(dict_with_rts_organized)%nb_samples_per_batch
+    print("Have %d samples originally" % len(dict_with_rts_organized))
+    print("Dropping %d samples" % (len(dict_with_rts_organized)%nb_samples_per_batch))
+    print("Total samples left %d" % nb_count_total)
+
+    # For each nb_sample, put them into one dictionary
+    rt_full_dict = {}
+    one_full_dict = {}
+    nb_count_per_batch = 0
+
+    for i in range(nb_count_total):
+        one_dict = dict_with_rts_organized[i]
+        one_full_dict[len(one_full_dict)] = one_dict
+        nb_count_per_batch += 1
+
+        if (nb_count_per_batch % nb_samples_per_batch==0):
+            rt_full_dict[len(rt_full_dict)] = one_full_dict
+            nb_count_per_batch = 0
+            one_full_dict = {}
+
+    print(len(rt_full_dict))
+
+    # Calculate the nb of entries and reorganize the dict that without RTs
+    nb_count_no_rt_total = len(dict_without_rts_organized) - len(dict_without_rts_organized) % nb_samples_per_batch
+    print("Have %d samples originally" % len(dict_without_rts_organized))
+    print("Dropping %d samples" % (len(dict_without_rts_organized) % nb_samples_per_batch))
+    print("Total samples left %d" % nb_count_no_rt_total)
+
+    no_rt_full_dict = {}
+    one_no_rt_full_dict = {}
+    nb_count_per_batch = 0
+
+    for i in range(nb_count_no_rt_total):
+        one_dict = dict_without_rts_organized[i]
+        one_no_rt_full_dict[len(one_no_rt_full_dict)] = one_dict
+        nb_count_per_batch += 1
+
+        if (nb_count_per_batch % nb_samples_per_batch == 0):
+            no_rt_full_dict[len(no_rt_full_dict)] = one_no_rt_full_dict
+            nb_count_per_batch = 0
+            one_no_rt_full_dict = {}
+
+    print(len(no_rt_full_dict))
+
+    # 3. Combine the dict with RTs and the dict with Nones
+    for i in range(len(no_rt_full_dict)):
+        rt_full_dict[len(rt_full_dict)+i] = no_rt_full_dict[i]
+    print(len(rt_full_dict))
+
+    # 4. Save the json
+    with open(processed_json_save_path, 'w') as f:
+        json.dump(rt_full_dict, f)
+        print("Saving file to %s" % processed_json_save_path)
+
+
+
+
 if __name__ == '__main__':
+    """
+    Grouping the samples into bigger batches according the RTs
+    """
+    # # train_known_known_with_rt
+    # group_train_known_known_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/train_known_known_with_rt_grouped.json"
+    # group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
+    #                    processed_json_save_path=group_train_known_known_rt_save_path,
+    #                    nb_samples_per_batch=16)
+    #
+    # # train_known_known_without_rt
+    # group_train_known_known_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/train_known_known_without_rt_grouped.json"
+    #
+    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
+    #                    processed_json_save_path=group_train_known_known_no_rt_save_path,
+    #                    nb_samples_per_batch=16)
+    #
+    # # train_known_unknown (all unknowns should have RT)
+    # group_train_known_unknown_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/train_known_unknown_grouped.json"
+    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
+    #                    processed_json_save_path=group_train_known_unknown_rt_save_path,
+    #                    nb_samples_per_batch=16)
+    #
+    # # train_known_known_with_rt
+    # group_valid_known_known_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/valid_known_known_with_rt_grouped.json"
+    # group_json_with_rt(original_json_file_path=valid_known_known_with_rt_json_path,
+    #                    processed_json_save_path=group_valid_known_known_rt_save_path,
+    #                    nb_samples_per_batch=16)
+    #
+    # # train_known_known_without_rt
+    # group_valid_known_known_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/valid_known_known_without_rt_grouped.json"
+    #
+    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
+    #                    processed_json_save_path=group_valid_known_known_no_rt_save_path,
+    #                    nb_samples_per_batch=16)
+    #
+    # # train_known_unknown (all unknowns should have RT)
+    # group_valid_known_unknown_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                  "npy_json_files/rt_group_json/valid_known_unknown_grouped.json"
+    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
+    #                    processed_json_save_path=group_valid_known_unknown_rt_save_path,
+    #                    nb_samples_per_batch=16)
+
+
+    # Combine the train_known_known and valid_known_known
+
+
+
+
+    """
+    Data processing before April 2021
+    """
     # # Process RT file with known and unknown respectively
     # known_class_labels, known_image_names, known_rts = remove_outliers(instance_rt_path=known_rt_path)
     # unknown_class_labels, unknown_image_names, unknown_rts = remove_outliers(instance_rt_path=unknown_rt_path)
@@ -1248,16 +1435,16 @@ if __name__ == '__main__':
     #                         training_ratio=0.80)
 
     # Combine Json files and adjust the indices
-    combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
-                 train_known_known_without_rt_path=train_known_known_without_rt_json_path,
-                 train_known_unknown_path=train_known_unknown_json_path,
-                 valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
-                 valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
-                 valid_known_unknown_path=valid_known_unknown_json_path,
-                 save_training_json_path=save_training_json_path,
-                 save_valid_json_path=save_valid_json_path)
-
-    adjust_json_index(train_json_path=save_training_json_path,
-                      valid_json_path=save_valid_json_path)
+    # combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
+    #              train_known_known_without_rt_path=train_known_known_without_rt_json_path,
+    #              train_known_unknown_path=train_known_unknown_json_path,
+    #              valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
+    #              valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
+    #              valid_known_unknown_path=valid_known_unknown_json_path,
+    #              save_training_json_path=save_training_json_path,
+    #              save_valid_json_path=save_valid_json_path)
+    #
+    # adjust_json_index(train_json_path=save_training_json_path,
+    #                   valid_json_path=save_valid_json_path)
 
 

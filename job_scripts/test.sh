@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N get_train_rt_pp_add
+#$ -N vkuk_pp_add
 
 # Required modules
 module load conda
