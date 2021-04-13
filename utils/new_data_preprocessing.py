@@ -8,6 +8,8 @@ import sys
 import os
 import ast
 import pickle
+from json import JSONDecoder
+from collections import OrderedDict
 
 # dataset_v1_3_partition/train_valid:dataset_v1/known_classes/images/train
 # dataset_v1_3_partition/test:dataset_v1/known_classes/images/val (we did MTurk data collection on this)
@@ -1024,30 +1026,52 @@ def combine_json(train_known_known_with_rt_path,
     :param valid_known_unknown_path:
     :return:
     """
+    customdecoder = JSONDecoder(object_pairs_hook=OrderedDict)
+
     # Load all Json files
     with open(train_known_known_with_rt_path) as train_known_known_with_rt:
         train_known_known_with_rt_json = json.load(train_known_known_with_rt)
     with open(train_known_known_without_rt_path) as train_known_known_without_rt:
         train_known_known_without_rt_json = json.load(train_known_known_without_rt)
-    # with open(train_known_unknown_path) as train_known_unknown:
-    #     train_known_unknown_json = json.load(train_known_unknown)
+
+    # TODO: Check whether there is any missing keys in 2 training files
+    print("Checking train_known_known_with_rt_json")
+    print(len())
+    for i in range(len(train_known_known_with_rt_json)):
+        try:
+            sample = train_known_known_with_rt_json[str(i)]
+        except Exception as e:
+            print(e)
+
+    print("Checking train_known_known_without_rt_json")
+    for i in range(len(train_known_known_without_rt_json)):
+        try:
+            sample = train_known_known_without_rt_json[str(i)]
+        except Exception as e:
+            print(e)
+
+    sys.exit()
 
     with open(valid_known_known_with_rt_path) as valid_known_known_with_rt:
         valid_known_known_with_rt_json = json.load(valid_known_known_with_rt)
     with open(valid_known_known_without_rt_path) as valid_known_known_without_rt:
         valid_known_known_without_rt_json = json.load(valid_known_known_without_rt)
-    # with open(valid_known_unknown_path) as valid_known_unknown:
-    #     valid_known_unknown_json = json.load(valid_known_unknown)
+
+    # TODO: Check whether there is any missing keys in 2 training files
+
+
 
 
     # Merge Training Jsons
     print("Training json before combining json has %d entries." % len(train_known_known_with_rt_json))
-    for i in range(1, len(train_known_known_without_rt_json)+1):
-        one_entry = train_known_known_without_rt_json[str(i)]
-        train_known_known_with_rt_json[len(train_known_known_with_rt_json)+i] = one_entry
-    # for i in range(1, len(train_known_unknown_json)+1):
-    #     one_entry = train_known_unknown_json[str(i)]
-    #     train_known_known_with_rt_json[len(train_known_known_with_rt_json)+i] = one_entry
+    for i in range(len(train_known_known_without_rt_json)):
+        try:
+            one_entry = train_known_known_without_rt_json[str(i)]
+            train_known_known_with_rt_json[len(train_known_known_with_rt_json) + i] = one_entry
+        except Exception as e:
+            print(e)
+            continue
+
     print("Training json after combining json has %d entries." % len(train_known_known_with_rt_json))
 
     with open(save_training_json_path, 'w') as f:
@@ -1056,12 +1080,9 @@ def combine_json(train_known_known_with_rt_path,
 
     # Merge valid Jsons
     print("Valid json before combining json has %d entries." % len(valid_known_known_with_rt_json))
-    for i in range(1, len(valid_known_known_without_rt_json) + 1):
+    for i in range(len(valid_known_known_without_rt_json)):
         one_entry = valid_known_known_without_rt_json[str(i)]
         valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
-    # for i in range(1, len(valid_known_unknown_json) + 1):
-    #     one_entry = valid_known_unknown_json[str(i)]
-    #     valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
     print("Valid json after combining json has %d entries." % len(valid_known_known_with_rt_json))
 
     with open(save_valid_json_path, 'w') as f:
@@ -1134,8 +1155,9 @@ def adjust_json_index(train_json_path,
 
 
 def group_json_with_rt(original_json_file_path,
-                       processed_json_save_path,
-                       nb_samples_per_batch):
+                       processed_json_rt_save_path,
+                       processed_json_no_rt_save_path,
+                       nb_samples_per_batch=16):
     """
 
     :param json_path:
@@ -1153,7 +1175,7 @@ def group_json_with_rt(original_json_file_path,
     
     1. Save all the RTs in order into a list
     2. Sort the Rts in this list and return the indices
-    3. Every nb_samples_per_batch, put them into a same bacth
+    3. Every nb_samples_per_batch, put them into a same batch
     
     P.S. There are some RTs that are None, and idk why. Just treat them as they dont have RT.
     """
@@ -1229,6 +1251,11 @@ def group_json_with_rt(original_json_file_path,
 
     print(len(rt_full_dict))
 
+    if (len(rt_full_dict) != 0):
+        with open(processed_json_rt_save_path, 'w') as f:
+            json.dump(rt_full_dict, f)
+            print("Saving file to %s" % processed_json_rt_save_path)
+
     # Calculate the nb of entries and reorganize the dict that without RTs
     nb_count_no_rt_total = len(dict_without_rts_organized) - len(dict_without_rts_organized) % nb_samples_per_batch
     print("Have %d samples originally" % len(dict_without_rts_organized))
@@ -1251,15 +1278,10 @@ def group_json_with_rt(original_json_file_path,
 
     print(len(no_rt_full_dict))
 
-    # 3. Combine the dict with RTs and the dict with Nones
-    for i in range(len(no_rt_full_dict)):
-        rt_full_dict[len(rt_full_dict)+i] = no_rt_full_dict[i]
-    print(len(rt_full_dict))
-
-    # 4. Save the json
-    with open(processed_json_save_path, 'w') as f:
-        json.dump(rt_full_dict, f)
-        print("Saving file to %s" % processed_json_save_path)
+    if len(no_rt_full_dict) != 0:
+        with open(processed_json_no_rt_save_path, 'w') as f:
+            json.dump(rt_full_dict, f)
+            print("Saving file to %s" % processed_json_no_rt_save_path)
 
 
 
@@ -1268,52 +1290,70 @@ if __name__ == '__main__':
     """
     Grouping the samples into bigger batches according the RTs
     """
-    # # train_known_known_with_rt
-    # group_train_known_known_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/train_known_known_with_rt_grouped.json"
-    # group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
-    #                    processed_json_save_path=group_train_known_known_rt_save_path,
-    #                    nb_samples_per_batch=16)
-    #
-    # # train_known_known_without_rt
-    # group_train_known_known_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/train_known_known_without_rt_grouped.json"
-    #
-    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
-    #                    processed_json_save_path=group_train_known_known_no_rt_save_path,
-    #                    nb_samples_per_batch=16)
-    #
-    # # train_known_unknown (all unknowns should have RT)
-    # group_train_known_unknown_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/train_known_unknown_grouped.json"
-    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
-    #                    processed_json_save_path=group_train_known_unknown_rt_save_path,
-    #                    nb_samples_per_batch=16)
-    #
-    # # train_known_known_with_rt
-    # group_valid_known_known_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/valid_known_known_with_rt_grouped.json"
-    # group_json_with_rt(original_json_file_path=valid_known_known_with_rt_json_path,
-    #                    processed_json_save_path=group_valid_known_known_rt_save_path,
-    #                    nb_samples_per_batch=16)
-    #
-    # # train_known_known_without_rt
-    # group_valid_known_known_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/valid_known_known_without_rt_grouped.json"
-    #
-    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
-    #                    processed_json_save_path=group_valid_known_known_no_rt_save_path,
-    #                    nb_samples_per_batch=16)
-    #
-    # # train_known_unknown (all unknowns should have RT)
-    # group_valid_known_unknown_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                  "npy_json_files/rt_group_json/valid_known_unknown_grouped.json"
-    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
-    #                    processed_json_save_path=group_valid_known_unknown_rt_save_path,
-    #                    nb_samples_per_batch=16)
+    # Training data Json save paths
+    tkk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                            "npy_json_files/rt_group_json/tkk_rt_rt_grouped.json"
+    tkk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                          "npy_json_files/rt_group_json/tkk_rt_none_grouped.json"
+    tkk_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                            "npy_json_files/rt_group_json/tkk_no_rt_grouped.json"
+    tkuk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                            "npy_json_files/rt_group_json/tkuk_rt_rt_grouped.json"
+    tkuk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                           "npy_json_files/rt_group_json/tkuk_rt_none_grouped.json"
 
+    # Validation data Json save paths
+    vkk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                            "npy_json_files/rt_group_json/vkk_rt_rt_grouped.json"
+    vkk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                          "npy_json_files/rt_group_json/vkk_rt_none_grouped.json"
+    vkk_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                          "npy_json_files/rt_group_json/vkk_no_rt_grouped.json"
+    vkuk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                            "npy_json_files/rt_group_json/vkuk_rt_rt_grouped.json"
+    vkuk_rt_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                "npy_json_files/rt_group_json/vkuk_rt_none_grouped.json"
+
+    # Training data
+    # group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
+    #                    processed_json_rt_save_path=tkk_rt_rt_save_path,
+    #                    processed_json_no_rt_save_path=tkk_rt_none_save_path)
+    #
+    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
+    #                    processed_json_rt_save_path=None,
+    #                    processed_json_no_rt_save_path=tkk_no_rt_save_path)
+    #
+    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
+    #                    processed_json_rt_save_path=tkuk_rt_rt_save_path,
+    #                    processed_json_no_rt_save_path=tkuk_rt_none_save_path)
+
+    # Validation data
+    group_json_with_rt(original_json_file_path=valid_known_known_with_rt_json_path,
+                       processed_json_rt_save_path=vkk_rt_rt_save_path,
+                       processed_json_no_rt_save_path=vkk_rt_none_save_path)
+    group_json_with_rt(original_json_file_path=valid_known_known_without_rt_json_path,
+                       processed_json_rt_save_path=None,
+                       processed_json_no_rt_save_path=vkk_no_rt_save_path)
+    group_json_with_rt(original_json_file_path=valid_known_unknown_json_path,
+                       processed_json_rt_save_path=vkuk_rt_rt_save_path,
+                       processed_json_no_rt_save_path=vkuk_rt_no_rt_save_path)
 
     # Combine the train_known_known and valid_known_known
+    # group_train_known_known_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                     "npy_json_files/rt_group_json/train_known_known_grouped.json"
+    # group_valid_known_known_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+    #                                     "npy_json_files/rt_group_json/valid_known_known_without_rt_grouped.json"
+    #
+    # # TODO: Wrong results here??
+    # combine_json(train_known_known_with_rt_path=group_train_known_known_rt_save_path,
+    #              train_known_known_without_rt_path=group_train_known_known_no_rt_save_path,
+    #              valid_known_known_with_rt_path=group_valid_known_known_rt_save_path,
+    #              valid_known_known_without_rt_path=group_valid_known_known_no_rt_save_path,
+    #              save_training_json_path=group_train_known_known_save_path,
+    #              save_valid_json_path=group_valid_known_known_save_path)
+    #
+    # adjust_json_index(train_json_path=group_train_known_known_save_path,
+    #                   valid_json_path=group_valid_known_known_save_path)
 
 
 
