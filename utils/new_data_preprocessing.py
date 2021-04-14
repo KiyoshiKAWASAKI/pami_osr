@@ -1280,7 +1280,7 @@ def group_json_with_rt(original_json_file_path,
 
     if len(no_rt_full_dict) != 0:
         with open(processed_json_no_rt_save_path, 'w') as f:
-            json.dump(rt_full_dict, f)
+            json.dump(no_rt_full_dict, f)
             print("Saving file to %s" % processed_json_no_rt_save_path)
 
 
@@ -1315,17 +1315,17 @@ if __name__ == '__main__':
                                 "npy_json_files/rt_group_json/vkuk_rt_none_grouped.json"
 
     # Training data
-    # group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
-    #                    processed_json_rt_save_path=tkk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=tkk_rt_none_save_path)
-    #
-    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
-    #                    processed_json_rt_save_path=None,
-    #                    processed_json_no_rt_save_path=tkk_no_rt_save_path)
-    #
-    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
-    #                    processed_json_rt_save_path=tkuk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=tkuk_rt_none_save_path)
+    group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
+                       processed_json_rt_save_path=tkk_rt_rt_save_path,
+                       processed_json_no_rt_save_path=tkk_rt_none_save_path)
+
+    group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
+                       processed_json_rt_save_path=None,
+                       processed_json_no_rt_save_path=tkk_no_rt_save_path)
+
+    group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
+                       processed_json_rt_save_path=tkuk_rt_rt_save_path,
+                       processed_json_no_rt_save_path=tkuk_rt_none_save_path)
 
     # Validation data
     group_json_with_rt(original_json_file_path=valid_known_known_with_rt_json_path,
