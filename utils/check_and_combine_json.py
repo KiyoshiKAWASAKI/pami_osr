@@ -69,58 +69,115 @@ if __name__ == '__main__':
     #         except Exception as e:
     #             print(e)
 
-    # training: Known_known
-    with open(tkk_rt_rt_save_path) as f_1:
-        tkk_rt_rt = json.load(f_1)
-    with open(tkk_rt_none_save_path) as f_2:
-        tkk_rt_none = json.load(f_2)
-    with open(tkk_no_rt_save_path) as f_3:
-        tkk_no_rt = json.load(f_3)
+    # # training: Known_known
+    # with open(tkk_rt_rt_save_path) as f_1:
+    #     tkk_rt_rt = json.load(f_1)
+    # with open(tkk_rt_none_save_path) as f_2:
+    #     tkk_rt_none = json.load(f_2)
+    # with open(tkk_no_rt_save_path) as f_3:
+    #     tkk_no_rt = json.load(f_3)
+    #
+    # print(len(tkk_rt_rt))
+    # print(len(tkk_rt_none))
+    # print(len(tkk_no_rt))
+    #
+    # for i in range(len(tkk_rt_none)):
+    #     tkk_rt_rt[len(tkk_rt_rt)+i] = tkk_rt_none[str(i)]
+    # for j in range(len(tkk_no_rt)):
+    #     tkk_rt_rt[len(tkk_rt_rt)+j] = tkk_no_rt[str(j)]
+    #
+    # tkk_rt_rt_fixed = {str(i): v for i, v in enumerate(tkk_rt_rt.values())}
+    # print(len(tkk_rt_rt_fixed))
+    #
+    # for i in range(len(tkk_rt_rt_fixed)):
+    #     try:
+    #         one_entry = tkk_rt_rt_fixed[str(i)]
+    #     except Exception as e:
+    #         print(e)
+    #
+    # with open(train_known_known_save_path, 'w') as f:
+    #     json.dump(tkk_rt_rt_fixed, f)
+    #     print("Saving file to %s" % train_known_known_save_path)
+    #
+    # # training: Known_unknown
+    # with open(tkuk_rt_rt_save_path) as f_4:
+    #     tkuk_rt_rt = json.load(f_4)
+    # with open(tkuk_rt_none_save_path) as f_5:
+    #     tkuk_rt_none = json.load(f_5)
+    #
+    # print(len(tkuk_rt_rt))
+    # print(len(tkuk_rt_none))
+    #
+    # for i in range(len(tkuk_rt_none)):
+    #     tkuk_rt_rt[len(tkuk_rt_rt)+i] = tkuk_rt_rt[str(i)]
+    #
+    # tkuk_rt_rt_fixed = {str(i): v for i, v in enumerate(tkuk_rt_rt.values())}
+    # print(len(tkuk_rt_rt_fixed))
+    #
+    # for i in range(len(tkuk_rt_rt_fixed)):
+    #     try:
+    #         one_entry = tkuk_rt_rt_fixed[str(i)]
+    #     except Exception as e:
+    #         print(e)
+    #
+    # with open(train_known_unknown_save_path, 'w') as f:
+    #     json.dump(tkuk_rt_rt_fixed, f)
+    #     print("Saving file to %s" % train_known_unknown_save_path)
 
-    print(len(tkk_rt_rt))
-    print(len(tkk_rt_none))
-    print(len(tkk_no_rt))
+    # Validation: Known_known
+    with open(vkk_rt_rt_save_path) as f_1:
+        vkk_rt_rt = json.load(f_1)
+    with open(vkk_rt_none_save_path) as f_2:
+        vkk_rt_none = json.load(f_2)
+    with open(vkk_no_rt_save_path) as f_3:
+        vkk_no_rt = json.load(f_3)
 
-    for i in range(len(tkk_rt_none)):
-        tkk_rt_rt[len(tkk_rt_rt)+i] = tkk_rt_none[str(i)]
-    for j in range(len(tkk_no_rt)):
-        tkk_rt_rt[len(tkk_rt_rt)+j] = tkk_no_rt[str(j)]
+    print(len(vkk_rt_rt))
+    print(len(vkk_rt_none))
+    print(len(vkk_no_rt))
 
-    tkk_rt_rt_fixed = {str(i): v for i, v in enumerate(tkk_rt_rt.values())}
+    for i in range(len(vkk_rt_none)):
+        vkk_rt_rt[len(vkk_rt_rt) + i] = vkk_rt_none[str(i)]
+    print(len(vkk_rt_rt))
+    for j in range(len(vkk_no_rt)):
+        vkk_rt_rt[len(vkk_rt_rt) + j] = vkk_no_rt[str(j)]
+    print(len(vkk_rt_rt))
 
-    for i in range(len(tkk_rt_rt_fixed)):
+    vkk_rt_rt_fixed = {str(i): v for i, v in enumerate(vkk_rt_rt.values())}
+    print(len(vkk_rt_rt_fixed))
+
+    for i in range(len(vkk_rt_rt_fixed)):
+        print(i)
         try:
-            one_entry = tkk_rt_rt_fixed[str(i)]
+            one_entry = vkk_rt_rt_fixed[str(i)]
         except Exception as e:
             print(e)
 
-    with open(train_known_known_save_path, 'w') as f:
-        json.dump(tkk_rt_rt_fixed, f)
-        print("Saving file to %s" % train_known_known_save_path)
+    with open(valid_known_known_save_path, 'w') as f:
+        json.dump(vkk_rt_rt_fixed, f)
+        print("Saving file to %s" % valid_known_known_save_path)
 
-    # training: Known_unknown
-    with open(tkuk_rt_rt_save_path) as f_4:
-        tkuk_rt_rt = json.load(f_4)
-    with open(tkuk_rt_none_save_path) as f_5:
-        tkuk_rt_none = json.load(f_5)
-
-    print(len(tkuk_rt_rt))
-    print(len(tkuk_rt_none))
-
-    for i in range(len(tkuk_rt_none)):
-        tkuk_rt_rt[len(tkuk_rt_rt)+i] = tkuk_rt_rt[str(i)]
-
-    tkuk_rt_rt_fixed = {str(i): v for i, v in enumerate(tkuk_rt_rt.values())}
-    print(len(tkuk_rt_rt_fixed))
-
-    for i in range(len(tkuk_rt_rt_fixed)):
-        try:
-            one_entry = tkuk_rt_rt_fixed[str(i)]
-        except Exception as e:
-            print(e)
-
-    with open(train_known_unknown_save_path, 'w') as f:
-        json.dump(tkuk_rt_rt_fixed, f)
-        print("Saving file to %s" % train_known_unknown_save_path)
-
-
+    # validation: Known_unknown
+    # with open(vkuk_rt_rt_save_path) as f_4:
+    #     vkuk_rt_rt = json.load(f_4)
+    # with open(tkuk_rt_none_save_path) as f_5:
+    #     vkuk_rt_none = json.load(f_5)
+    #
+    # print(len(vkuk_rt_rt))
+    # print(len(vkuk_rt_none))
+    #
+    # for i in range(len(vkuk_rt_none)):
+    #     vkuk_rt_rt[len(vkuk_rt_rt)+i] = vkuk_rt_none[str(i)]
+    #
+    # vkuk_rt_rt_fixed = {str(i): v for i, v in enumerate(vkuk_rt_rt.values())}
+    # print(len(vkuk_rt_rt_fixed))
+    #
+    # for i in range(len(vkuk_rt_rt_fixed)):
+    #     try:
+    #         one_entry = vkuk_rt_rt_fixed[str(i)]
+    #     except Exception as e:
+    #         print(e)
+    #
+    # with open(valid_known_unknown_save_path, 'w') as f:
+    #     json.dump(vkuk_rt_rt_fixed, f)
+    #     print("Saving file to %s" % valid_known_unknown_save_path)
