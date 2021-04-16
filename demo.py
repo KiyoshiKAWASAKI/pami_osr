@@ -27,49 +27,49 @@ args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
 
 
-###############################################
-# Change these parameters
-###############################################
+##############################################
+# Training options
+##############################################
 model_name = "msd_net"
-# model_name = "dense_net"
-# model_name = "inception_v4"
-# model_name = "vgg16"
-debug = False
+
+debug = True
+use_pre_train = False
+train_binary = False
+
+##############################################
+# Loss options
+##############################################
 use_pp_loss = True
 use_addition = True
 scale = 1.0
 thresh = 0.7
-
-use_pre_train = False
-train_binary = False
-
 perform_loss_weight = 1.0
 cross_entropy_weight = 1.0
 exit_loss_weight = 1.0
 
-
-# This is for the binary classifier
+##############################################
+# Test process options
+##############################################
+run_test = False
 get_train_valid_prob = True
-run_test = True
 run_one_sample = True
 nb_itrs = 1000
 use_trained_weights = False
-save_one_sample_rt_folder = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/" \
-                            "get_outliers/valid_known_unknown/pp_add"
-
-
+save_one_sample_rt_folder = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/" \
+                            "models/0225/get_outliers/valid_known_unknown/pp_add"
 
 # test_epoch_list = [141] # for original
 # test_epoch_list = [168] # for pp mul
 test_epoch_list = [111] # for pp add
 
+##############################################
+# Paths for saving results
+##############################################
 # This is for saving training model as well as getting test model and saving test npy files
 # save_path_sub = "0225/original"
 # save_path_sub = "0225/pp_loss"
 save_path_sub = "0225/pp_loss_add"
 
-# This is the path for the pre-train model used for continue training
-# pre_train_model_path = ""
 
 
 ###############################################
@@ -79,46 +79,58 @@ use_json_data = True
 save_training_prob = False
 
 nb_itr = 30
-
 n_epochs = 200
 nb_clfs = 5
-
-if run_test:
-    batch_size = 1
-else:
-    batch_size = 16
-
 img_size = 224
 nBlocks = 5
+nb_classes = 296
 
-if debug:
-    nb_classes = 336
-else:
-    nb_classes = 296
+# if run_test:
+#     batch_size = 1
+# else:
+#     batch_size = 16
+batch_size = 1
+
+# if debug:
+#     nb_classes = 336
+# else:
+#     nb_classes = 296
 
 if train_binary:
     nb_training_classes = 2
 else:
-    if debug:
-        nb_training_classes = 336  # known_known:335, unknown_unknown:1
-    else:
-        nb_training_classes = 296 # known_known:295, unknown_unknown:1
+    nb_training_classes = 296
+    # if debug:
+    #     nb_training_classes = 336  # known_known:335, unknown_unknown:1
+    # else:
+    #     nb_training_classes = 296 # known_known:295, unknown_unknown:1
 
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
 unknown_exit_rt = [4,2550, 5.9220, 8.2368, 13.0090, 28.1661]
 
-
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+save_path = save_path_base + "/" + save_path_sub
 
 if debug:
-    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-                               "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-    valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                                "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    # train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+    #                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+    # train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
+    #                            "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    # valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+    #                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+    # valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+    #                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    # TODO: change the debug path to grouped Jsons
+    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/valid_known_unknown.json"
+    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                               "npy_json_files/rt_group_json/valid_known_unknown.json"
+    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/valid_known_unknown.json"
+    valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                               "npy_json_files/rt_group_json/valid_known_unknown.json"
+
+
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
     test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
@@ -128,15 +140,25 @@ if debug:
 
 
 else:
-    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                             "dataset_v1_3_partition/npy_json_files/train_known_known.json"
-    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                               "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+    # TODO: change the data path to grouped Jsons (only for training and validation)
+    # train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+    #                          "dataset_v1_3_partition/npy_json_files/train_known_known.json"
+    # train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+    #                            "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+    #
+    # valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+    #                          "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+    # valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+    #                             "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
 
-    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                             "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
-    valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/train_known_known.json"
+    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/train_known_unknown.json"
+    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/valid_known_known.json"
+    valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                             "npy_json_files/rt_group_json/valid_known_unknown.json"
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                             "dataset_v1_3_partition/npy_json_files/test_known_known_without_rt.json"
@@ -144,9 +166,6 @@ else:
                               "dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
     test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                                 "dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
-
-save_path = save_path_base + "/" + save_path_sub
-
 
 
 
@@ -908,6 +927,7 @@ def demo(depth=100,
     #######################################################################
     # Create dataset and data loader
     #######################################################################
+    # TODO: Use the new data loader here: no collate function??
     if use_json_data:
         # Training loaders
         train_known_known_dataset = msd_net_dataset(json_path=train_known_known_path,
@@ -918,17 +938,27 @@ def demo(depth=100,
                                                       transform=train_transform)
         train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
 
+        # train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
+        #                                                        batch_size=batch_size,
+        #                                                        shuffle=False,
+        #                                                        sampler=torch.utils.data.RandomSampler(train_known_known_index),
+        #                                                        collate_fn=customized_dataloader.collate,
+        #                                                        drop_last=True)
+        # train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
+        #                                                          batch_size=batch_size,
+        #                                                          shuffle=False,
+        #                                                          sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
+        #                                                          collate_fn=customized_dataloader.collate,
+        #                                                          drop_last=True)
         train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
                                                                batch_size=batch_size,
                                                                shuffle=False,
                                                                sampler=torch.utils.data.RandomSampler(train_known_known_index),
-                                                               collate_fn=customized_dataloader.collate,
                                                                drop_last=True)
         train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
                                                                  batch_size=batch_size,
                                                                  shuffle=False,
                                                                  sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
-                                                                 collate_fn=customized_dataloader.collate,
                                                                  drop_last=True)
 
         # Validation loaders
@@ -940,18 +970,27 @@ def demo(depth=100,
                                                       transform=valid_transform)
         valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
 
+        # valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
+        #                                                        batch_size=batch_size,
+        #                                                        shuffle=False,
+        #                                                        sampler=torch.utils.data.RandomSampler(valid_known_known_index),
+        #                                                        collate_fn=customized_dataloader.collate,
+        #                                                        drop_last=True)
+        # valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
+        #                                                          batch_size=batch_size,
+        #                                                          shuffle=False,
+        #                                                          sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
+        #                                                          collate_fn=customized_dataloader.collate,
+        #                                                          drop_last=True)
         valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
                                                                batch_size=batch_size,
                                                                shuffle=False,
                                                                sampler=torch.utils.data.RandomSampler(valid_known_known_index),
-                                                               collate_fn=customized_dataloader.collate,
                                                                drop_last=True)
-
         valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
                                                                  batch_size=batch_size,
                                                                  shuffle=False,
                                                                  sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
-                                                                 collate_fn=customized_dataloader.collate,
                                                                  drop_last=True)
 
         # Test loaders

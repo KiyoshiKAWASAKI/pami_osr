@@ -104,7 +104,7 @@ optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
                          help='number of total epochs to run (default: 164)')
 optim_group.add_argument('--start-epoch', default=0, type=int, metavar='N',
                          help='manual epoch number (useful on restarts)')
-optim_group.add_argument('-b', '--batch-size', default=64, type=int,
+optim_group.add_argument('-b', '--batch-size', default=16, type=int,
                          metavar='N', help='mini-batch size (default: 64)')
 optim_group.add_argument('--optimizer', default='sgd',
                          choices=['sgd', 'rmsprop', 'adam'], metavar='N',
