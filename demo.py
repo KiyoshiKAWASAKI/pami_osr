@@ -6,7 +6,7 @@ from models import efficient_dense_net
 import numpy as np
 from timeit import default_timer as timer
 from utils import customized_dataloader
-from utils.customized_dataloader import msd_net_dataset
+from utils.customized_dataloader import msd_net_dataset, msd_net_with_grouped_rts
 import sys
 import warnings
 warnings.filterwarnings("ignore")
@@ -271,9 +271,9 @@ def train_valid_one_epoch(known_loader,
                 batch = next(unknown_iter)
                 batch_type = "unknown"
 
-            input = batch["imgs"]
-            rts = batch["rts"]
-            target = batch["labels"]
+            input = batch[0]["imgs"]
+            rts = batch[0]["rts"]
+            target = batch[0]["labels"]
 
             # Change label into binary
             if train_binary:
@@ -285,8 +285,7 @@ def train_valid_one_epoch(known_loader,
                     else:
                         target[i] = 1
 
-            # print(target)
-
+            # Convert into PyTorch tensor
             input_var = torch.autograd.Variable(input).cuda()
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
@@ -294,17 +293,8 @@ def train_valid_one_epoch(known_loader,
             start = timer()
             output, end_time = model(input_var)
 
-            # This part is right, len(output[0])=16
-            # print("output")
-            # print(len(output[0]))
-
-            print("end time")
-            print(end_time)
-
-            # Save the RTs
             full_rt_list = []
-
-            for end in end_time:
+            for end in end_time[0]:
                 full_rt_list.append(end-start)
 
             if not isinstance(output, list):
@@ -319,15 +309,11 @@ def train_valid_one_epoch(known_loader,
             elif batch_type == "unknown":
                 exit_rt_cut = unknown_exit_rt
             else:
-                print("unknown batch type!!")
+                print("Unknown batch type!!")
                 sys.exit()
 
             # Find the target exit RT for each sample according to its RT
             target_exit_rt = []
-
-            print("full_rt_list")
-            print(full_rt_list)
-
             for one_rt in rts:
                 if (one_rt<exit_rt_cut[0]):
                     target_exit_rt.append(exit_rt_cut[0])
@@ -339,7 +325,6 @@ def train_valid_one_epoch(known_loader,
                     target_exit_rt.append(exit_rt_cut[3])
                 if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
                     target_exit_rt.append(exit_rt_cut[4])
-
 
             # TODO: Find the actual/predicted RT for each sample
             """
@@ -353,6 +338,8 @@ def train_valid_one_epoch(known_loader,
             full_prob_list = []
 
             # Logits to probs: Extract the probability and apply our threshold
+            sm = torch.nn.Softmax(dim=2)
+
             prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
             prob_list = np.array(prob.cpu().tolist())
 
@@ -435,10 +422,13 @@ def train_valid_one_epoch(known_loader,
                             loss += perform_loss + ce_loss + exit_loss
 
                         else:
-                            loss += scale_factor * criterion(output[j], target_var)
+                            # TODO: Do we still do a multiplication version???
+                            # loss += scale_factor * criterion(output[j], target_var)
+                            pass
 
             else:
-                # TODO(low priority): other networks - may be the same with MSD Net cause 5 weights are gone?
+                # TODO(low priority): other networks -
+                #  may be the same with MSD Net cause 5 weights are gone?
                 pass
 
 
@@ -930,68 +920,47 @@ def demo(depth=100,
     # TODO: Use the new data loader here: no collate function??
     if use_json_data:
         # Training loaders
-        train_known_known_dataset = msd_net_dataset(json_path=train_known_known_path,
-                                                    transform=train_transform)
+        train_known_known_dataset = msd_net_with_grouped_rts(json_path=train_known_known_path,
+                                                             transform=train_transform)
         train_known_known_index = torch.randperm(len(train_known_known_dataset))
 
-        train_known_unknown_dataset = msd_net_dataset(json_path=train_known_unknown_path,
-                                                      transform=train_transform)
+        train_known_unknown_dataset = msd_net_with_grouped_rts(json_path=train_known_unknown_path,
+                                                               transform=train_transform)
         train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
 
-        # train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
-        #                                                        batch_size=batch_size,
-        #                                                        shuffle=False,
-        #                                                        sampler=torch.utils.data.RandomSampler(train_known_known_index),
-        #                                                        collate_fn=customized_dataloader.collate,
-        #                                                        drop_last=True)
-        # train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
-        #                                                          batch_size=batch_size,
-        #                                                          shuffle=False,
-        #                                                          sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
-        #                                                          collate_fn=customized_dataloader.collate,
-        #                                                          drop_last=True)
         train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
                                                                batch_size=batch_size,
                                                                shuffle=False,
-                                                               sampler=torch.utils.data.RandomSampler(train_known_known_index),
-                                                               drop_last=True)
+                                                               drop_last=True,
+                                                               collate_fn=customized_dataloader.collate_new,
+                                                               sampler=torch.utils.data.RandomSampler(train_known_known_index))
         train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
                                                                  batch_size=batch_size,
                                                                  shuffle=False,
-                                                                 sampler=torch.utils.data.RandomSampler(train_known_unknown_index),
-                                                                 drop_last=True)
+                                                                 drop_last=True,
+                                                                 collate_fn=customized_dataloader.collate_new,
+                                                                 sampler=torch.utils.data.RandomSampler(train_known_unknown_index))
 
         # Validation loaders
-        valid_known_known_dataset = msd_net_dataset(json_path=valid_known_known_path,
-                                                    transform=valid_transform)
+        valid_known_known_dataset = msd_net_with_grouped_rts(json_path=valid_known_known_path,
+                                                             transform=valid_transform)
         valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
 
-        valid_known_unknown_dataset = msd_net_dataset(json_path=valid_known_unknown_path,
+        valid_known_unknown_dataset = msd_net_with_grouped_rts(json_path=valid_known_unknown_path,
                                                       transform=valid_transform)
         valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
 
-        # valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
-        #                                                        batch_size=batch_size,
-        #                                                        shuffle=False,
-        #                                                        sampler=torch.utils.data.RandomSampler(valid_known_known_index),
-        #                                                        collate_fn=customized_dataloader.collate,
-        #                                                        drop_last=True)
-        # valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
-        #                                                          batch_size=batch_size,
-        #                                                          shuffle=False,
-        #                                                          sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
-        #                                                          collate_fn=customized_dataloader.collate,
-        #                                                          drop_last=True)
         valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
                                                                batch_size=batch_size,
                                                                shuffle=False,
-                                                               sampler=torch.utils.data.RandomSampler(valid_known_known_index),
-                                                               drop_last=True)
+                                                               collate_fn=customized_dataloader.collate_new,
+                                                               sampler=torch.utils.data.RandomSampler(valid_known_known_index))
         valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
                                                                  batch_size=batch_size,
                                                                  shuffle=False,
-                                                                 sampler=torch.utils.data.RandomSampler(valid_known_unknown_index),
-                                                                 drop_last=True)
+                                                                 drop_last=True,
+                                                                 collate_fn=customized_dataloader.collate_new,
+                                                                 sampler=torch.utils.data.RandomSampler(valid_known_unknown_index))
 
         # Test loaders
         test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
@@ -1190,7 +1159,6 @@ def demo(depth=100,
             os.makedirs(save_path)
         if not os.path.isdir(save_path):
             raise Exception('%s is not a dir' % save_path)
-
 
         # Combine training all networks together
         train(model=model,

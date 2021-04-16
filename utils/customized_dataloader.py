@@ -241,6 +241,8 @@ class msd_net_with_grouped_rts(Dataset):
         line_imgs = torch.from_numpy(input_batch)
         labels = torch.from_numpy(np.array(all_labels).astype(np.int32))
 
+        print(line_imgs.shape)
+
         return {"imgs": line_imgs,
                 "labels": labels,
                 "rts": psychs,
