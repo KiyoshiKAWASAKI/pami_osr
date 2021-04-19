@@ -106,7 +106,18 @@ else:
     #     nb_training_classes = 296 # known_known:295, unknown_unknown:1
 
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
-unknown_exit_rt = [4,2550, 5.9220, 8.2368, 13.0090, 28.1661]
+unknown_exit_rt = [4.2550, 5.9220, 8.2368, 13.0090, 28.1661]
+
+known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
+                    0.5123290032915468, 0.5468768758061252]
+unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
+                      0.42355671497950664, 0.4600701578332428]
+
+# Data from pp_add
+train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
+train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.071147]
+# valid_known_known_machine_rt_max = [0.024027, 0.049423, 0.055970, 0.061030, 0.063622]
+# valid_known_unknown_machine_rt_max = [0.010409, 0.015693, 0.019874, 0.022608, 0.023821]
 
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
 save_path = save_path_base + "/" + save_path_sub
@@ -176,7 +187,8 @@ def train_valid_one_epoch(known_loader,
                           optimizer,
                           nb_epoch,
                           use_msd_net,
-                          train_phase):
+                          train_phase,
+                          nb_sample_per_bacth=16):
     """
 
     :param train_loader_known:
@@ -303,37 +315,60 @@ def train_valid_one_epoch(known_loader,
             ##########################################
             # TODO: Get exits for each sample
             ##########################################
-            # Define the RT cuts for known and unknown
+            # TODO: Define the RT cuts for known and unknown, and the thresholds
             if batch_type == "known":
                 exit_rt_cut = known_exit_rt
+                top_1_threshold = known_thresholds
             elif batch_type == "unknown":
                 exit_rt_cut = unknown_exit_rt
+                top_1_threshold = unknown_thresholds
             else:
                 print("Unknown batch type!!")
                 sys.exit()
 
+            if debug:
+                print("batch_type: %s" % batch_type)
+
             # Find the target exit RT for each sample according to its RT
             target_exit_rt = []
-            for one_rt in rts:
-                if (one_rt<exit_rt_cut[0]):
-                    target_exit_rt.append(exit_rt_cut[0])
-                if (one_rt>=exit_rt_cut[0]) and (one_rt<exit_rt_cut[1]):
-                    target_exit_rt.append(exit_rt_cut[1])
-                if (one_rt>=exit_rt_cut[1]) and (one_rt<exit_rt_cut[2]):
-                    target_exit_rt.append(exit_rt_cut[2])
-                if (one_rt>=exit_rt_cut[2]) and (one_rt<exit_rt_cut[3]):
-                    target_exit_rt.append(exit_rt_cut[3])
-                if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
-                    target_exit_rt.append(exit_rt_cut[4])
+
+            if batch_type == "known":
+                for one_rt in rts:
+                    if (one_rt<exit_rt_cut[0]):
+                        target_exit_rt.append(exit_rt_cut[0])
+                    if (one_rt>=exit_rt_cut[0]) and (one_rt<exit_rt_cut[1]):
+                        target_exit_rt.append(exit_rt_cut[1])
+                    if (one_rt>=exit_rt_cut[1]) and (one_rt<exit_rt_cut[2]):
+                        target_exit_rt.append(exit_rt_cut[2])
+                    if (one_rt>=exit_rt_cut[2]) and (one_rt<exit_rt_cut[3]):
+                        target_exit_rt.append(exit_rt_cut[3])
+                    if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
+                        target_exit_rt.append(exit_rt_cut[4])
+            elif batch_type == "unknown":
+                # TODO: what should be the target????
+                target_exit_rt = [exit_rt_cut[4]] * nb_sample_per_bacth
+
+            else:
+                print("Invalid batch type.")
+                sys.exit()
+
+            if debug:
+                print("Human RTs from batch:")
+                print(rts)
+                print("Exit RT cut:")
+                print(exit_rt_cut)
+                print("Obtained target exit RT")
+                print(target_exit_rt)
 
             # TODO: Find the actual/predicted RT for each sample
             """
             Case 1:
-                prob > threshold - exit right away
+                prob > threshold && prediction is correct - exit right away
             Case 2:
-                prob < threshold && not at the last exit - check next exit
+                prob < threshold && not at the last exit or
+                prob > threshold but predicition is wrong - check next exit
             Case 3:
-                prob < threshold && at the last exit - exit from the last clf
+                prob < threshold && at the last exit - exit no matter what
             """
             full_prob_list = []
 
@@ -352,46 +387,40 @@ def train_valid_one_epoch(known_loader,
             for one_prob in prob_list.tolist():
                 full_prob_list.append(one_prob)
 
-            # TODO: thresholding - check for each exit
+            # Thresholding - check for each exit
             pred_exit_rt = []
 
-            for i in len(full_prob_list):
-                # TODO(???): Find the label: known or unknown
-                if target[i] < nb_training_classes-1:
-                    target_label = target[i]
-                else:
-                    target_label = -1
-
+            for i in range(len(full_prob_list)):
+                # Get probs and GT labels
                 prob = full_prob_list[i]
+                gt_label = target[i]
 
                 # check each classifier in order and decide when to exit
                 for j in range(nb_clfs):
                     one_prob = prob[j]
-                    pred = np.argmax(one_prob)
                     max_prob = np.sort(one_prob)[-1]
+                    pred = np.argmax(one_prob)
 
                     # If this is not the last classifier
                     if j != nb_clfs - 1:
-                        # Only consider top-1 if it is not the last classifier
-                        if (max_prob > top_1_threshold) and (pred == target_label):
-                            # TODO: Get the RT here
+                        # Updated - use different threshold for each exit
+                        if (max_prob > top_1_threshold[j]) and (pred == gt_label):
+                            # Case 1
                             pred_rt = full_rt_list[j]
                             pred_exit_rt.append(pred_rt)
-
-                            # If top-1 is larger than threshold,
-                            # then directly go to next sample
                             break
-
                         else:
-                            # If the max prob is smaller than threshold, check next clf
+                            # Case 2
                             continue
-
-                    # If this is the last classifier
+                    # Case 3
                     else:
-                        # TODO: RT for last exit
                         pred_rt = full_rt_list[-1]
                         pred_exit_rt.append(pred_rt)
 
+            # Check the human RTs and machine RTs
+            if debug:
+                print("Machine RT:")
+                print(pred_exit_rt)
 
             ##########################################
             # Only MSD-Net
@@ -407,22 +436,24 @@ def train_valid_one_epoch(known_loader,
                     print("Using psyphy loss")
                     for j in range(len(output)):
                         # Part 1: Cross-entropy loss
-                        ce_loss = cross_entropy_weight * criterion(output[j], target_var)
+                        ce_loss = criterion(output[j], target_var)
 
                         # Part 2: Performance psyphy loss
-                        perform_loss = perform_loss_weight * get_perform_loss(rt=rts[j], rt_max=20)
+                        perform_loss = get_perform_loss(rt=rts[j], rt_max=20)
 
                         # Part 3: Exit psyphy loss
                         # TODO: Define the "exit psyphy loss"
-                        exit_loss = exit_loss_weight * get_exit_loss(pred_exit_rt=pred_exit_rt,
-                                                                     target_exit_rt=target_exit_rt)
+                        exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt,
+                                                  target_exit_rt=target_exit_rt)
 
                         if use_addition:
                             # TODO: Complete the full loss funtion
-                            loss += perform_loss + ce_loss + exit_loss
+                            loss += cross_entropy_weight * ce_loss + \
+                                    perform_loss_weight * perform_loss + \
+                                    exit_loss_weight * exit_loss
 
                         else:
-                            # TODO: Do we still do a multiplication version???
+                            # TODO: Do we still do a multiplication version??? - Maybe not
                             # loss += scale_factor * criterion(output[j], target_var)
                             pass
 
@@ -1262,17 +1293,24 @@ def get_perform_loss(rt,
 
 
 def get_exit_loss(pred_exit_rt,
-                  target_exit_rt):
+                  target_exit_rt,
+                  known_rt_max,
+                  unknown_rt_max):
     """
 
     """
     exit_loss = 0.0
 
+    if debug:
+        print("len of pred rt: %d" % len(pred_exit_rt))
+        print("len of target rt: %d" % len(target_exit_rt))
+
+    # TODO: How to define this loss??
     for i in range(len(pred_exit_rt)):
         one_pred = pred_exit_rt[i]
         one_target = target_exit_rt[i]
 
-        one_loss = math.abs(one_pred-one_target)
+        one_loss = abs(one_pred-one_target)
         exit_loss += one_loss
 
     return exit_loss

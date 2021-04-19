@@ -155,8 +155,6 @@ def get_outliers(base_dir,
             print("%d outliers by MAD, taking %f percent of the data" %
                   (counts_4[1], (float(counts_4[1])/float(len(rt_exit_4)))))
 
-            sys.exit()
-
 
 if __name__ == '__main__':
     get_outliers(base_dir=base_dir,
