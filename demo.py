@@ -32,7 +32,7 @@ args.nScales = len(args.grFactor)
 ##############################################
 model_name = "msd_net"
 
-debug = True
+debug = False
 use_pre_train = False
 train_binary = False
 
@@ -68,7 +68,8 @@ test_epoch_list = [111] # for pp add
 # This is for saving training model as well as getting test model and saving test npy files
 # save_path_sub = "0225/original"
 # save_path_sub = "0225/pp_loss"
-save_path_sub = "0225/pp_loss_add"
+# save_path_sub = "0225/pp_loss_add"
+save_path_sub = "0421/full_pp"
 
 
 
@@ -112,6 +113,11 @@ known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
                     0.5123290032915468, 0.5468768758061252]
 unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
                       0.42355671497950664, 0.4600701578332428]
+
+human_known_rt_max = 28
+human_unknown_rt_max = 28
+machine_known_rt_max = 0.057930
+machine_unknown_rt_max = 0.071147
 
 # Data from pp_add
 train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
@@ -329,10 +335,14 @@ def train_valid_one_epoch(known_loader,
             if debug:
                 print("batch_type: %s" % batch_type)
 
-            # Find the target exit RT for each sample according to its RT
+            """
+            Find the target exit RT for each sample according to its RT:
+                If a batch has human RT: check the 5 intervals from human RT distribution
+                If a batch doesn't have human RT: assign zeroes
+            """
             target_exit_rt = []
 
-            if batch_type == "known":
+            if rts[0] != 0:
                 for one_rt in rts:
                     if (one_rt<exit_rt_cut[0]):
                         target_exit_rt.append(exit_rt_cut[0])
@@ -344,13 +354,8 @@ def train_valid_one_epoch(known_loader,
                         target_exit_rt.append(exit_rt_cut[3])
                     if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
                         target_exit_rt.append(exit_rt_cut[4])
-            elif batch_type == "unknown":
-                # TODO: what should be the target????
-                target_exit_rt = [exit_rt_cut[4]] * nb_sample_per_bacth
-
-            else:
-                print("Invalid batch type.")
-                sys.exit()
+            else :
+                target_exit_rt = [0.0] * nb_sample_per_bacth
 
             if debug:
                 print("Human RTs from batch:")
@@ -360,12 +365,14 @@ def train_valid_one_epoch(known_loader,
                 print("Obtained target exit RT")
                 print(target_exit_rt)
 
-            # TODO: Find the actual/predicted RT for each sample
             """
+            Find the actual/predicted RT for each sample
+            
             Case 1:
                 prob > threshold && prediction is correct - exit right away
             Case 2:
-                prob < threshold && not at the last exit or
+                prob < threshold && not at the last exit 
+                or
                 prob > threshold but predicition is wrong - check next exit
             Case 3:
                 prob < threshold && at the last exit - exit no matter what
@@ -422,6 +429,7 @@ def train_valid_one_epoch(known_loader,
                 print("Machine RT:")
                 print(pred_exit_rt)
 
+
             ##########################################
             # Only MSD-Net
             ##########################################
@@ -439,23 +447,29 @@ def train_valid_one_epoch(known_loader,
                         ce_loss = criterion(output[j], target_var)
 
                         # Part 2: Performance psyphy loss
-                        perform_loss = get_perform_loss(rt=rts[j], rt_max=20)
+                        perform_loss = get_perform_loss(rt=rts[j], rt_max=28)
 
                         # Part 3: Exit psyphy loss
                         # TODO: Define the "exit psyphy loss"
-                        exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt,
-                                                  target_exit_rt=target_exit_rt)
+                        exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
+                                                  target_exit_rt=target_exit_rt[j],
+                                                  human_known_rt_max=human_known_rt_max,
+                                                  human_unknown_rt_max=human_unknown_rt_max,
+                                                  machine_known_rt_max=machine_known_rt_max,
+                                                  machine_unknown_rt_max=machine_unknown_rt_max,
+                                                  batch_type=batch_type)
 
                         if use_addition:
-                            # TODO: Complete the full loss funtion
                             loss += cross_entropy_weight * ce_loss + \
                                     perform_loss_weight * perform_loss + \
                                     exit_loss_weight * exit_loss
 
                         else:
-                            # TODO: Do we still do a multiplication version??? - Maybe not
+                            # TODO: Do we still do a multiplication version??? - Maybe not idk
                             # loss += scale_factor * criterion(output[j], target_var)
                             pass
+
+
 
             else:
                 # TODO(low priority): other networks -
@@ -948,7 +962,7 @@ def demo(depth=100,
     #######################################################################
     # Create dataset and data loader
     #######################################################################
-    # TODO: Use the new data loader here: no collate function??
+    # Use the new data loader here: no collate function??
     if use_json_data:
         # Training loaders
         train_known_known_dataset = msd_net_with_grouped_rts(json_path=train_known_known_path,
@@ -1292,26 +1306,32 @@ def get_perform_loss(rt,
             return ((rt_max-rt)/rt_max + 1)
 
 
+
 def get_exit_loss(pred_exit_rt,
                   target_exit_rt,
-                  known_rt_max,
-                  unknown_rt_max):
+                  human_known_rt_max,
+                  human_unknown_rt_max,
+                  machine_known_rt_max,
+                  machine_unknown_rt_max,
+                  batch_type):
     """
 
+    :param pred_exit_rt:
+    :param target_exit_rt:
+    :param human_known_rt_max:
+    :param human_unknown_rt_max:
+    :param machine_known_rt_max:
+    :param machine_unknown_rt_max:
+    :param batch_type:
+    :return:
     """
-    exit_loss = 0.0
-
-    if debug:
-        print("len of pred rt: %d" % len(pred_exit_rt))
-        print("len of target rt: %d" % len(target_exit_rt))
-
-    # TODO: How to define this loss??
-    for i in range(len(pred_exit_rt)):
-        one_pred = pred_exit_rt[i]
-        one_target = target_exit_rt[i]
-
-        one_loss = abs(one_pred-one_target)
-        exit_loss += one_loss
+    if batch_type == "known":
+        exit_loss = abs((target_exit_rt/human_known_rt_max) - (pred_exit_rt/machine_known_rt_max))
+    elif batch_type == "unknown":
+        exit_loss = abs((target_exit_rt/human_unknown_rt_max) - (pred_exit_rt/machine_unknown_rt_max))
+    else:
+        print("Invalid batch type.")
+        sys.exit()
 
     return exit_loss
 
