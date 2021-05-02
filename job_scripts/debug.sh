@@ -16,6 +16,6 @@ CUDA_VISIBLE_DEVICES=3 python demo.py --arch msdnet \
                                        --optimizer sgd \
                                        --learning-rate 0.1 \
                                        --gpu 1 \
-                                       --epochs 5 \
+                                       --epochs 3 \
                                        --print-freq 1 \
                                        --test_with_novel True

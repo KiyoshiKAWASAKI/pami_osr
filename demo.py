@@ -14,6 +14,7 @@ import random
 from args import arg_parser
 import torch.nn as nn
 import models
+from datetime import datetime
 import math
 
 
@@ -26,30 +27,35 @@ args.grFactor = list(map(int, args.grFactor.split('-')))
 args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
 
+date = datetime.today().strftime('%Y-%m-%d')
 
-##############################################
-# Training options
-##############################################
+
+###################################################################
+                            # Loss options #
+###################################################################
+use_performance_loss = True
+use_exit_loss = True
+thresh = 0.7
+cross_entropy_weight = 1.0
+perform_loss_weight = 3.0
+exit_loss_weight = 2.0
+
+
+###################################################################
+                    # Training options #
+###################################################################
 model_name = "msd_net"
 
 debug = False
 use_pre_train = False
 train_binary = False
-
-##############################################
-# Loss options
-##############################################
-use_pp_loss = True
+use_new_loader = False
 use_addition = True
-scale = 1.0
-thresh = 0.7
-perform_loss_weight = 1.0
-cross_entropy_weight = 1.0
-exit_loss_weight = 1.0
 
-##############################################
-# Test process options
-##############################################
+
+###################################################################
+                    # Test process options #
+###################################################################
 run_test = False
 get_train_valid_prob = True
 run_one_sample = True
@@ -62,40 +68,48 @@ save_one_sample_rt_folder = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set
 # test_epoch_list = [168] # for pp mul
 test_epoch_list = [111] # for pp add
 
-##############################################
-# Paths for saving results
-##############################################
-# This is for saving training model as well as getting test model and saving test npy files
-# save_path_sub = "0225/original"
-# save_path_sub = "0225/pp_loss"
-# save_path_sub = "0225/pp_loss_add"
-save_path_sub = "0421/full_pp"
+###################################################################
+                # Paths for saving results #
+###################################################################
+if (use_performance_loss == False) and (use_exit_loss == False):
+    save_path_sub = "cross_entropy_only"
+
+elif (use_performance_loss == True) and (use_exit_loss == False):
+    save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
+                    "_pfm_" + str(perform_loss_weight)
+
+elif (use_performance_loss == True) and (use_exit_loss == True):
+    save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
+                    "_pfm_" + str(perform_loss_weight) + \
+                    "_exit_" + str(exit_loss_weight)
+
+else:
+    save_path_sub = None
 
 
-
-###############################################
-# Normally, there is no need to change these
-###############################################
+####################################################################
+    # Normally, there is no need to change these #
+####################################################################
 use_json_data = True
 save_training_prob = False
 
 nb_itr = 30
-n_epochs = 200
 nb_clfs = 5
 img_size = 224
 nBlocks = 5
 nb_classes = 296
+rt_max = 28
 
-# if run_test:
-#     batch_size = 1
-# else:
-#     batch_size = 16
-batch_size = 1
+if debug:
+    n_epochs = 3
+else:
+    n_epochs = 200
 
-# if debug:
-#     nb_classes = 336
-# else:
-#     nb_classes = 296
+if use_new_loader or run_test:
+    batch_size = 1
+else:
+    batch_size = 16
+
 
 if train_binary:
     nb_training_classes = 2
@@ -125,27 +139,40 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 # valid_known_known_machine_rt_max = [0.024027, 0.049423, 0.055970, 0.061030, 0.063622]
 # valid_known_unknown_machine_rt_max = [0.010409, 0.015693, 0.019874, 0.022608, 0.023821]
 
+
+#########################################################################################
+            # Define paths for saving model and data source #
+#########################################################################################
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
-save_path = save_path_base + "/" + save_path_sub
+save_path_with_date = save_path_base + "/" + date
+
+if not save_path_with_date:
+    os.mkdir(save_path_with_date)
 
 if debug:
-    # train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-    #                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-    # train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-    #                            "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-    # valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-    #                          "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-    # valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-    #                             "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-    # TODO: change the debug path to grouped Jsons
-    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/valid_known_unknown.json"
-    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                               "npy_json_files/rt_group_json/valid_known_unknown.json"
-    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/valid_known_unknown.json"
-    valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                               "npy_json_files/rt_group_json/valid_known_unknown.json"
+    save_path = save_path_with_date + "/debug_" + save_path_sub
+else:
+    save_path = save_path_with_date + "/" + save_path_sub
+
+if debug:
+    if use_new_loader == False:
+        train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                                 "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+        train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
+                                   "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+        valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                                 "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+        valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
+                                    "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+    else:
+        train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/valid_known_unknown.json"
+        train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                   "npy_json_files/rt_group_json/valid_known_unknown.json"
+        valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/valid_known_unknown.json"
+        valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                   "npy_json_files/rt_group_json/valid_known_unknown.json"
 
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
@@ -157,25 +184,25 @@ if debug:
 
 
 else:
-    # TODO: change the data path to grouped Jsons (only for training and validation)
-    # train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-    #                          "dataset_v1_3_partition/npy_json_files/train_known_known.json"
-    # train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-    #                            "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
-    #
-    # valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-    #                          "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
-    # valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-    #                             "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+    if use_new_loader == False:
+        train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                 "dataset_v1_3_partition/npy_json_files/train_known_known.json"
+        train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                   "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
 
-    train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/train_known_known.json"
-    train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/train_known_unknown.json"
-    valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/valid_known_known.json"
-    valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-                             "npy_json_files/rt_group_json/valid_known_unknown.json"
+        valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                 "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+        valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                    "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+    else:
+        train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/train_known_known.json"
+        train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/train_known_unknown.json"
+        valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/valid_known_known.json"
+        valid_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
+                                 "npy_json_files/rt_group_json/valid_known_unknown.json"
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                             "dataset_v1_3_partition/npy_json_files/test_known_known_without_rt.json"
@@ -185,7 +212,9 @@ else:
                                 "dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
 
 
-
+#########################################################################################
+                            # Define all the functions #
+#########################################################################################
 def train_valid_one_epoch(known_loader,
                           unknown_loader,
                           model,
@@ -289,9 +318,14 @@ def train_valid_one_epoch(known_loader,
                 batch = next(unknown_iter)
                 batch_type = "unknown"
 
-            input = batch[0]["imgs"]
-            rts = batch[0]["rts"]
-            target = batch[0]["labels"]
+            if use_new_loader:
+                input = batch[0]["imgs"]
+                rts = batch[0]["rts"]
+                target = batch[0]["labels"]
+            else:
+                input = batch["imgs"]
+                rts = batch["rts"]
+                target = batch["labels"]
 
             # Change label into binary
             if train_binary:
@@ -315,142 +349,136 @@ def train_valid_one_epoch(known_loader,
             for end in end_time[0]:
                 full_rt_list.append(end-start)
 
+            # len(output) = 5
             if not isinstance(output, list):
                 output = [output]
 
-            ##########################################
-            # TODO: Get exits for each sample
-            ##########################################
-            # TODO: Define the RT cuts for known and unknown, and the thresholds
-            if batch_type == "known":
-                exit_rt_cut = known_exit_rt
-                top_1_threshold = known_thresholds
-            elif batch_type == "unknown":
-                exit_rt_cut = unknown_exit_rt
-                top_1_threshold = unknown_thresholds
-            else:
-                print("Unknown batch type!!")
-                sys.exit()
+            if use_exit_loss == True:
+                ##########################################
+                # TODO: Get exits for each sample
+                ##########################################
+                # TODO: Define the RT cuts for known and unknown, and the thresholds
+                if batch_type == "known":
+                    exit_rt_cut = known_exit_rt
+                    top_1_threshold = known_thresholds
+                elif batch_type == "unknown":
+                    exit_rt_cut = unknown_exit_rt
+                    top_1_threshold = unknown_thresholds
+                else:
+                    print("Unknown batch type!!")
+                    sys.exit()
 
-            if debug:
-                print("batch_type: %s" % batch_type)
+                if debug:
+                    print("batch_type: %s" % batch_type)
 
-            """
-            Find the target exit RT for each sample according to its RT:
-                If a batch has human RT: check the 5 intervals from human RT distribution
-                If a batch doesn't have human RT: assign zeroes
-            """
-            target_exit_rt = []
+                """
+                Find the target exit RT for each sample according to its RT:
+                    If a batch has human RT: check the 5 intervals from human RT distribution
+                    If a batch doesn't have human RT: assign zeroes
+                """
+                target_exit_rt = []
 
-            if rts[0] != 0:
-                for one_rt in rts:
-                    if (one_rt<exit_rt_cut[0]):
-                        target_exit_rt.append(exit_rt_cut[0])
-                    if (one_rt>=exit_rt_cut[0]) and (one_rt<exit_rt_cut[1]):
-                        target_exit_rt.append(exit_rt_cut[1])
-                    if (one_rt>=exit_rt_cut[1]) and (one_rt<exit_rt_cut[2]):
-                        target_exit_rt.append(exit_rt_cut[2])
-                    if (one_rt>=exit_rt_cut[2]) and (one_rt<exit_rt_cut[3]):
-                        target_exit_rt.append(exit_rt_cut[3])
-                    if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
-                        target_exit_rt.append(exit_rt_cut[4])
-            else :
-                target_exit_rt = [0.0] * nb_sample_per_bacth
+                if rts[0] != 0:
+                    for one_rt in rts:
+                        if (one_rt<exit_rt_cut[0]):
+                            target_exit_rt.append(exit_rt_cut[0])
+                        if (one_rt>=exit_rt_cut[0]) and (one_rt<exit_rt_cut[1]):
+                            target_exit_rt.append(exit_rt_cut[1])
+                        if (one_rt>=exit_rt_cut[1]) and (one_rt<exit_rt_cut[2]):
+                            target_exit_rt.append(exit_rt_cut[2])
+                        if (one_rt>=exit_rt_cut[2]) and (one_rt<exit_rt_cut[3]):
+                            target_exit_rt.append(exit_rt_cut[3])
+                        if (one_rt>=exit_rt_cut[3]) and (one_rt<exit_rt_cut[4]):
+                            target_exit_rt.append(exit_rt_cut[4])
+                else :
+                    target_exit_rt = [0.0] * nb_sample_per_bacth
 
-            if debug:
-                print("Human RTs from batch:")
-                print(rts)
-                print("Exit RT cut:")
-                print(exit_rt_cut)
-                print("Obtained target exit RT")
-                print(target_exit_rt)
+                if debug:
+                    print("Human RTs from batch:")
+                    print(rts)
+                    print("Exit RT cut:")
+                    print(exit_rt_cut)
+                    print("Obtained target exit RT")
+                    print(target_exit_rt)
 
-            """
-            Find the actual/predicted RT for each sample
-            
-            Case 1:
-                prob > threshold && prediction is correct - exit right away
-            Case 2:
-                prob < threshold && not at the last exit 
-                or
-                prob > threshold but predicition is wrong - check next exit
-            Case 3:
-                prob < threshold && at the last exit - exit no matter what
-            """
-            full_prob_list = []
+                """
+                Find the actual/predicted RT for each sample
+                
+                Case 1:
+                    prob > threshold && prediction is correct - exit right away
+                Case 2:
+                    prob < threshold && not at the last exit 
+                    or
+                    prob > threshold but predicition is wrong - check next exit
+                Case 3:
+                    prob < threshold && at the last exit - exit no matter what
+                """
+                full_prob_list = []
 
-            # Logits to probs: Extract the probability and apply our threshold
-            sm = torch.nn.Softmax(dim=2)
+                # Logits to probs: Extract the probability and apply our threshold
+                sm = torch.nn.Softmax(dim=2)
 
-            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-            prob_list = np.array(prob.cpu().tolist())
+                prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+                prob_list = np.array(prob.cpu().tolist())
 
-            # Reshape it into [batch, block, class]
-            prob_list = np.reshape(prob_list,
-                                   (prob_list.shape[1],
-                                    prob_list.shape[0],
-                                    prob_list.shape[2]))
+                # Reshape it into [batch, block, class]
+                prob_list = np.reshape(prob_list,
+                                       (prob_list.shape[1],
+                                        prob_list.shape[0],
+                                        prob_list.shape[2]))
 
-            for one_prob in prob_list.tolist():
-                full_prob_list.append(one_prob)
+                for one_prob in prob_list.tolist():
+                    full_prob_list.append(one_prob)
 
-            # Thresholding - check for each exit
-            pred_exit_rt = []
+                # Thresholding - check for each exit
+                pred_exit_rt = []
 
-            for i in range(len(full_prob_list)):
-                # Get probs and GT labels
-                prob = full_prob_list[i]
-                gt_label = target[i]
+                for i in range(len(full_prob_list)):
+                    # Get probs and GT labels
+                    prob = full_prob_list[i]
+                    gt_label = target[i]
 
-                # check each classifier in order and decide when to exit
-                for j in range(nb_clfs):
-                    one_prob = prob[j]
-                    max_prob = np.sort(one_prob)[-1]
-                    pred = np.argmax(one_prob)
+                    # check each classifier in order and decide when to exit
+                    for j in range(nb_clfs):
+                        one_prob = prob[j]
+                        max_prob = np.sort(one_prob)[-1]
+                        pred = np.argmax(one_prob)
 
-                    # If this is not the last classifier
-                    if j != nb_clfs - 1:
-                        # Updated - use different threshold for each exit
-                        if (max_prob > top_1_threshold[j]) and (pred == gt_label):
-                            # Case 1
-                            pred_rt = full_rt_list[j]
-                            pred_exit_rt.append(pred_rt)
-                            break
+                        # If this is not the last classifier
+                        if j != nb_clfs - 1:
+                            # Updated - use different threshold for each exit
+                            if (max_prob > top_1_threshold[j]) and (pred == gt_label):
+                                # Case 1
+                                pred_rt = full_rt_list[j]
+                                pred_exit_rt.append(pred_rt)
+                                break
+                            else:
+                                # Case 2
+                                continue
+                        # Case 3
                         else:
-                            # Case 2
-                            continue
-                    # Case 3
-                    else:
-                        pred_rt = full_rt_list[-1]
-                        pred_exit_rt.append(pred_rt)
+                            pred_rt = full_rt_list[-1]
+                            pred_exit_rt.append(pred_rt)
 
-            # Check the human RTs and machine RTs
-            if debug:
-                print("Machine RT:")
-                print(pred_exit_rt)
+                # Check the human RTs and machine RTs
+                if debug:
+                    print("Machine RT:")
+                    print(pred_exit_rt)
 
 
             ##########################################
             # Only MSD-Net
             ##########################################
             if model_name == "msd_net":
-                # Case 1: Not using pp loss
-                if use_pp_loss == False:
-                    for j in range(len(output)):
-                        loss += criterion(output[j], target_var)
+                for j in range(len(output)):
+                    # Part 1: Cross-entropy loss
+                    ce_loss = criterion(output[j], target_var)
 
-                # Case 2: Using pp loss
-                if use_pp_loss == True:
-                    print("Using psyphy loss")
-                    for j in range(len(output)):
-                        # Part 1: Cross-entropy loss
-                        ce_loss = criterion(output[j], target_var)
+                    # Part 2: Performance psyphy loss
+                    perform_loss = get_perform_loss(rt=rts[j], rt_max=rt_max)
 
-                        # Part 2: Performance psyphy loss
-                        perform_loss = get_perform_loss(rt=rts[j], rt_max=28)
-
-                        # Part 3: Exit psyphy loss
-                        # TODO: Define the "exit psyphy loss"
+                    # Part 3: Exit psyphy loss
+                    if use_exit_loss:
                         exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
                                                   target_exit_rt=target_exit_rt[j],
                                                   human_known_rt_max=human_known_rt_max,
@@ -458,17 +486,21 @@ def train_valid_one_epoch(known_loader,
                                                   machine_known_rt_max=machine_known_rt_max,
                                                   machine_unknown_rt_max=machine_unknown_rt_max,
                                                   batch_type=batch_type)
+                    # 3 Cases
+                    if (use_performance_loss == True) and (use_exit_loss == False):
+                        # print("Using cross-entropy and performance loss")
+                        loss += cross_entropy_weight * ce_loss + \
+                                perform_loss_weight * perform_loss
 
-                        if use_addition:
-                            loss += cross_entropy_weight * ce_loss + \
-                                    perform_loss_weight * perform_loss + \
-                                    exit_loss_weight * exit_loss
+                    if (use_exit_loss == True) and (use_exit_loss == True):
+                        # print("Using all 3 losses")
+                        loss += cross_entropy_weight * ce_loss + \
+                                perform_loss_weight * perform_loss + \
+                                exit_loss_weight * exit_loss
 
-                        else:
-                            # TODO: Do we still do a multiplication version??? - Maybe not idk
-                            # loss += scale_factor * criterion(output[j], target_var)
-                            pass
-
+                    if (use_performance_loss == False) and (use_exit_loss == False):
+                        # print("Using cross-entropy only")
+                        loss += ce_loss
 
 
             else:
@@ -500,25 +532,19 @@ def train_valid_one_epoch(known_loader,
 
             if i % args.print_freq == 0:
                 print('Epoch: [{0}][{1}/{2}]\t'
-                              'Time {batch_time.avg:.3f}\t'
-                              'Data {data_time.avg:.3f}\t'
                               'Loss {loss.val:.4f}\t'
                               'Acc@1 {top1.val:.4f}\t'
                               'Acc@3 {top3.val:.4f}\t'
                               'Acc@5 {top5.val:.4f}\n'.format(
                     nb_epoch, i + 1, nb_total_batches,
-                    batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                 f.write('Epoch: [{0}][{1}/{2}]\t'
-                              'Time {batch_time.avg:.3f}\t'
-                              'Data {data_time.avg:.3f}\t'
                               'Loss {loss.val:.4f}\t'
                               'Acc@1 {top1.val:.4f}\t'
                               'Acc@3 {top3.val:.4f}\t'
                               'Acc@5 {top5.val:.4f}\n'.format(
                     nb_epoch, i + 1, nb_total_batches,
-                    batch_time=batch_time, data_time=data_time,
                     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
     return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
@@ -865,7 +891,7 @@ def run_one_sample(test_loader,
 
             rts = []
             input = input.cuda()
-            target = target.cuda(async=True)
+            target = torch.tensor(target).cuda(async=True)
 
             # Save original labels to the list
             original_label_list = np.array(target.cpu().tolist())
@@ -963,14 +989,14 @@ def demo(depth=100,
     # Create dataset and data loader
     #######################################################################
     # Use the new data loader here: no collate function??
-    if use_json_data:
-        # Training loaders
+    if use_new_loader:
+        # Training
         train_known_known_dataset = msd_net_with_grouped_rts(json_path=train_known_known_path,
                                                              transform=train_transform)
-        train_known_known_index = torch.randperm(len(train_known_known_dataset))
-
         train_known_unknown_dataset = msd_net_with_grouped_rts(json_path=train_known_unknown_path,
                                                                transform=train_transform)
+
+        train_known_known_index = torch.randperm(len(train_known_known_dataset))
         train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
 
         train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
@@ -986,67 +1012,117 @@ def demo(depth=100,
                                                                  collate_fn=customized_dataloader.collate_new,
                                                                  sampler=torch.utils.data.RandomSampler(train_known_unknown_index))
 
-        # Validation loaders
+        # Validation
         valid_known_known_dataset = msd_net_with_grouped_rts(json_path=valid_known_known_path,
                                                              transform=valid_transform)
-        valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
-
         valid_known_unknown_dataset = msd_net_with_grouped_rts(json_path=valid_known_unknown_path,
-                                                      transform=valid_transform)
+                                                               transform=valid_transform)
+
+        valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
         valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
 
         valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
                                                                batch_size=batch_size,
                                                                shuffle=False,
                                                                collate_fn=customized_dataloader.collate_new,
-                                                               sampler=torch.utils.data.RandomSampler(valid_known_known_index))
+                                                               sampler=torch.utils.data.RandomSampler(
+                                                                   valid_known_known_index))
         valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
                                                                  batch_size=batch_size,
                                                                  shuffle=False,
                                                                  drop_last=True,
                                                                  collate_fn=customized_dataloader.collate_new,
-                                                                 sampler=torch.utils.data.RandomSampler(valid_known_unknown_index))
+                                                                 sampler=torch.utils.data.RandomSampler(
+                                                                     valid_known_unknown_index))
 
-        # Test loaders
-        test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
+
+    else:
+        # Training
+        train_known_known_dataset = msd_net_dataset(json_path=train_known_known_path,
+                                                             transform=train_transform)
+        train_known_unknown_dataset = msd_net_dataset(json_path=train_known_unknown_path,
+                                                               transform=train_transform)
+
+        train_known_known_index = torch.randperm(len(train_known_known_dataset))
+        train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
+
+        train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
+                                                               batch_size=batch_size,
+                                                               shuffle=False,
+                                                               drop_last=True,
+                                                               collate_fn=customized_dataloader.collate,
+                                                               sampler=torch.utils.data.RandomSampler(
+                                                                   train_known_known_index))
+        train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
+                                                                 batch_size=batch_size,
+                                                                 shuffle=False,
+                                                                 drop_last=True,
+                                                                 collate_fn=customized_dataloader.collate,
+                                                                 sampler=torch.utils.data.RandomSampler(
+                                                                     train_known_unknown_index))
+
+        # Validation
+        valid_known_known_dataset = msd_net_dataset(json_path=valid_known_known_path,
+                                                             transform=valid_transform)
+        valid_known_unknown_dataset = msd_net_dataset(json_path=valid_known_unknown_path,
+                                                               transform=valid_transform)
+
+        valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
+        valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
+
+        valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
+                                                               batch_size=batch_size,
+                                                               shuffle=False,
+                                                               collate_fn=customized_dataloader.collate,
+                                                               sampler=torch.utils.data.RandomSampler(
+                                                                   valid_known_known_index))
+        valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
+                                                                 batch_size=batch_size,
+                                                                 shuffle=False,
+                                                                 drop_last=True,
+                                                                 collate_fn=customized_dataloader.collate,
+                                                                 sampler=torch.utils.data.RandomSampler(
+                                                                     valid_known_unknown_index))
+
+
+    # Test loaders
+    test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
+                                               transform=test_transform)
+    test_known_known_index = torch.randperm(len(test_known_known_dataset))
+
+    test_known_unknown_dataset = msd_net_dataset(json_path=test_known_unknown_path,
+                                                 transform=test_transform)
+    test_known_unknown_index = torch.randperm(len(test_known_unknown_dataset))
+
+    test_unknown_unknown_dataset = msd_net_dataset(json_path=test_unknown_unknown_path,
                                                    transform=test_transform)
-        test_known_known_index = torch.randperm(len(test_known_known_dataset))
+    test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
 
-        test_known_unknown_dataset = msd_net_dataset(json_path=test_known_unknown_path,
-                                                     transform=test_transform)
-        test_known_unknown_index = torch.randperm(len(test_known_unknown_dataset))
+    # When doing test, set the batch size to 1 to test the time one by one accurately
+    test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+                                                          batch_size=1,
+                                                          shuffle=False,
+                                                          sampler=torch.utils.data.RandomSampler(
+                                                              test_known_known_index),
+                                                          collate_fn=customized_dataloader.collate,
+                                                          drop_last=True)
 
-        test_unknown_unknown_dataset = msd_net_dataset(json_path=test_unknown_unknown_path,
-                                                       transform=test_transform)
-        test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
+    test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
+                                                            batch_size=1,
+                                                            shuffle=False,
+                                                            sampler=torch.utils.data.RandomSampler(
+                                                                test_known_unknown_index),
+                                                            collate_fn=customized_dataloader.collate,
+                                                            drop_last=True)
 
-        # When doing test, set the batch size to 1 to test the time one by one accurately
-        test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+    test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
                                                               batch_size=1,
                                                               shuffle=False,
                                                               sampler=torch.utils.data.RandomSampler(
-                                                                  test_known_known_index),
+                                                                  test_unknown_unknown_index),
                                                               collate_fn=customized_dataloader.collate,
                                                               drop_last=True)
 
-        test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
-                                                                batch_size=1,
-                                                                shuffle=False,
-                                                                sampler=torch.utils.data.RandomSampler(
-                                                                    test_known_unknown_index),
-                                                                collate_fn=customized_dataloader.collate,
-                                                                drop_last=True)
-
-        test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
-                                                                  batch_size=1,
-                                                                  shuffle=False,
-                                                                  sampler=torch.utils.data.RandomSampler(
-                                                                      test_unknown_unknown_index),
-                                                                  collate_fn=customized_dataloader.collate,
-                                                                  drop_last=True)
-
-    else:
-        return
 
 
     ########################################################################
@@ -1198,7 +1274,6 @@ def demo(depth=100,
 
 
     else:
-
         # Make save directory
         if not os.path.exists(save_path):
             os.makedirs(save_path)
