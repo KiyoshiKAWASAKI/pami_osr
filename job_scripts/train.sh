@@ -2,8 +2,8 @@
 
 #$ -M jhuang24@nd.edu
 #$ -m abe
-#$ -q gpu@@cvrl-titanxp -l gpu=1
-#$ -N pfm_3.0_exit_2.0
+#$ -q gpu@@cvrl-1080ti -l gpu=1
+#$ -N pfm_4.0_exit_3.0
 
 # Required modules
 module load conda

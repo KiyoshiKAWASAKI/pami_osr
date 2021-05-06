@@ -13,14 +13,18 @@ import statistics
 
 
 test_binary = False
-model_type = "pp_add" # original/pp_mul/pp_add
+model_type = "pp_full" # original/pp_add/pp_full
 
-# test_epoch_list = [141] # for cross entropy
-# test_epoch_list = [168] # for pp multiplication
-test_epoch_list = [111] # for pp addition
+# test_epoch_list = [140] # for cross entropy
+# test_epoch_list = [174] # for ce + pfm
+# test_epoch_list = [190] # for ce + pfm + exit
+test_epoch_list = [121]
 
 # This is the path that needs to be changed
-save_path_sub = "0225/pp_loss_add"
+# save_path_sub = "2021-04-29/cross_entropy_only" # Cross entropy
+# save_path_sub = "2021-04-29/cross_entropy_1.0_pfm_1.5" # CE + pfm
+# save_path_sub = "2021-04-29/cross_entropy_1.0_pfm_1.0_exit_2.0" # ce + pfm + exit
+save_path_sub = "2021-05-02/cross_entropy_1.0_pfm_3.0_exit_2.0"
 
 ##############################################################################################
 # Normally, no need to change these paths
@@ -31,8 +35,8 @@ nb_training_classes = 296
 original_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/original/test/valid_known_known_prob_epoch_141.npy"
 original_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/original/test/valid_known_unknown_probs_epoch_141.npy"
 
-pp_mul_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_known_prob_epoch_168.npy"
-pp_mul_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_unknown_probs_epoch_168.npy"
+# pp_mul_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_known_prob_epoch_168.npy"
+# pp_mul_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_unknown_probs_epoch_168.npy"
 
 pp_add_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss_add/test/valid_known_known_prob_epoch_111.npy"
 pp_add_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss_add/test/valid_known_unknown_probs_epoch_111.npy"
@@ -572,27 +576,27 @@ if __name__ == '__main__':
         # Load all the probs, labels and rts
         ################################################################
         # Known_known
-        known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known/probs_epoch_" + str(epoch_index) + ".npy"
-        known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known/labels_epoch_" + str(epoch_index) + ".npy"
-        known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known/rts_epoch_" + str(epoch_index) + ".npy"
+        known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known_probs_epoch_" + str(epoch_index) + ".npy"
+        known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known_labels_epoch_" + str(epoch_index) + ".npy"
+        known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known_rts_epoch_" + str(epoch_index) + ".npy"
 
         known_known_original_labels = np.load(known_known_original_label_path)
         known_known_probs = np.load(known_known_probs_path)
         known_known_rts = np.load(known_known_rt_path)
 
         # Known_unknown
-        known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/probs_epoch_" + str(epoch_index) + ".npy"
-        known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/labels_epoch_" + str(epoch_index) + ".npy"
-        known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/rts_epoch_" + str(epoch_index) + ".npy"
+        known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+        known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+        known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
 
         known_unknown_original_labels = np.load(known_unknown_original_label_path)
         known_unknown_probs = np.load(known_unknown_probs_path)
         known_unknown_rts = np.load(known_unknown_rt_path)
 
         # unknown_unknown
-        unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/probs_epoch_" + str(epoch_index) + ".npy"
-        unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/labels_epoch_" + str(epoch_index) + ".npy"
-        unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/rts_epoch_" + str(epoch_index) + ".npy"
+        unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+        unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+        unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_rts_epoch_" + str(epoch_index) + ".npy"
 
         unknown_unknown_original_labels = np.load(unknown_unknown_original_label_path)
         unknown_unknown_probs = np.load(unknown_unknown_probs_path)
@@ -607,15 +611,15 @@ if __name__ == '__main__':
             known_known_thresh = get_thresholds(npy_file_path=original_valid_known_known_npy_path)
             known_unknown_thresh = get_thresholds(npy_file_path=original_valid_known_unknown_npy_path)
 
-        elif model_type == "pp_mul":
-            print("Getting thrshold for pp_mul")
-            known_known_thresh = get_thresholds(npy_file_path=pp_mul_valid_known_known_npy_path)
-            known_unknown_thresh = get_thresholds(npy_file_path=pp_mul_valid_known_unknown_npy_path)
-
         elif model_type == "pp_add":
             print("Getting thrshold for pp_add")
             known_known_thresh = get_thresholds(npy_file_path=pp_add_valid_known_known_npy_path)
             known_unknown_thresh = get_thresholds(npy_file_path=pp_add_valid_known_unknown_npy_path)
+
+        elif model_type == "pp_full":
+            print("Getting thrshold for pp_full")
+            known_known_thresh = get_thresholds(npy_file_path=pp_full_valid_known_known_npy_path)
+            known_unknown_thresh = get_thresholds(npy_file_path=pp_full_valid_known_unknown_npy_path)
 
         else:
             print("Something is wrong")

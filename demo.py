@@ -37,8 +37,11 @@ use_performance_loss = True
 use_exit_loss = True
 thresh = 0.7
 cross_entropy_weight = 1.0
-perform_loss_weight = 3.0
-exit_loss_weight = 2.0
+perform_loss_weight = 4.0
+exit_loss_weight = 3.0
+
+# perform_loss_weight = 3.0
+# exit_loss_weight = 2.0
 
 
 ###################################################################
@@ -56,17 +59,23 @@ use_addition = True
 ###################################################################
                     # Test process options #
 ###################################################################
+nb_itrs = 1000
+
 run_test = False
 get_train_valid_prob = True
-run_one_sample = True
-nb_itrs = 1000
-use_trained_weights = False
+use_trained_weights = True
+run_one_sample = False
 save_one_sample_rt_folder = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/" \
                             "models/0225/get_outliers/valid_known_unknown/pp_add"
 
-# test_epoch_list = [141] # for original
-# test_epoch_list = [168] # for pp mul
-test_epoch_list = [111] # for pp add
+# Cross-entropy only
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_only/model_epoch_140.dat"
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_1.0_pfm_1.5/model_epoch_174.dat"
+test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_1.0_pfm_1.0_exit_2.0/model_epoch_190.dat"
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-05-02/cross_entropy_1.0_pfm_3.0_exit_2.0/model_epoch_121.dat"
+
+test_date = test_model_path.split("/")[-3]
+
 
 ###################################################################
                 # Paths for saving results #
@@ -115,10 +124,7 @@ if train_binary:
     nb_training_classes = 2
 else:
     nb_training_classes = 296
-    # if debug:
-    #     nb_training_classes = 336  # known_known:335, unknown_unknown:1
-    # else:
-    #     nb_training_classes = 296 # known_known:295, unknown_unknown:1
+
 
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
 unknown_exit_rt = [4.2550, 5.9220, 8.2368, 13.0090, 28.1661]
@@ -144,7 +150,10 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
             # Define paths for saving model and data source #
 #########################################################################################
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
-save_path_with_date = save_path_base + "/" + date
+if not run_test:
+    save_path_with_date = save_path_base + "/" + date
+else:
+    save_path_with_date = save_path_base + "/" + test_date
 
 if not save_path_with_date:
     os.mkdir(save_path_with_date)
@@ -683,38 +692,32 @@ def test_and_save_probs(test_loader,
     # Setup the paths for saving npy files
     if use_trained_weights:
         if get_train_valid_prob:
-            save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_probs_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_original_label_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_rt_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
 
-            save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_probs_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_original_label_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_rt_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
 
         else:
-            save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known/probs_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known/labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known/rts_epoch_" + str(epoch_index) + ".npy"
+            save_prob_base_path = save_path_with_date + "/" + save_path_sub + "/test"
 
-            save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/probs_epoch_" + str(epoch_index) + ".npy"    # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/rts_epoch_" + str(epoch_index) + ".npy"
-
-            save_unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/probs_epoch_" + str(epoch_index) + ".npy"
-            save_unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/labels_epoch_" + str(epoch_index) + ".npy"
-            save_unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown/rts_epoch_" + str(epoch_index) + ".npy"
+            if not os.path.exists(save_prob_base_path):
+                print("Creating the directory %s" % save_prob_base_path)
+                os.mkdir(save_prob_base_path)
 
     else:
         # Test the model with random initialized weights
         # Test: train_known_known, train_known_unknown
-        save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known_prob_rand_" + str(test_itr_index) + ".npy"
-        save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known_labels_rand_" + str(test_itr_index) + ".npy"
-        save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known_rts_rand_" + str(test_itr_index) + ".npy"
-
-        save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_rand_" + str(test_itr_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
-        save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_rand_" + str(test_itr_index) + ".npy"
-        save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_rand_" + str(test_itr_index) + ".npy"
-
+        # save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known_prob_rand_" + str(test_itr_index) + ".npy"
+        # save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known_labels_rand_" + str(test_itr_index) + ".npy"
+        # save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known_rts_rand_" + str(test_itr_index) + ".npy"
+        #
+        # save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_rand_" + str(test_itr_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
+        # save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_rand_" + str(test_itr_index) + ".npy"
+        # save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_rand_" + str(test_itr_index) + ".npy"
+        pass
 
     # Set the model to evaluation mode
     model.cuda()
@@ -733,8 +736,8 @@ def test_and_save_probs(test_loader,
         print(len(test_loader))
         # sys.exit()
 
-
         for i in range(len(test_loader)):
+        # for i in range(5):
             batch = next(iter(test_loader))
 
             input = batch["imgs"]
@@ -802,6 +805,10 @@ def test_and_save_probs(test_loader,
 
             else:
                 if test_type == "known_known":
+                    save_known_known_probs_path = save_prob_base_path + "/known_known_probs_epoch_" + str(epoch_index) + ".npy"
+                    save_known_known_original_label_path = save_prob_base_path + "/known_known_labels_epoch_" + str(epoch_index) + ".npy"
+                    save_known_known_rt_path = save_prob_base_path + "/known_known_rts_epoch_" + str(epoch_index) + ".npy"
+
                     print("Saving probabilities to %s" % save_known_known_probs_path)
                     np.save(save_known_known_probs_path, full_prob_list_np)
                     print("Saving original labels to %s" % save_known_known_original_label_path)
@@ -810,6 +817,10 @@ def test_and_save_probs(test_loader,
                     np.save(save_known_known_rt_path, full_rt_list_np)
 
                 elif test_type == "known_unknown":
+                    save_known_unknown_probs_path = save_prob_base_path + "/known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+                    save_known_unknown_original_label_path = save_prob_base_path + "/known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+                    save_known_unknown_rt_path = save_prob_base_path + "/known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+
                     print("Saving probabilities to %s" % save_known_unknown_probs_path)
                     np.save(save_known_unknown_probs_path, full_prob_list_np)
                     print("Saving original labels to %s" % save_known_unknown_original_label_path)
@@ -818,6 +829,10 @@ def test_and_save_probs(test_loader,
                     np.save(save_known_unknown_rt_path, full_rt_list_np)
 
                 else:
+                    save_unknown_unknown_probs_path = save_prob_base_path + "/unknown_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+                    save_unknown_unknown_original_label_path = save_prob_base_path + "/unknown_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+                    save_unknown_unknown_rt_path = save_prob_base_path + "/unknown_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+
                     print("Saving probabilities to %s" % save_unknown_unknown_probs_path)
                     np.save(save_unknown_unknown_probs_path, full_prob_list_np)
                     print("Saving original labels to %s" % save_unknown_unknown_original_label_path)
@@ -1151,112 +1166,178 @@ def demo(depth=100,
     ########################################################################
     if run_test:
         if model_name == "msd_net":
+            model.load_state_dict(torch.load(test_model_path))
+            print("Loading MSD-Net model: %s" % test_model_path)
+
+            # Get the epoch index
+            index = test_model_path.split("/")[-1].split(".")[0].split("_")[-1]
+
+            if get_train_valid_prob:
+                print("Testing the training known_known samples...")
+                test_and_save_probs(test_loader=train_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="train")
+
+                print("Testing the training known_unknown samples...")
+                test_and_save_probs(test_loader=train_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="train")
+
+                print("Testing the validation known_known samples...")
+                test_and_save_probs(test_loader=valid_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="valid")
+
+                print("Testing the validation known_known samples...")
+                test_and_save_probs(test_loader=valid_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="valid")
+
+
+            else:
+                print("Testing the trained models")
+
+                print("Testing the known_known samples...")
+                test_and_save_probs(test_loader=test_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index)
+
+                print("Testing the known_unknown samples...")
+                test_and_save_probs(test_loader=test_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index)
+
+                print("testing the unknown samples...")
+                test_and_save_probs(test_loader=test_unknown_unknown_loader,
+                                    model=model,
+                                    test_type="unknown_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index)
+
             if run_one_sample:
-                for index in test_epoch_list:
-                    if use_trained_weights:
-                        model_path = save_path_base + "/" + save_path_sub + \
-                                     "/model_epoch_" + str(index) + ".dat"
-                        model.load_state_dict(torch.load(model_path))
-
-                        print("Loading MSD-Net model: %s" % model_path)
-
-                    for i in range(nb_itrs):
-                        run_one_sample(test_loader=valid_known_unknown_loader,
-                                       save_folder=save_one_sample_rt_folder,
-                                       model=model,
-                                       use_msd_net=True,
-                                       test_itr_index=i)
+                pass
+                # if use_trained_weights:
+                #     model.load_state_dict(torch.load(test_model_path))
+                #
+                #     print("Loading MSD-Net model: %s" % test_model_path)
+                #
+                # for i in range(nb_itrs):
+                #     run_one_sample(test_loader=valid_known_unknown_loader,
+                #                    save_folder=save_one_sample_rt_folder,
+                #                    model=model,
+                #                    use_msd_net=True,
+                #                    test_itr_index=i)
 
 
 
 
             else:
-                for index in test_epoch_list:
-                    if use_trained_weights:
-                        model_path = save_path_base + "/" + save_path_sub + \
-                                     "/model_epoch_" + str(index) + ".dat"
-                        model.load_state_dict(torch.load(model_path))
+                if use_trained_weights:
+                    # model.load_state_dict(torch.load(test_model_path))
+                    # print("Loading MSD-Net model: %s" % test_model_path)
+                    #
+                    # # Get the epoch index
+                    # index = test_model_path.split("/")[-1].split(".")[0].split("_")[-1]
 
-                        print("Loading MSD-Net model: %s" % model_path)
-
-                        if get_train_valid_prob:
-                            # TODO: getting prob for training and validation set
-                            print("Testing the training known_known samples...")
-                            test_and_save_probs(test_loader=train_known_known_loader,
-                                                model=model,
-                                                test_type="known_known",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                data_type="train")
-
-                            print("Testing the training known_unknown samples...")
-                            test_and_save_probs(test_loader=train_known_unknown_loader,
-                                                model=model,
-                                                test_type="known_unknown",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                data_type="train")
-
-                            print("Testing the validation known_known samples...")
-                            test_and_save_probs(test_loader=valid_known_known_loader,
-                                                model=model,
-                                                test_type="known_known",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                data_type="valid")
-
-                            print("Testing the validation known_known samples...")
-                            test_and_save_probs(test_loader=valid_known_unknown_loader,
-                                                model=model,
-                                                test_type="known_unknown",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                data_type="valid")
-
-                        else:
-                            print("Testing the known_known samples...")
-                            test_and_save_probs(test_loader=test_known_known_loader,
-                                                  model=model,
-                                                  test_type="known_known",
-                                                  use_msd_net=True,
-                                                  epoch_index=index)
-
-                            print("Testing the known_unknown samples...")
-                            test_and_save_probs(test_loader=test_known_unknown_loader,
-                                                model=model,
-                                                test_type="known_unknown",
-                                                use_msd_net=True,
-                                                epoch_index=index)
-
-                            print("testing the unknown samples...")
-                            test_and_save_probs(test_loader=test_unknown_unknown_loader,
-                                                  model=model,
-                                                  test_type="unknown_unknown",
-                                                  use_msd_net=True,
-                                                  epoch_index=index)
+                    if get_train_valid_prob:
+                        pass
+                        # Getting prob for training and validation set
+                        # print("Testing the training known_known samples...")
+                        # test_and_save_probs(test_loader=train_known_known_loader,
+                        #                     model=model,
+                        #                     test_type="known_known",
+                        #                     use_msd_net=True,
+                        #                     epoch_index=index,
+                        #                     data_type="train")
+                        #
+                        # print("Testing the training known_unknown samples...")
+                        # test_and_save_probs(test_loader=train_known_unknown_loader,
+                        #                     model=model,
+                        #                     test_type="known_unknown",
+                        #                     use_msd_net=True,
+                        #                     epoch_index=index,
+                        #                     data_type="train")
+                        #
+                        # print("Testing the validation known_known samples...")
+                        # test_and_save_probs(test_loader=valid_known_known_loader,
+                        #                     model=model,
+                        #                     test_type="known_known",
+                        #                     use_msd_net=True,
+                        #                     epoch_index=index,
+                        #                     data_type="valid")
+                        #
+                        # print("Testing the validation known_known samples...")
+                        # test_and_save_probs(test_loader=valid_known_unknown_loader,
+                        #                     model=model,
+                        #                     test_type="known_unknown",
+                        #                     use_msd_net=True,
+                        #                     epoch_index=index,
+                        #                     data_type="valid")
 
                     else:
-                        for i in range(nb_itr):
-                            print("Iteration: %d" % i)
+                        pass
+                        # print("Testing the trained models")
+                        #
+                        # print("Testing the known_known samples...")
+                        # test_and_save_probs(test_loader=test_known_known_loader,
+                        #                       model=model,
+                        #                       test_type="known_known",
+                        #                       use_msd_net=True,
+                        #                       epoch_index=index)
+                        #
+                        # print("Testing the known_unknown samples...")
+                        # test_and_save_probs(test_loader=test_known_unknown_loader,
+                        #                     model=model,
+                        #                     test_type="known_unknown",
+                        #                     use_msd_net=True,
+                        #                     epoch_index=index)
+                        #
+                        # print("testing the unknown samples...")
+                        # test_and_save_probs(test_loader=test_unknown_unknown_loader,
+                        #                       model=model,
+                        #                       test_type="unknown_unknown",
+                        #                       use_msd_net=True,
+                        #                       epoch_index=index)
 
-                            print("Initializing the model.")
-                            model = getattr(models, args.arch)(args)
-
-                            print("Testing the train known_known samples...")
-                            test_and_save_probs(test_loader=train_known_known_loader,
-                                                model=model,
-                                                test_type="known_known",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                test_itr_index=i)
-
-                            print("Testing the known_unknown samples...")
-                            test_and_save_probs(test_loader=train_known_unknown_loader,
-                                                model=model,
-                                                test_type="known_unknown",
-                                                use_msd_net=True,
-                                                epoch_index=index,
-                                                test_itr_index=i)
+                else:
+                    pass
+                    # for i in range(nb_itr):
+                    #     print("Iteration: %d" % i)
+                    #
+                    #     print("Initializing the model.")
+                    #     model = getattr(models, args.arch)(args)
+                    #
+                    #     print("Testing the train known_known samples...")
+                    #     test_and_save_probs(test_loader=train_known_known_loader,
+                    #                         model=model,
+                    #                         test_type="known_known",
+                    #                         use_msd_net=True,
+                    #                         epoch_index=index,
+                    #                         test_itr_index=i)
+                    #
+                    #     print("Testing the known_unknown samples...")
+                    #     test_and_save_probs(test_loader=train_known_unknown_loader,
+                    #                         model=model,
+                    #                         test_type="known_unknown",
+                    #                         use_msd_net=True,
+                    #                         epoch_index=index,
+                    #                         test_itr_index=i)
 
 
 
@@ -1287,8 +1368,6 @@ def demo(depth=100,
               valid_known_known_loader=valid_known_known_loader,
               valid_known_unknown_loader=valid_known_unknown_loader,
               save=save_path)
-
-
 
 
 
