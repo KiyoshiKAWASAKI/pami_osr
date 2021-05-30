@@ -2,7 +2,7 @@
 
 #$ -M jhuang24@nd.edu
 #$ -m abe
-#$ -q gpu@@cvrl-1080ti -l gpu=1
+#$ -q gpu@qa-xp-013.crc.nd.edu -l gpu=1
 #$ -N pfm_4.0_exit_3.0
 
 # Required modules
