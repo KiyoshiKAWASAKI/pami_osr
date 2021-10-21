@@ -39,6 +39,7 @@ thresh = 0.7
 cross_entropy_weight = 1.0
 perform_loss_weight = 4.0
 exit_loss_weight = 3.0
+random_seed = 0
 
 
 ###################################################################
@@ -156,9 +157,9 @@ if not save_path_with_date:
     os.mkdir(save_path_with_date)
 
 if debug:
-    save_path = save_path_with_date + "/debug_" + save_path_sub
+    save_path = save_path_with_date + "/debug_" + save_path_sub + "/seed_" + str(random_seed)
 else:
-    save_path = save_path_with_date + "/" + save_path_sub
+    save_path = save_path_with_date + "/" + save_path_sub + "/seed_" + str(random_seed)
 
 if debug:
     if use_new_loader == False:
@@ -601,6 +602,10 @@ def train(model,
 
     if seed is not None:
         torch.manual_seed(seed)
+
+    torch.manual_seed(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Model on cuda
     if torch.cuda.is_available():
