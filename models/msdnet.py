@@ -354,6 +354,7 @@ class MSDNet(nn.Module):
 
             # print("One sample")
             for i in range(self.nBlocks):
+                # print(i)
                 x = self.blocks[i](x)
                 logit = self.classifier[i](x)
                 end = timer()
@@ -362,6 +363,9 @@ class MSDNet(nn.Module):
                 res.append(logit)
 
             all_end_times.append(end_times)
+
+            # print(res)
+            # print("*" * 40)
 
             return res, all_end_times
     else:

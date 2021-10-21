@@ -33,15 +33,12 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = True
-use_exit_loss = True
+use_performance_loss = False
+use_exit_loss = False
 thresh = 0.7
 cross_entropy_weight = 1.0
 perform_loss_weight = 4.0
 exit_loss_weight = 3.0
-
-# perform_loss_weight = 3.0
-# exit_loss_weight = 2.0
 
 
 ###################################################################
@@ -149,7 +146,7 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 #########################################################################################
             # Define paths for saving model and data source #
 #########################################################################################
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr"
 if not run_test:
     save_path_with_date = save_path_base + "/" + date
 else:
@@ -166,13 +163,13 @@ else:
 if debug:
     if use_new_loader == False:
         train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                                 "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                                 "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_known.json"
         train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_ne" \
-                                   "t/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                                   "t/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_unknown.json"
         valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                                 "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                                 "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_known.json"
         valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                                    "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                                    "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_unknown.json"
     else:
         train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
                                  "npy_json_files/rt_group_json/valid_known_unknown.json"
@@ -185,11 +182,11 @@ if debug:
 
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_known.json"
     test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                              "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                              "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_unknown.json"
     test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
-                            "/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
+                            "/derivatives/dataset_v1_3_partition/npy_json_files/2021_02_old/debug_known_unknown.json"
 
 
 else:
@@ -304,6 +301,7 @@ def train_valid_one_epoch(known_loader,
     # Only train one batch for each step
     with open(save_txt_path, 'w') as f:
         for i in range(nb_total_batches):
+            # print(i)
             ##########################################
             # Basic setups
             ##########################################
@@ -346,10 +344,22 @@ def train_valid_one_epoch(known_loader,
                     else:
                         target[i] = 1
 
+            # Adjust the label for unknown
+            if batch_type == "unknown":
+                for i in range(len(target)):
+                    target[i] = nb_training_classes - 1
+
+
             # Convert into PyTorch tensor
             input_var = torch.autograd.Variable(input).cuda()
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
+
+            # print("#" * 30)
+            # print(input_var)
+            # print(target)
+            # print(target_var)
+            # print("#" * 30)
 
             start = timer()
             output, end_time = model(input_var)
@@ -598,8 +608,8 @@ def train(model,
 
     # Wrap model for multi-GPUs, if necessary
     model_wrapper = model
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        model_wrapper = torch.nn.DataParallel(model).cuda()
+    # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+    #     model_wrapper = torch.nn.DataParallel(model).cuda()
 
     # Optimizer
     criterion = nn.CrossEntropyLoss().cuda()
