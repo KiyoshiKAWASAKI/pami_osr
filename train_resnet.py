@@ -35,14 +35,15 @@ date = datetime.today().strftime('%Y-%m-%d')
 # Training options #
 ###################################################################
 model_name = "resnet_50"
+save_path_sub = "resnet_50"
+
 n_epochs = 200
 batch_size = 16
 nb_training_classes = 296
+random_seed = 4
 
 debug = False
 run_test = False
-
-save_path_sub = "resnet50"
 
 ####################################################################
 # Normally, there is no need to change these #
@@ -81,16 +82,16 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 #########################################################################################
 # Define paths for saving model and data source #
 #########################################################################################
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr_resnet"
 save_path_with_date = save_path_base + "/" + date
 
 if not save_path_with_date:
     os.mkdir(save_path_with_date)
 
 if debug:
-    save_path = save_path_with_date + "/debug_" + save_path_sub
+    save_path = save_path_with_date + "/debug_" + save_path_sub + "_seed_" + str(random_seed)
 else:
-    save_path = save_path_with_date + "/" + save_path_sub
+    save_path = save_path_with_date + "/" + save_path_sub + "_seed_" + str(random_seed)
 
 if debug:
     train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net" \
@@ -138,7 +139,6 @@ def train_valid_one_epoch(known_loader,
                           criterion,
                           optimizer,
                           nb_epoch,
-                          use_msd_net,
                           train_phase,
                           nb_sample_per_bacth=16):
     """
@@ -216,15 +216,19 @@ def train_valid_one_epoch(known_loader,
             ##########################################
             if i in known_indices:
                 batch = next(known_iter)
-                batch_type = "known"
+
+                input = batch["imgs"]
+                target = batch["labels"]
 
             elif i in unknown_indices:
                 batch = next(unknown_iter)
-                batch_type = "unknown"
 
-            input = batch["imgs"]
-            rts = batch["rts"]
-            target = batch["labels"]
+                input = batch["imgs"]
+                target = batch["labels"]
+
+                for i in range(len(target)):
+                    target[i] = nb_training_classes - 1
+
 
             # Convert into PyTorch tensor
             input_var = torch.autograd.Variable(input).cuda()
@@ -237,7 +241,7 @@ def train_valid_one_epoch(known_loader,
                 output = [output]
 
             for j in range(len(output)):
-                # Cross-entropy loss
+                # Cross-entropy loss only
                 ce_loss = criterion(output[j], target_var)
                 loss += ce_loss
 
@@ -310,14 +314,18 @@ def train(model,
     if seed is not None:
         torch.manual_seed(seed)
 
+    torch.manual_seed(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     # Model on cuda
     if torch.cuda.is_available():
         model = model.cuda()
 
     # Wrap model for multi-GPUs, if necessary
     model_wrapper = model
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        model_wrapper = torch.nn.DataParallel(model).cuda()
+    # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+    #     model_wrapper = torch.nn.DataParallel(model).cuda()
 
     # Optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -333,40 +341,37 @@ def train(model,
     # Train model
     best_acc_top1 = 0.00
 
+    print("hello")
+
     for epoch in range(n_epochs):
-        if model_name == "msd_net":
-            train_loss, train_acc_top1, \
-            train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
-                                                                   unknown_loader=train_known_unknown_loader,
-                                                                   model=model_wrapper,
-                                                                   criterion=criterion,
-                                                                   optimizer=optimizer,
-                                                                   nb_epoch=epoch,
-                                                                   use_msd_net=True,
-                                                                   train_phase=True)
+        train_loss, train_acc_top1, \
+        train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
+                                                               unknown_loader=train_known_unknown_loader,
+                                                               model=model_wrapper,
+                                                               criterion=criterion,
+                                                               optimizer=optimizer,
+                                                               nb_epoch=epoch,
+                                                               train_phase=True)
 
-            scheduler.step()
+        scheduler.step()
 
-            valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
-                                                                   unknown_loader=valid_known_unknown_loader,
-                                                                   model=model_wrapper,
-                                                                   criterion=criterion,
-                                                                   optimizer=optimizer,
-                                                                   nb_epoch=epoch,
-                                                                   use_msd_net=True,
-                                                                   train_phase=False)
+        valid_loss, valid_acc_top1, \
+        valid_acc_top3, valid_acc_top5 = train_valid_one_epoch(known_loader=valid_known_known_loader,
+                                                               unknown_loader=valid_known_unknown_loader,
+                                                               model=model_wrapper,
+                                                               criterion=criterion,
+                                                               optimizer=optimizer,
+                                                               nb_epoch=epoch,
+                                                               train_phase=False)
 
-        else:
-            pass
 
         # Determine if model is the best
         if valid_loader:
             if valid_acc_top1 > best_acc_top1:
                 best_acc_top1 = valid_acc_top1
                 print('New best top-1 accuracy: %.4f' % best_acc_top1)
-                torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
-                torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
+            torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
+            torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
         else:
             torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
 
@@ -677,15 +682,11 @@ def run_one_sample(test_loader,
 def demo():
     global args
 
-    # if (depth - 4) % 3:
-    #     raise Exception('Invalid depth')
-    # block_config = [(depth - 4) // 6 for _ in range(3)]
-
     # Data transforms
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    # TODO: modify the input size (?)
+
     train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
                                           transforms.RandomHorizontalFlip(),
                                           transforms.ToTensor(),
@@ -800,7 +801,7 @@ def demo():
         model = torchvision.models.resnet152(pretrained=False)
 
     else:
-        print("Error")
+        model = None
 
 
     # Make save directory

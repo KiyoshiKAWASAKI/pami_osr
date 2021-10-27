@@ -2,8 +2,8 @@
 
 #$ -M jhuang24@nd.edu
 #$ -m abe
-#$ -q gpu@qa-xp-013.crc.nd.edu -l gpu=1
-#$ -N baseline
+#$ -q gpu -l gpu=1
+#$ -N pfm_1.0_exit_1.0_seed_4
 
 # Required modules
 module load conda

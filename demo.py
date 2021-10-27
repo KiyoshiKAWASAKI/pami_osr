@@ -33,13 +33,13 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = False
-use_exit_loss = False
+use_performance_loss = True
+use_exit_loss = True
 thresh = 0.7
 cross_entropy_weight = 1.0
-perform_loss_weight = 4.0
+perform_loss_weight = 1.0
 exit_loss_weight = 3.0
-random_seed = 0
+random_seed = 4
 
 
 ###################################################################
@@ -671,8 +671,8 @@ def train(model,
             if valid_acc_top1 > best_acc_top1:
                 best_acc_top1 = valid_acc_top1
                 print('New best top-1 accuracy: %.4f' % best_acc_top1)
-                torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
-                torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
+            torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
+            torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
         else:
             torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
 
