@@ -347,14 +347,11 @@ class MSDNet(nn.Module):
     # Only return both RT and prediction when testing with novel samples
     if args.test_with_novel or args.train_k_plus_1:
         def forward(self, x):
-            # print("Calling forward function")
             res = []
             end_times = []
             all_end_times = []
 
-            # print("One sample")
             for i in range(self.nBlocks):
-                # print(i)
                 x = self.blocks[i](x)
                 logit = self.classifier[i](x)
                 end = timer()
@@ -364,10 +361,32 @@ class MSDNet(nn.Module):
 
             all_end_times.append(end_times)
 
-            # print(res)
-            # print("*" * 40)
-
             return res, all_end_times
+
+
+    if args.generate_feature:
+        def forward(self, x):
+            res = []
+            end_times = []
+            all_end_times = []
+            features = []
+
+            for i in range(self.nBlocks):
+                x = self.blocks[i](x)
+                logit = self.classifier[i](x)
+                end = timer()
+
+                end_times.append(end)
+                res.append(logit)
+
+                if i == self.nBlocks - 1:
+                    features = x
+
+            all_end_times.append(end_times)
+
+            return res, features, all_end_times
+
+
     else:
         def forward(self, x):
             res = []

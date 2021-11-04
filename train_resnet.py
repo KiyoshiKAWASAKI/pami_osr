@@ -34,8 +34,8 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
 # Training options #
 ###################################################################
-model_name = "resnet_50"
-save_path_sub = "resnet_50"
+model_name = "resnet_101"
+save_path_sub = "resnet_101"
 
 n_epochs = 200
 batch_size = 16

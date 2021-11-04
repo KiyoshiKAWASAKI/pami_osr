@@ -99,6 +99,7 @@ optim_group.add_argument('--thresh_top_1',type=float)
 optim_group.add_argument('--thresh_top_3',type=float)
 optim_group.add_argument('--thresh_top_5',type=float)
 optim_group.add_argument('--train_k_plus_1', default=False, type=bool)
+optim_group.add_argument('--generate_feature', default=False, type=bool)
 optim_group.add_argument('--train_early_exit', default=False, type=bool)
 optim_group.add_argument('--epochs', default=300, type=int, metavar='N',
                          help='number of total epochs to run (default: 164)')

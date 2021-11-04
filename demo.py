@@ -34,11 +34,11 @@ date = datetime.today().strftime('%Y-%m-%d')
                             # Loss options #
 ###################################################################
 use_performance_loss = True
-use_exit_loss = True
+use_exit_loss = False
 thresh = 0.7
 cross_entropy_weight = 1.0
-perform_loss_weight = 1.0
-exit_loss_weight = 3.0
+perform_loss_weight = 1.5
+exit_loss_weight = 2.0
 random_seed = 4
 
 
