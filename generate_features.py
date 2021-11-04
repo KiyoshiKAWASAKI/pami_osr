@@ -6,7 +6,7 @@ import time
 import torch
 from torchvision import datasets, transforms
 from models import efficient_dense_net
-from models import resnet
+# from models import resnet
 import numpy as np
 from timeit import default_timer as timer
 from utils import customized_dataloader
@@ -41,7 +41,7 @@ model_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/"
 # model_name = "msd_net"
 model_name = "resnet_50"
 model_used = "model_epoch_34.dat"
-model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0"
+model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0/"
 test_model_path = model_path_base + model_dir + model_used
 
 debug = False
@@ -128,39 +128,39 @@ def gen_feature(loader,
             output, feature, end_time = model(input_var)
 
             feature = feature[0][0].cpu().detach().numpy()
-            print(feature.shape)
 
-            feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
-
-            if i == 0:
-                full_feature_list = feature
-            else:
-                full_feature_list = np.concatenate((full_feature_list, feature), axis=0)
 
         elif model_name == "resnet_50":
+            # model.replace_logits
+            # TODO: nb classes in incorrect here, it should be 296 not 1000
+            output, feature = model(input_var)
 
-
+            feature = feature.cpu().detach().numpy()
 
         # TODO: Add other resnet arch
         else:
             pass
 
+        feature = np.reshape(feature, (1, feature.shape[1] * feature.shape[2] * feature.shape[3]))
 
-
-        # Save all results to npy
-        full_label_list = np.array(full_original_label_list)
+        if i == 0:
+            full_feature_list = feature
+        else:
+            full_feature_list = np.concatenate((full_feature_list, feature), axis=0)
 
         print(full_feature_list.shape)
-        print(full_label_list.shape)
+        print(len(full_original_label_list))
 
-        save_label_dir = save_dir + data_category + "_labels.npy"
-        save_feature_dir = save_dir + data_category + "_features.npy"
+    # Save all results to npy
+    full_label_list = np.array(full_original_label_list)
 
-        np.save(save_label_dir, full_label_list)
-        np.save(save_feature_dir, full_feature_list)
+    save_label_dir = save_dir + data_category + "_labels.npy"
+    save_feature_dir = save_dir + data_category + "_features.npy"
 
-    else:
-        if model_name == "resnet_50":
+    np.save(save_label_dir, full_label_list)
+    np.save(save_feature_dir, full_feature_list)
+
+    print("NPY files saved!")
 
 
 
@@ -259,7 +259,7 @@ def demo(depth=100,
     ########################################################################
     # TODO: change this to ResNet series
     if model_name == "resnet_50":
-        model = resnet.resnet50(pretrained=False)
+        model = torchvision.models.resnet50(pretrained=False)
         msd_net = False
 
 
@@ -289,31 +289,31 @@ def demo(depth=100,
                 model=model,
                 use_msd_net=msd_net,
                 data_category="train_known_known",
-                save_dir=model_dir)
+                save_dir=model_path_base + model_dir)
 
     gen_feature(loader=train_known_unknown_loader,
                 model=model,
                 use_msd_net=msd_net,
                 data_category="train_known_unknown",
-                save_dir=model_dir)
+                save_dir=model_path_base + model_dir)
 
     gen_feature(loader=test_known_known_loader,
                 model=model,
                 use_msd_net=msd_net,
                 data_category="test_known_known",
-                save_dir=model_dir)
+                save_dir=model_path_base + model_dir)
 
     gen_feature(loader=test_known_unknown_loader,
                 model=model,
                 use_msd_net=msd_net,
                 data_category="test_known_unknown",
-                save_dir=model_dir)
+                save_dir=model_path_base + model_dir)
 
     gen_feature(loader=test_unknown_unknown_loader,
                 model=model,
                 use_msd_net=msd_net,
                 data_category="test_unknown_unknown",
-                save_dir=model_dir)
+                save_dir=model_path_base + model_dir)
 
 
 if __name__ == '__main__':
