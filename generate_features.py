@@ -39,10 +39,18 @@ model_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/"
 # Change these for each model
 ###################################################################
 model_name = "msd_net"
+# model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_0/"
+# model_used = "model_epoch_167.dat"
+
+model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_0/"
+model_used = "model_epoch_149.dat"
+
+# model_dir = "cvpr/2021-10-31/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_0/"
+# model_used = "model_epoch_151.dat"
+
 # model_name = "resnet_50"
-model_used = "model_epoch_167.dat"
 # model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0/"
-model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_0/"
+
 test_model_path = model_path_base + model_dir + model_used
 
 debug = False
@@ -108,7 +116,7 @@ def gen_feature(loader,
         input = batch["imgs"]
 
         if (data_category == "train_known_unknown") or (data_category == "test_known_unknown"):
-            target = 0
+            target = torch.tensor(0)
         else:
             target = batch["labels"]
 
@@ -117,8 +125,13 @@ def gen_feature(loader,
 
         # Save original labels to the list
         original_label_list = np.array(target.cpu().tolist())
-        for label in original_label_list:
-            full_original_label_list.append(label)
+        # print(original_label_list)
+
+        try:
+            for label in original_label_list:
+                full_original_label_list.append(label)
+        except:
+            full_original_label_list.append(original_label_list)
 
         input_var = torch.autograd.Variable(input)
 

@@ -3,7 +3,8 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N resnet_50_seed_0
+#$ -N resnet_50_seed_4
+
 
 # Required modules
 module load conda
