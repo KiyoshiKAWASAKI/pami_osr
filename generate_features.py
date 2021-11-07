@@ -38,10 +38,11 @@ model_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/"
 ###################################################################
 # Change these for each model
 ###################################################################
-# model_name = "msd_net"
-model_name = "resnet_50"
-model_used = "model_epoch_34.dat"
-model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0/"
+model_name = "msd_net"
+# model_name = "resnet_50"
+model_used = "model_epoch_167.dat"
+# model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0/"
+model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_0/"
 test_model_path = model_path_base + model_dir + model_used
 
 debug = False
@@ -80,7 +81,6 @@ test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set
 ##########################################################################
 def gen_feature(loader,
                 model,
-                use_msd_net,
                 data_category,
                 save_dir):
     """
@@ -128,6 +128,8 @@ def gen_feature(loader,
             output, feature, end_time = model(input_var)
 
             feature = feature[0][0].cpu().detach().numpy()
+            print(feature.shape)
+            feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
 
 
         elif model_name == "resnet_50":
@@ -136,12 +138,13 @@ def gen_feature(loader,
             output, feature = model(input_var)
 
             feature = feature.cpu().detach().numpy()
+            feature = np.reshape(feature, (1, feature.shape[1] * feature.shape[2] * feature.shape[3]))
 
         # TODO: Add other resnet arch
         else:
             pass
 
-        feature = np.reshape(feature, (1, feature.shape[1] * feature.shape[2] * feature.shape[3]))
+
 
         if i == 0:
             full_feature_list = feature
@@ -262,7 +265,6 @@ def demo(depth=100,
         model = torchvision.models.resnet50(pretrained=False)
         msd_net = False
 
-
     elif model_name == "resnet_101":
         model = torchvision.models.resnet101(pretrained=False)
         msd_net = False
@@ -287,25 +289,21 @@ def demo(depth=100,
     # Generate features
     gen_feature(loader=train_known_known_loader,
                 model=model,
-                use_msd_net=msd_net,
                 data_category="train_known_known",
                 save_dir=model_path_base + model_dir)
 
     gen_feature(loader=train_known_unknown_loader,
                 model=model,
-                use_msd_net=msd_net,
                 data_category="train_known_unknown",
                 save_dir=model_path_base + model_dir)
 
     gen_feature(loader=test_known_known_loader,
                 model=model,
-                use_msd_net=msd_net,
                 data_category="test_known_known",
                 save_dir=model_path_base + model_dir)
 
     gen_feature(loader=test_known_unknown_loader,
                 model=model,
-                use_msd_net=msd_net,
                 data_category="test_known_unknown",
                 save_dir=model_path_base + model_dir)
 

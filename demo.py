@@ -34,10 +34,10 @@ date = datetime.today().strftime('%Y-%m-%d')
                             # Loss options #
 ###################################################################
 use_performance_loss = True
-use_exit_loss = False
+use_exit_loss = True
 thresh = 0.7
 cross_entropy_weight = 1.0
-perform_loss_weight = 1.5
+perform_loss_weight = 1.0
 exit_loss_weight = 2.0
 random_seed = 4
 
@@ -363,7 +363,7 @@ def train_valid_one_epoch(known_loader,
             # print("#" * 30)
 
             start = timer()
-            output, end_time = model(input_var)
+            output, feature, end_time = model(input_var)
 
             full_rt_list = []
             for end in end_time[0]:
@@ -771,7 +771,7 @@ def test_and_save_probs(test_loader,
 
             # Get the model outputs and RTs
             start =timer()
-            output, end_time = model(input_var)
+            output, feature, end_time = model(input_var)
 
             # print(end_time)
 
@@ -932,7 +932,7 @@ def run_one_sample(test_loader,
 
             # Get the model outputs and RTs
             start =timer()
-            output, end_time = model(input_var)
+            output, feature, end_time = model(input_var)
 
             # print(end_time)
 

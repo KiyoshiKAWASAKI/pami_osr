@@ -345,26 +345,26 @@ class MSDNet(nn.Module):
         return ClassifierModule(conv, nIn, num_classes)
 
     # Only return both RT and prediction when testing with novel samples
-    if args.test_with_novel or args.train_k_plus_1:
-        def forward(self, x):
-            res = []
-            end_times = []
-            all_end_times = []
+    if args.test_with_novel or args.train_k_plus_1 or args.generate_feature:
+        # def forward(self, x):
+        #     res = []
+        #     end_times = []
+        #     all_end_times = []
+        #
+        #     for i in range(self.nBlocks):
+        #         x = self.blocks[i](x)
+        #         logit = self.classifier[i](x)
+        #         end = timer()
+        #
+        #         end_times.append(end)
+        #         res.append(logit)
+        #
+        #     all_end_times.append(end_times)
+        #
+        #     return res, all_end_times
 
-            for i in range(self.nBlocks):
-                x = self.blocks[i](x)
-                logit = self.classifier[i](x)
-                end = timer()
 
-                end_times.append(end)
-                res.append(logit)
-
-            all_end_times.append(end_times)
-
-            return res, all_end_times
-
-
-    if args.generate_feature:
+    # if args.generate_feature:
         def forward(self, x):
             res = []
             end_times = []

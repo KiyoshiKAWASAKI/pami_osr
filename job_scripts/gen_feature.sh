@@ -3,7 +3,7 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N feat_c
+#$ -N feat_ce
 
 # Required modules
 module load conda

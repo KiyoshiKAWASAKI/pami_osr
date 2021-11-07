@@ -235,10 +235,15 @@ def train_valid_one_epoch(known_loader,
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
 
-            output = model(input_var)
+            output, feature = model(input_var)
+
+            # print(output)
 
             if not isinstance(output, list):
                 output = [output]
+
+            # print(len(output))
+            # print(len(output[0][0]))
 
             for j in range(len(output)):
                 # Cross-entropy loss only

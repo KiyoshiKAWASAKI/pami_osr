@@ -2,8 +2,8 @@
 
 #$ -M jhuang24@nd.edu
 #$ -m abe
-#$ -q gpu@@crc_gpu -l gpu=1
-#$ -N pfm_1.5_seed_4
+#$ -q gpu -l gpu=1
+#$ -N pfm_1.0_exit_2.0_seed_4
 
 # Required modules
 module load conda
