@@ -10,6 +10,9 @@ import ast
 import pickle
 from json import JSONDecoder
 from collections import OrderedDict
+import itertools
+import random
+# import pandas as pd
 
 # dataset_v1_3_partition/train_valid:dataset_v1/known_classes/images/train
 # dataset_v1_3_partition/test:dataset_v1/known_classes/images/val (we did MTurk data collection on this)
@@ -17,6 +20,8 @@ from collections import OrderedDict
 
 # unknown_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/npy_json_files/unknown.npy"
 # known_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/npy_json_files/known.npy"
+unknown_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                  "derivatives/dataset_v1_3_partition/npy_json_files/unknown_rt_combined.npy"
 known_rt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
                 "derivatives/dataset_v1_3_partition/npy_json_files/0212_with_known/known_rt_processed.npy"
 
@@ -37,14 +42,18 @@ How to prepare the data:
 
 """
 
-# Paths for saving RT npy
-save_known_train_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
-                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files/known_rt_train.npy"
-save_known_valid_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
-                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files/known_rt_valid.npy"
+known_classes = [  4,   5,  10,  11,  55,  73,  91, 108, 114, 115,
+                133, 135, 141, 142, 144, 154, 155, 156, 162, 163,
+                164, 171, 172, 173, 202, 205, 206, 207, 236, 237,
+                238, 273, 274, 314, 315, 343, 386, 402, 403, 410]
 
+#################################################################################
+# Data directory
+#################################################################################
 # Data directories.
 # Reminder: Data was already switched when doing copy and paste
+
+# known known data
 known_known_with_rt_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data" \
                                      "/dataset_v1_3_partition/train_valid/known_known_with_rt"
 known_known_with_rt_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
@@ -54,75 +63,94 @@ known_known_without_rt_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch
 known_known_without_rt_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                                 "dataset_v1_3_partition/test/known_known_without_rt"
 
+# known unknown data
+known_unknown_with_rt_train_val_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                       "dataset_v1_3_partition/train_valid/known_unknown"
+known_unknown_without_rt_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                     "dataset_v1_3_partition/test/known_unknown"
+
+# unknown known (no RT and testing only)
+unknown_unknown_without_rt_test_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                                       "dataset_v1_3_partition/test/unknown_unknown"
+
+
+#################################################################################
+# Path for saving stuff
+#################################################################################
+# Paths for saving RT npy
+save_known_train_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
+                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_known_rt_train.npy"
+save_known_valid_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
+                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_known_rt_valid.npy"
+
+save_unknown_train_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
+                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_unknown_rt_train.npy"
+save_unknown_valid_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/" \
+                            "image_net/derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_unknown_rt_valid.npy"
+
+
+##################################################################################
 # Json save path
+# known known
 train_known_known_with_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                      "derivatives/dataset_v1_3_partition/npy_json_files/train_known_known_with_rt.json"
-valid_known_known_with_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                      "derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known_with_rt.json"
-test_known_known_with_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                     "derivatives/dataset_v1_3_partition/npy_json_files/test_known_known_with_rt.json"
-
+                                      "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/train_known_known_with_rt.json"
 train_known_known_without_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                         "derivatives/dataset_v1_3_partition/npy_json_files/train_known_known_without_rt.json"
+                                         "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/train_known_known_without_rt.json"
+
+valid_known_known_with_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                                      "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/valid_known_known_with_rt.json"
 valid_known_known_without_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                         "derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known_without_rt.json"
+                                         "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/valid_known_known_without_rt.json"
+
+test_known_known_with_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                                     "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_known_with_rt.json"
 test_known_known_without_rt_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                        "derivatives/dataset_v1_3_partition/npy_json_files/test_known_known_without_rt.json"
+                                        "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_known_without_rt.json"
 
+######################################################################
+# known unknown (training and validation have RTs, testing doesnt)
 train_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                "derivatives/dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+                                        "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/train_known_unknown.json"
+
 valid_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                                "derivatives/dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+                                        "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/valid_known_unknown.json"
 
-# train_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                                 "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
-# valid_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                                 "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
-# test_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                                "dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
-#
-# test_unknown_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                                  "dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
+test_known_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                                          "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_unknown.json"
 
+######################################################################
+# unknown unknown (No RT at all)
+test_unknown_unknown_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                                "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_unknown_unknown.json"
+
+
+######################################################################
 # TXT paths
 save_known_train_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                            "derivatives/dataset_v1_3_partition/npy_json_files/known_train_rt.txt"
+                            "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_train_rt.txt"
 save_known_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                            "derivatives/dataset_v1_3_partition/npy_json_files/known_valid_rt.txt"
+                            "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_valid_rt.txt"
 
-# save_unknown_train_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                             "dataset_v1_3_partition/npy_json_files/unknown_train_rt.txt"
-# save_unknown_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                             "dataset_v1_3_partition/npy_json_files/unknown_valid_rt.txt"
+save_unknown_train_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                            "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/unknown_train_rt.txt"
+save_unknown_valid_txt_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                            "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/unknown_valid_rt.txt"
 
+######################################################################
 # Combined Jsons
-save_training_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                          "derivatives/dataset_v1_3_partition/npy_json_files/train_known_known.json"
-save_valid_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                       "derivatives/dataset_v1_3_partition/npy_json_files/valid_known_known.json"
-
-save_test_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
-                          "derivatives/dataset_v1_3_partition/npy_json_files/test_known_known.json"
-# save_test_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-#                       "dataset_v1_3_partition/npy_json_files/test.json"
+train_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                              "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/train_known_known.json"
+valid_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                              "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/valid_known_known.json"
+test_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+                              "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_known.json"
 
 
-# Known classes that have RTs
-known_classes = [  4,   5,  10,  11,  55,  73,  91, 108, 114, 115,
-                133, 135, 141, 142, 144, 154, 155, 156, 162, 163,
-                164, 171, 172, 173, 202, 205, 206, 207, 236, 237,
-                238, 273, 274, 314, 315, 343, 386, 402, 403, 410]
-
-# Debug json save path
-# save_known_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/
-# object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_known_50.json"
-# save_unknown_debug_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/
-# object_recognition/image_net/derivatives/dataset_v1_3_partition/npy_json_files/debug_known_unknown_50.json"
-#
-
-
+#################################################################################
+# Functions
+#################################################################################
 def remove_outliers(instance_rt_path,
-                    rt_thresh=20.0):
+                    rt_thresh=28.0):
     """
 
     :param instance_rt_path:
@@ -150,6 +178,8 @@ def remove_outliers(instance_rt_path,
     new_img_numbers = np.delete(image_numbers,remove_index)
     new_rts = np.delete(rts, remove_index)
     print("There are %d entries after thresholding." % new_class_labels.shape)
+
+    # print("Number of classes:", np.unique(new_class_labels))
 
 
     return new_class_labels, new_img_numbers, new_rts
@@ -180,6 +210,7 @@ def make_data_dict(class_labels,
     print(class_index)
     print(class_counts)
 
+
     # Convert numpy input into list
     class_label_full_list = list(class_labels)
     image_name_list = list(image_names)
@@ -200,28 +231,35 @@ def make_data_dict(class_labels,
     # Split everything into training and validation first
     training_class_labels = []
     validation_class_labels = []
+
     training_img_names = []
     validation_img_names = []
+
     training_rts = []
     validation_rts = []
 
     count_train = 0
     count_valid = 0
 
+    # index_list = list(range(len(class_label_full_list)))
+    # random.shuffle(index_list)
+
+    print(len(class_label_full_list))
+    # sys.exit()
+
     for i in range(len(class_label_full_list)):
+    # for i in index_list:
         class_label = class_label_full_list[i]
         img_name = image_name_list[i]
         rt = rt_list[i]
-        print("Class: %s" % class_label)
+        # print("Class: %s" % class_label)
 
         # Find the counts first
         nb_training_sample = training_counts[list(class_label_list).index(class_label)]
         nb_validation_sample = validation_counts[list(class_label_list).index(class_label)]
-        print("%d training samples for this class." % nb_training_sample)
-        print("%d validation samples for this class." % nb_validation_sample)
 
         if (count_train != nb_training_sample) and (count_valid != nb_validation_sample):
-            print("CASE 1")
+            # print("CASE 1")
             training_class_labels.append(class_label)
             training_img_names.append(img_name)
             training_rts.append(rt)
@@ -229,7 +267,7 @@ def make_data_dict(class_labels,
             count_train += 1
 
         elif (count_train == nb_training_sample) and (count_valid != nb_validation_sample - 1):
-            print("CASE 2")
+            # print("CASE 2")
             validation_class_labels.append(class_label)
             validation_img_names.append(img_name)
             validation_rts.append(rt)
@@ -237,7 +275,11 @@ def make_data_dict(class_labels,
             count_valid += 1
 
         elif (count_train == nb_training_sample) and (count_valid == nb_validation_sample - 1):
-            print("CASE 3")
+            # print("CASE 3")
+            print("Class: %s" % class_label)
+            print("%d training samples for this class." % nb_training_sample)
+            print("%d validation samples for this class." % nb_validation_sample)
+
             count_train = 0
             count_valid = 0
 
@@ -284,7 +326,6 @@ def make_data_dict(class_labels,
 
 
 
-
 def process_npy(training_rt_dict_path,
                 valid_rt_dict_path,
                 save_train_txt_path,
@@ -327,6 +368,7 @@ def process_npy(training_rt_dict_path,
     training_class_label_img_np = np.asarray(training_class_label_img)
     training_class_label_img_set = list(set(training_class_label_img))
 
+    print("Processing training data")
     for one_img in training_class_label_img_set:
         rts = []
         indices = np.where(training_class_label_img_np == one_img)
@@ -344,9 +386,17 @@ def process_npy(training_rt_dict_path,
             else:
                 pass
 
-        rt_average = float(total_rt/rt_count)
+        try:
+            rt_average = float(total_rt/rt_count)
+            training_list.append([one_img, rt_average])
 
-        print("Processed one training entry: There are %d RTs for this image, avg RT %f." % (len(rts), rt_average))
+        except:
+            print("No valid RT for this image")
+            print(one_img)
+            continue
+
+
+        # print("Processed one training entry: There are %d RTs for this image, avg RT %f." % (len(rts), rt_average))
         training_list.append([one_img, rt_average])
 
 
@@ -359,6 +409,7 @@ def process_npy(training_rt_dict_path,
     valid_class_label_img_np = np.asarray(valid_class_label_img)
     valid_class_label_img_set = list(set(valid_class_label_img))
 
+    print("processing validation data")
     for one_img in valid_class_label_img_set:
         rts = []
         indices = np.where(valid_class_label_img_np == one_img)
@@ -376,10 +427,17 @@ def process_npy(training_rt_dict_path,
             else:
                 pass
 
-        rt_average = float(total_rt/rt_count)
+        try:
+            rt_average = float(total_rt/rt_count)
+            valid_list.append([one_img, rt_average])
+        except:
+            print("No valid RT for this image")
+            print(one_img)
+            continue
 
-        print("Processed one valid entry: There are %d RTs for this image, avg RT %f." % (len(rts), rt_average))
-        valid_list.append([one_img, rt_average])
+
+        # print("Processed one valid entry: There are %d RTs for this image, avg RT %f." % (len(rts), rt_average))
+        # valid_list.append([one_img, rt_average])
 
 
     # Save the data into files...
@@ -421,6 +479,7 @@ def gen_known_known_json(train_valid_known_known_dir,
     if gen_train_valid:
         for path, subdirs, files in os.walk(train_valid_known_known_dir):
             print("Processing folder: %s" % path)
+            print("Number of files", len(files))
 
             training_count = 0
             valid_count = 0
@@ -431,6 +490,8 @@ def gen_known_known_json(train_valid_known_known_dir,
                 nb_training = int(len(files) * training_ratio)
                 nb_valid = len(files) - nb_training
                 print("There are %d training samples and %d validation samples for this class" % (nb_training, nb_valid))
+
+                random.shuffle(files)
 
             for one_file_name in files:
                 full_path = os.path.join(path, one_file_name)
@@ -466,6 +527,8 @@ def gen_known_known_json(train_valid_known_known_dir,
 
             label += 1
 
+        print("LABEL", label)
+
         with open(save_train_path, 'w') as train_f:
             json.dump(train_known_known_dict, train_f)
             print("Saving file to %s" % save_train_path)
@@ -479,22 +542,27 @@ def gen_known_known_json(train_valid_known_known_dir,
         for path, subdirs, files in os.walk(test_known_known_dir):
             print("Processing folder: %s" % path)
 
-            for one_file_name in files:
-                full_path = os.path.join(path, one_file_name)
+            if len(files) == 0:
+                continue
 
-                one_file_dict = {}
-                key_list = ["img_path", "label", "RT", "category"]
-                for key in key_list:
-                    one_file_dict[key] = None
+            else:
 
-                one_file_dict["img_path"] = full_path
-                one_file_dict["label"] = label
-                one_file_dict["RT"] = None
-                one_file_dict["category"] = "known_known"
+                for one_file_name in files:
+                    full_path = os.path.join(path, one_file_name)
 
-                test_known_known_dict[len(test_known_known_dict)] = one_file_dict
+                    one_file_dict = {}
+                    key_list = ["img_path", "label", "RT", "category"]
+                    for key in key_list:
+                        one_file_dict[key] = None
 
-            label += 1
+                    one_file_dict["img_path"] = full_path
+                    one_file_dict["label"] = label
+                    one_file_dict["RT"] = None
+                    one_file_dict["category"] = "known_known"
+
+                    test_known_known_dict[len(test_known_known_dict)] = one_file_dict
+
+                label += 1
 
         # print(test_known_known_dict)
         with open(save_test_path, 'w') as test_f:
@@ -568,7 +636,7 @@ def gen_known_unknown_json(train_list_path,
             for key in key_list:
                 one_file_dict[key] = None
 
-            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, training_list[i][0])
+            one_file_dict["img_path"] = os.path.join(train_valid_known_unknown_dir, training_list[i][0])
             one_file_dict["label"] = label
             one_file_dict["RT"] = training_list[i][1]
             one_file_dict["category"] = "known_unknown"
@@ -583,7 +651,7 @@ def gen_known_unknown_json(train_list_path,
             for key in key_list:
                 one_file_dict[key] = None
 
-            one_file_dict["img_path"] = os.path.join(known_unknown_train_val_path, valid_list[i][0])
+            one_file_dict["img_path"] = os.path.join(train_valid_known_unknown_dir, valid_list[i][0])
             one_file_dict["label"] = label
             one_file_dict["RT"] = valid_list[i][1]
             one_file_dict["category"] = "known_unknown"
@@ -609,7 +677,7 @@ def gen_known_unknown_json(train_list_path,
                 valid_count = 0
 
             """
-            Check whether this class is in the 40 labels.
+            Check whether this class is in the 78 labels.
 
             If yes, calculate the number of entries, and decide the train/valid number
             If no, directly split into train and valid
@@ -631,7 +699,7 @@ def gen_known_unknown_json(train_list_path,
 
                 for one_file in files:
                     if one_file.split("/")[-1] in img_list:
-                        print("This image has RT, pass")
+                        # print("This image has RT, pass")
                         continue
                     else:
                         full_path = os.path.join(path, one_file)
@@ -816,7 +884,7 @@ def gen_known_known_rt_json(train_list_path,
     test_known_known_dict = {}
 
     full_label_list = []
-
+    full_valid_label_list = []
     # total_training_count = 0
     # total_valid_count = 0
     # total_test_count = 0
@@ -829,6 +897,18 @@ def gen_known_known_rt_json(train_list_path,
     label_list, label_counts = np.unique(np.asarray(full_label_list), return_counts=True)
     label_list = label_list.tolist()
     label_counts = label_counts.tolist()
+
+
+    for j in range(len(valid_list)):
+        one_label = valid_list[j][0].split("/")[0]
+        full_valid_label_list.append(one_label)
+
+    valid_label_list, valid_label_counts = np.unique(np.asarray(full_valid_label_list), return_counts=True)
+    valid_label_list = valid_label_list.tolist()
+    valid_label_counts = valid_label_counts.tolist()
+
+
+    # sys.exit()
 
 
     if gen_train_valid:
@@ -852,8 +932,33 @@ def gen_known_known_rt_json(train_list_path,
 
             train_known_known_dict[len(train_known_known_dict) + 1] = one_file_dict
 
+        ########################################################################
+        #
+        ########################################################################
+        label_class_pair = []
+        try:
+            for i in range(len(train_known_known_dict)):
+                class_num = train_known_known_dict[i]["img_path"].split("/")[-2]
+                one_pair = [train_known_known_dict[i]["label"],class_num]
+
+                if one_pair not in label_class_pair:
+                    label_class_pair.append(one_pair)
+        except:
+            for i in range(len(train_known_known_dict)):
+                class_num = train_known_known_dict[i + 1]["img_path"].split("/")[-2]
+                one_pair = [train_known_known_dict[i + 1]["label"], class_num]
+
+                if one_pair not in label_class_pair:
+                    label_class_pair.append(one_pair)
+
+        print(len(label_class_pair))
+
         # print(train_known_known_dict)
         # sys.exit()
+
+        ########################################################################
+        #
+        ########################################################################
 
         for i in range(len(valid_list)):
             one_file_dict = {}
@@ -861,7 +966,9 @@ def gen_known_known_rt_json(train_list_path,
             for key in key_list:
                 one_file_dict[key] = None
 
-            label = class_map[full_label_list[i]]
+            label = class_map[full_valid_label_list[i]]
+
+
 
             one_file_dict["img_path"] = os.path.join(train_valid_known_known_dir, valid_list[i][0])
             one_file_dict["label"] = label
@@ -869,6 +976,26 @@ def gen_known_known_rt_json(train_list_path,
             one_file_dict["category"] = "known_known"
 
             valid_known_known_dict[len(valid_known_known_dict) + 1] = one_file_dict
+
+        label_class_pair = []
+
+        try:
+            for i in range(len(valid_known_known_dict)):
+                class_num = valid_known_known_dict[i]["img_path"].split("/")[-2]
+                one_pair = [valid_known_known_dict[i]["label"],class_num]
+
+                if one_pair not in label_class_pair:
+                    label_class_pair.append(one_pair)
+        except:
+            for i in range(len(valid_known_known_dict)):
+                class_num = valid_known_known_dict[i + 1]["img_path"].split("/")[-2]
+                one_pair = [valid_known_known_dict[i + 1]["label"], class_num]
+
+                if one_pair not in label_class_pair:
+                    label_class_pair.append(one_pair)
+
+        print(len(label_class_pair))
+        # sys.exit()
 
         """
         For the whole directory:
@@ -989,6 +1116,8 @@ def gen_known_known_rt_json(train_list_path,
 
                 label = path.split("/")[-1]
 
+                label = class_map[label]
+
                 one_file_dict = {}
                 key_list = ["img_path", "label", "RT", "category"]
                 for key in key_list:
@@ -1004,6 +1133,8 @@ def gen_known_known_rt_json(train_list_path,
         with open(save_test_path, 'w') as test_f:
             json.dump(test_known_known_dict, test_f)
             print("Saving file to %s" % save_test_path)
+
+
 
 
 
@@ -1027,69 +1158,153 @@ def combine_json(train_known_known_with_rt_path,
     """
     customdecoder = JSONDecoder(object_pairs_hook=OrderedDict)
 
+    #######################################
     # Load all Json files
+    #######################################
     with open(train_known_known_with_rt_path) as train_known_known_with_rt:
         train_known_known_with_rt_json = json.load(train_known_known_with_rt)
     with open(train_known_known_without_rt_path) as train_known_known_without_rt:
         train_known_known_without_rt_json = json.load(train_known_known_without_rt)
-
-    # TODO: Check whether there is any missing keys in 2 training files
-    print("Checking train_known_known_with_rt_json")
-    print(len(train_known_known_with_rt_json))
-    print(len(train_known_known_without_rt_json))
-
-    for i in range(len(train_known_known_with_rt_json)):
-        try:
-            sample = train_known_known_with_rt_json[str(i+1)]
-        except Exception as e:
-            print(e)
-
-    print("Checking train_known_known_without_rt_json")
-    for i in range(len(train_known_known_without_rt_json)):
-        try:
-            sample = train_known_known_without_rt_json[str(i+1)]
-        except Exception as e:
-            print(e)
-
-    # sys.exit()
 
     with open(valid_known_known_with_rt_path) as valid_known_known_with_rt:
         valid_known_known_with_rt_json = json.load(valid_known_known_with_rt)
     with open(valid_known_known_without_rt_path) as valid_known_known_without_rt:
         valid_known_known_without_rt_json = json.load(valid_known_known_without_rt)
 
-    print(len(valid_known_known_with_rt_json))
-    print(len(valid_known_known_without_rt_json))
+    print("train_known_known_with_rt_json", len(train_known_known_with_rt_json))
+    print("train_known_known_without_rt_json", len(train_known_known_without_rt_json))
+    print("valid_known_known_with_rt_json", len(valid_known_known_with_rt_json))
+    print("valid_known_known_without_rt_json", len(valid_known_known_without_rt_json))
 
-
-
+    #######################################
+    # Check whether there is any missing keys in 2 training files
+    #######################################
+    print("*" * 60)
 
     # Merge Training Jsons
-    print("Training json before combining json has %d entries." % len(train_known_known_with_rt_json))
     for i in range(len(train_known_known_without_rt_json)):
         try:
+            # print(i)
             one_entry = train_known_known_without_rt_json[str(i+1)]
-            train_known_known_with_rt_json[len(train_known_known_with_rt_json) + i] = one_entry
+            train_known_known_with_rt_json[str(len(train_known_known_with_rt_json) + i + 1)] = one_entry
         except Exception as e:
             print(e)
             continue
 
-    print("Training json after combining json has %d entries." % len(train_known_known_with_rt_json))
+    print(len(train_known_known_with_rt_json.keys()))
+    print(len(train_known_known_with_rt_json.values()))
+
+    train_known_known_dict = {}
+
+    for i in range(len(train_known_known_with_rt_json.keys())):
+        one_entry = list(train_known_known_with_rt_json.values())[i]
+        train_known_known_dict[i] = one_entry
+
+    labels = []
+
+    for i in range(len(train_known_known_dict)):
+        try:
+            labels.append(train_known_known_dict[i]["label"])
+        except Exception as e:
+            print(e)
+            continue
+
+    print(np.unique(np.asarray(labels)))
 
     with open(save_training_json_path, 'w') as f:
-        json.dump(train_known_known_with_rt_json, f)
+        json.dump(train_known_known_dict, f)
         print("Saving file to %s" % save_training_json_path)
 
     # Merge valid Jsons
-    print("Valid json before combining json has %d entries." % len(valid_known_known_with_rt_json))
     for i in range(len(valid_known_known_without_rt_json)):
-        one_entry = valid_known_known_without_rt_json[str(i+1)]
-        valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
-    print("Valid json after combining json has %d entries." % len(valid_known_known_with_rt_json))
+        try:
+            one_entry = valid_known_known_without_rt_json[str(i+1)]
+            valid_known_known_with_rt_json[str(len(valid_known_known_with_rt_json) + i + 1)] = one_entry
+        except Exception as e:
+            print(e)
+            continue
+
+    print(len(valid_known_known_with_rt_json.keys()))
+    print(len(valid_known_known_with_rt_json.values()))
+
+    valid_known_known_dict = {}
+
+    for i in range(len(valid_known_known_with_rt_json.keys())):
+        one_entry = list(valid_known_known_with_rt_json.values())[i]
+        valid_known_known_dict[i] = one_entry
+
+    labels = []
+
+    for i in range(len(valid_known_known_dict)):
+        try:
+            labels.append(valid_known_known_dict[i]["label"])
+        except Exception as e:
+            print(e)
+            continue
+
+    print(np.unique(np.asarray(labels)))
 
     with open(save_valid_json_path, 'w') as f:
-        json.dump(valid_known_known_with_rt_json, f)
+        json.dump(valid_known_known_dict, f)
         print("Saving file to %s" % save_valid_json_path)
+
+
+
+
+    # for i in range(len(train_known_known_with_rt_json)):
+    #     print(train_known_known_with_rt_json[str(i+1)])
+    # print("Training json before combining json has %d entries." % len(train_known_known_with_rt_json))
+    # for i in range(len(train_known_known_without_rt_json)):
+    #     try:
+    #         one_entry = train_known_known_without_rt_json[str(i+1)]
+    #         print(one_entry)
+    #         sys.exit()
+    #         train_known_known_with_rt_json[len(train_known_known_with_rt_json) + i] = one_entry
+    #     except Exception as e:
+    #         print(e)
+    #         continue
+    #
+    # print("Training json after combining json has %d entries." % len(train_known_known_with_rt_json))
+    #
+    # with open(save_training_json_path, 'w') as f:
+    #     json.dump(train_known_known_with_rt_json, f)
+    #     print("Saving file to %s" % save_training_json_path)
+    #
+    # labels = []
+    #
+    # print(train_known_known_with_rt_json["0"])
+
+    # try:
+    #     for i in range(len(train_known_known_with_rt_json)):
+    #         labels.append(train_known_known_with_rt_json[i]["label"])
+    # except:
+    #     for i in range(len(train_known_known_with_rt_json)):
+    #         labels.append(train_known_known_with_rt_json[i+1]["label"])
+    #
+    # print(np.unique(np.asarray(labels)))
+    #
+    # print("*" * 40)
+    # # Merge valid Jsons
+    # print("Valid json before combining json has %d entries." % len(valid_known_known_with_rt_json))
+    # for i in range(len(valid_known_known_without_rt_json)):
+    #     one_entry = valid_known_known_without_rt_json[str(i+1)]
+    #     valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
+    # print("Valid json after combining json has %d entries." % len(valid_known_known_with_rt_json))
+    #
+    #
+    # try:
+    #     for i in range(len(valid_known_known_with_rt_json)):
+    #         labels.append(valid_known_known_with_rt_json[str(i)]["label"])
+    # except:
+    #     for i in range(len(valid_known_known_with_rt_json)):
+    #         labels.append(valid_known_known_with_rt_json[str(i+1)]["label"])
+    #
+    # print(np.unique(np.asarray(labels)))
+    #
+    #
+    # with open(save_valid_json_path, 'w') as f:
+    #     json.dump(valid_known_known_with_rt_json, f)
+    #     print("Saving file to %s" % save_valid_json_path)
 
 
 
@@ -1156,213 +1371,12 @@ def adjust_json_index(train_json_path,
 
 
 
-def group_json_with_rt(original_json_file_path,
-                       processed_json_rt_save_path,
-                       processed_json_no_rt_save_path,
-                       nb_samples_per_batch=16):
-    """
-
-    :param json_path:
-    :return:
-    """
-    print("*" * 40)
-
-    # Load the json file
-    with open(original_json_file_path) as f_train:
-        print(original_json_file_path)
-        original_json_file = json.load(f_train)
-
-    """
-    Sort the dictionaries according to RT:
-    
-    1. Save all the RTs in order into a list
-    2. Sort the Rts in this list and return the indices
-    3. Every nb_samples_per_batch, put them into a same batch
-    
-    P.S. There are some RTs that are None, and idk why. Just treat them as they dont have RT.
-    """
-    rt_list = []
-    rt_key_list = []
-    dict_without_rts = {}
-
-    # Index in original Json starts from "1"
-    for i in range(len(original_json_file)):
-        one_sample = original_json_file[str(i+1)]
-        one_rt = one_sample["RT"]
-
-        if one_rt != None:
-            rt_list.append(one_rt)
-            rt_key_list.append(i+1)
-        else:
-            dict_without_rts[str(len(dict_without_rts))] = one_sample
-
-    # 1. Sort the list and return indices
-    sorted_indices = sorted(range(len(rt_list)), key=lambda k: rt_list[k])
-    print(len(sorted_indices))
-    assert(len(sorted_indices)==len(rt_list))
-
-    # 2. Process the Json with Rts and cut the extra
-    dict_with_rts = {}
-
-    for one_index in sorted_indices:
-        # print("Index for an entry in the RT list: %d" % one_index)
-        # Find where this RT belongs to in the original Json string
-        index_in_json = rt_key_list[one_index]
-        # Get that dictionary in Json
-        one_dict = original_json_file[str(index_in_json)]
-        # Append this dict to the main dictionary
-        dict_with_rts[str(len(dict_with_rts))] = one_dict
-
-    # print(dict_with_rts) # This is correct
-    # print(dict_without_rts) # This is correct
-
-    # Reorganize the dicts with new index
-    dict_with_rts_organized = {}
-    dict_without_rts_organized = {}
-
-    for i in range(len(dict_with_rts)):
-        one_dict = dict_with_rts[str(i)]
-        dict_with_rts_organized[len(dict_with_rts_organized)] = one_dict
-    # print(dict_with_rts_organized) # index starts from 0, and is int not str
-
-    for i in range(len(dict_without_rts)):
-        one_dict = dict_without_rts[str(i)]
-        dict_without_rts_organized[len(dict_without_rts_organized)] = one_dict
-    # print(dict_without_rts_organized) # index starts from 0, and is int not str
-
-    # Calculate the nb of entries
-    nb_count_total = len(dict_with_rts_organized) - len(dict_with_rts_organized)%nb_samples_per_batch
-    print("Have %d samples originally" % len(dict_with_rts_organized))
-    print("Dropping %d samples" % (len(dict_with_rts_organized)%nb_samples_per_batch))
-    print("Total samples left %d" % nb_count_total)
-
-    # For each nb_sample, put them into one dictionary
-    rt_full_dict = {}
-    one_full_dict = {}
-    nb_count_per_batch = 0
-
-    for i in range(nb_count_total):
-        one_dict = dict_with_rts_organized[i]
-        one_full_dict[len(one_full_dict)] = one_dict
-        nb_count_per_batch += 1
-
-        if (nb_count_per_batch % nb_samples_per_batch==0):
-            rt_full_dict[len(rt_full_dict)] = one_full_dict
-            nb_count_per_batch = 0
-            one_full_dict = {}
-
-    print(len(rt_full_dict))
-
-    if (len(rt_full_dict) != 0):
-        with open(processed_json_rt_save_path, 'w') as f:
-            json.dump(rt_full_dict, f)
-            print("Saving file to %s" % processed_json_rt_save_path)
-
-    # Calculate the nb of entries and reorganize the dict that without RTs
-    nb_count_no_rt_total = len(dict_without_rts_organized) - len(dict_without_rts_organized) % nb_samples_per_batch
-    print("Have %d samples originally" % len(dict_without_rts_organized))
-    print("Dropping %d samples" % (len(dict_without_rts_organized) % nb_samples_per_batch))
-    print("Total samples left %d" % nb_count_no_rt_total)
-
-    no_rt_full_dict = {}
-    one_no_rt_full_dict = {}
-    nb_count_per_batch = 0
-
-    for i in range(nb_count_no_rt_total):
-        one_dict = dict_without_rts_organized[i]
-        one_no_rt_full_dict[len(one_no_rt_full_dict)] = one_dict
-        nb_count_per_batch += 1
-
-        if (nb_count_per_batch % nb_samples_per_batch == 0):
-            no_rt_full_dict[len(no_rt_full_dict)] = one_no_rt_full_dict
-            nb_count_per_batch = 0
-            one_no_rt_full_dict = {}
-
-    print(len(no_rt_full_dict))
-
-    if len(no_rt_full_dict) != 0:
-        with open(processed_json_no_rt_save_path, 'w') as f:
-            json.dump(no_rt_full_dict, f)
-            print("Saving file to %s" % processed_json_no_rt_save_path)
 
 
 
 
 if __name__ == '__main__':
-    """
-    Grouping the samples into bigger batches according the RTs
-    """
-    # Training data Json save paths
-    # tkk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                         "npy_json_files/rt_group_json/tkk_rt_rt_grouped.json"
-    # tkk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                       "npy_json_files/rt_group_json/tkk_rt_none_grouped.json"
-    # tkk_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                         "npy_json_files/rt_group_json/tkk_no_rt_grouped.json"
-    # tkuk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                         "npy_json_files/rt_group_json/tkuk_rt_rt_grouped.json"
-    # tkuk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                        "npy_json_files/rt_group_json/tkuk_rt_none_grouped.json"
 
-    # Validation data Json save paths
-    # vkk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                         "npy_json_files/rt_group_json/vkk_rt_rt_grouped.json"
-    # vkk_rt_none_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                       "npy_json_files/rt_group_json/vkk_rt_none_grouped.json"
-    # vkk_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                       "npy_json_files/rt_group_json/vkk_no_rt_grouped.json"
-    # vkuk_rt_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                         "npy_json_files/rt_group_json/vkuk_rt_rt_grouped.json"
-    # vkuk_rt_no_rt_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                             "npy_json_files/rt_group_json/vkuk_rt_none_grouped.json"
-
-    # Training data
-    # group_json_with_rt(original_json_file_path=train_known_known_with_rt_json_path,
-    #                    processed_json_rt_save_path=tkk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=tkk_rt_none_save_path)
-    #
-    # group_json_with_rt(original_json_file_path=train_known_known_without_rt_json_path,
-    #                    processed_json_rt_save_path=None,
-    #                    processed_json_no_rt_save_path=tkk_no_rt_save_path)
-    #
-    # group_json_with_rt(original_json_file_path=train_known_unknown_json_path,
-    #                    processed_json_rt_save_path=tkuk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=tkuk_rt_none_save_path)
-
-    # Validation data
-    # group_json_with_rt(original_json_file_path=valid_known_known_with_rt_json_path,
-    #                    processed_json_rt_save_path=vkk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=vkk_rt_none_save_path)
-    # group_json_with_rt(original_json_file_path=valid_known_known_without_rt_json_path,
-    #                    processed_json_rt_save_path=None,
-    #                    processed_json_no_rt_save_path=vkk_no_rt_save_path)
-    # group_json_with_rt(original_json_file_path=valid_known_unknown_json_path,
-    #                    processed_json_rt_save_path=vkuk_rt_rt_save_path,
-    #                    processed_json_no_rt_save_path=vkuk_rt_no_rt_save_path)
-
-    # Combine the train_known_known and valid_known_known
-    # group_train_known_known_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                     "npy_json_files/rt_group_json/train_known_known_grouped.json"
-    # group_valid_known_known_save_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
-    #                                     "npy_json_files/rt_group_json/valid_known_known_without_rt_grouped.json"
-    #
-    # # TODO: Wrong results here??
-    # combine_json(train_known_known_with_rt_path=group_train_known_known_rt_save_path,
-    #              train_known_known_without_rt_path=group_train_known_known_no_rt_save_path,
-    #              valid_known_known_with_rt_path=group_valid_known_known_rt_save_path,
-    #              valid_known_known_without_rt_path=group_valid_known_known_no_rt_save_path,
-    #              save_training_json_path=group_train_known_known_save_path,
-    #              save_valid_json_path=group_valid_known_known_save_path)
-    #
-    # adjust_json_index(train_json_path=group_train_known_known_save_path,
-    #                   valid_json_path=group_valid_known_known_save_path)
-
-
-
-
-    """
-    Data processing before April 2021
-    """
     # Process RT file with known and unknown respectively
     # known_class_labels, known_image_names, known_rts = remove_outliers(instance_rt_path=known_rt_path)
     # unknown_class_labels, unknown_image_names, unknown_rts = remove_outliers(instance_rt_path=unknown_rt_path)
@@ -1378,10 +1392,10 @@ if __name__ == '__main__':
     # make_data_dict(class_labels=unknown_class_labels,
     #                image_names=unknown_image_names,
     #                rts=unknown_rts,
-    #                category="unknown_known",
+    #                category="known_unknown",
     #                save_train_dict_path=save_unknown_train_npy_path,
     #                save_valid_dict_path=save_unknown_valid_npy_path)
-    #
+
     # Process known and unknown npy files
     # process_npy(training_rt_dict_path=save_known_train_npy_path,
     #             valid_rt_dict_path=save_known_valid_npy_path,
@@ -1392,7 +1406,7 @@ if __name__ == '__main__':
     #             valid_rt_dict_path=save_unknown_valid_npy_path,
     #             save_train_txt_path=save_unknown_train_txt_path,
     #             save_valid_txt_path=save_unknown_valid_txt_path)
-    #
+
     # Generate known_known json (the part without RT)
     # gen_known_known_json(train_valid_known_known_dir=known_known_without_rt_train_val_path,
     #                      test_known_known_dir=known_known_without_rt_test_path,
@@ -1402,7 +1416,7 @@ if __name__ == '__main__':
     #                      gen_train_valid=True,
     #                      gen_test=False,
     #                      training_ratio=0.8)
-    #
+
     # gen_known_known_json(train_valid_known_known_dir=known_known_without_rt_train_val_path,
     #                      test_known_known_dir=known_known_without_rt_test_path,
     #                      save_train_path=train_known_known_without_rt_json_path,
@@ -1412,11 +1426,11 @@ if __name__ == '__main__':
     #                      gen_test=True,
     #                      training_ratio=0.8)
 
-    # # Generate known_unknown json
+    # Generate known_unknown json
     # gen_known_unknown_json(train_list_path=save_unknown_train_txt_path,
     #                        valid_list_path=save_unknown_valid_txt_path,
-    #                        train_valid_known_unknown_dir=known_unknown_train_val_path,
-    #                        test_known_unknown_dir=known_unknown_test_path,
+    #                        train_valid_known_unknown_dir=known_unknown_with_rt_train_val_path,
+    #                        test_known_unknown_dir=known_unknown_without_rt_test_path,
     #                        save_train_path=train_known_unknown_json_path,
     #                        save_valid_path=valid_known_unknown_json_path,
     #                        save_test_path=test_known_unknown_json_path,
@@ -1427,8 +1441,8 @@ if __name__ == '__main__':
     #
     # gen_known_unknown_json(train_list_path=save_unknown_train_txt_path,
     #                        valid_list_path=save_unknown_valid_txt_path,
-    #                        train_valid_known_unknown_dir=known_unknown_train_val_path,
-    #                        test_known_unknown_dir=known_unknown_test_path,
+    #                        train_valid_known_unknown_dir=known_unknown_with_rt_train_val_path,
+    #                        test_known_unknown_dir=known_unknown_without_rt_test_path,
     #                        save_train_path=train_known_unknown_json_path,
     #                        save_valid_path=valid_known_unknown_json_path,
     #                        save_test_path=test_known_unknown_json_path,
@@ -1436,29 +1450,29 @@ if __name__ == '__main__':
     #                        gen_train_valid=False,
     #                        gen_test=True,
     #                        training_ratio=0.80)
-    #
-    # # Generate unknown_unknown for test
-    # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_test_path,
+
+    # Generate unknown_unknown for test
+    # gen_unknown_unknown(test_unknown_unknown_dir=unknown_unknown_without_rt_test_path,
     #                     save_test_path=test_unknown_unknown_json_path,
     #                     nb_known_classes=293)
 
     # Generate class label matching
-    # class_mapping = gen_class_label_map(known_classes_with_rt=known_classes,
-    #                                     nb_known_without_rt=253)
+    class_mapping = gen_class_label_map(known_classes_with_rt=known_classes,
+                                        nb_known_without_rt=253)
 
     # Generate known_known json (the part with RT)
-    # gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
-    #                         valid_list_path=save_known_valid_txt_path,
-    #                         train_valid_known_known_dir=known_known_with_rt_train_val_path,
-    #                         test_known_known_dir=known_known_with_rt_test_path,
-    #                         save_train_path=train_known_known_with_rt_json_path,
-    #                         save_valid_path=valid_known_known_with_rt_json_path,
-    #                         save_test_path=test_known_known_with_rt_json_path,
-    #                         class_map=class_mapping,
-    #                         nb_known_classes_without_rt=253,
-    #                         gen_train_valid=True,
-    #                         gen_test=False,
-    #                         training_ratio=0.80)
+    gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
+                            valid_list_path=save_known_valid_txt_path,
+                            train_valid_known_known_dir=known_known_with_rt_train_val_path,
+                            test_known_known_dir=known_known_with_rt_test_path,
+                            save_train_path=train_known_known_with_rt_json_path,
+                            save_valid_path=valid_known_known_with_rt_json_path,
+                            save_test_path=test_known_known_with_rt_json_path,
+                            class_map=class_mapping,
+                            nb_known_classes_without_rt=253,
+                            gen_train_valid=True,
+                            gen_test=False,
+                            training_ratio=0.80)
 
     # gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
     #                         valid_list_path=save_known_valid_txt_path,
@@ -1474,19 +1488,19 @@ if __name__ == '__main__':
     #                         training_ratio=0.80)
 
     # Combine Json files and adjust the indices
-    # combine_json(train_known_known_with_rt_path=test_known_known_with_rt_json_path,
-    #              train_known_known_without_rt_path=test_known_known_without_rt_json_path,
-    #              valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
-    #              valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
-    #              save_training_json_path=save_test_known_json_path,
-    #              save_valid_json_path=save_valid_json_path)
+    combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
+                 train_known_known_without_rt_path=train_known_known_without_rt_json_path,
+                 valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
+                 valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
+                 save_training_json_path=train_known_known_json_path,
+                 save_valid_json_path=valid_known_known_json_path)
 
     # Adjust json: known_known
-    adjust_json_index(train_json_path=save_training_json_path,
-                      valid_json_path=save_valid_json_path)
-
-    # Adjust json: known_unknown
-    adjust_json_index(train_json_path=train_known_unknown_json_path,
-                      valid_json_path=valid_known_unknown_json_path)
+    # adjust_json_index(train_json_path=train_known_known_json_path,
+    #                   valid_json_path=valid_known_known_json_path)
+    #
+    # # Adjust json: known_unknown
+    # adjust_json_index(train_json_path=train_known_unknown_json_path,
+    #                   valid_json_path=valid_known_unknown_json_path)
 
 

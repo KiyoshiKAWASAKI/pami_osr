@@ -16,6 +16,7 @@ import torch.nn as nn
 import models
 from datetime import datetime
 import math
+from tqdm import tqdm
 
 
 args = arg_parser.parse_args()
@@ -33,12 +34,12 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = True
-use_exit_loss = True
+use_performance_loss = False
+use_exit_loss = False
 thresh = 0.7
 cross_entropy_weight = 1.0
-perform_loss_weight = 1.0
-exit_loss_weight = 2.0
+perform_loss_weight = 0.0
+exit_loss_weight = 1.0
 random_seed = 4
 
 
@@ -57,22 +58,68 @@ use_addition = True
 ###################################################################
                     # Test process options #
 ###################################################################
-nb_itrs = 1000
+run_test = True
+get_train_valid_prob = False
 
-run_test = False
-get_train_valid_prob = True
+
+nb_itrs = 1000
 use_trained_weights = True
 run_one_sample = False
-save_one_sample_rt_folder = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/" \
-                            "models/0225/get_outliers/valid_known_unknown/pp_add"
 
-# Cross-entropy only
-# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_only/model_epoch_140.dat"
-# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_1.0_pfm_1.5/model_epoch_174.dat"
-test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-04-29/cross_entropy_1.0_pfm_1.0_exit_2.0/model_epoch_190.dat"
-# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/2021-05-02/cross_entropy_1.0_pfm_3.0_exit_2.0/model_epoch_121.dat"
+save_one_sample_rt_folder = None
 
-test_date = test_model_path.split("/")[-3]
+# TODO: Cross-entropy seed 0
+test_model_path = "/scratch365/jhuang24/sail-on/models/msd_net/2021-12-12/cross_entropy_only/seed_0/model_epoch_195.dat"
+npy_save_dir =  "/scratch365/jhuang24/sail-on/models/msd_net/2021-12-12/cross_entropy_only/seed_0/"
+
+# TODO: Cross-entropy seed 1
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_1/model_epoch_110.dat"
+# npy_save_dir =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_1/"
+
+# TODO: Cross-entropy seed 2
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_2/model_epoch_95.dat"
+# npy_save_dir =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_2/"
+
+# TODO: Cross-entropy seed 3
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_3/model_epoch_89.dat"
+# npy_save_dir =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_3/"
+
+# TODO: Cross-entropy seed 4
+# test_model_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_4/model_epoch_88.dat"
+# npy_save_dir =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                   "cvpr/2021-10-24/cross_entropy_only/seed_4/"
+
+# TODO: pfm1.0 seed 0
+
+
+# TODO: pfm1.0 seed 1
+
+
+# TODO: pfm1.0 seed 2
+
+
+# TODO: pfm1.0 seed 3
+
+# TODO: pfm1.0 seed 4
+
+# TODO: pfm1.0_exit1.0 seed 0
+
+# TODO: pfm1.0_exit1.0 seed 1
+
+# TODO: pfm1.0_exit1.0 seed 2
+
+# TODO: pfm1.0_exit1.0 seed 3
+
+# TODO: pfm1.0_exit1.0 seed 4
+
+test_date = test_model_path.split("/")[-4]
 
 
 ###################################################################
@@ -104,7 +151,7 @@ nb_itr = 30
 nb_clfs = 5
 img_size = 224
 nBlocks = 5
-nb_classes = 296
+nb_classes = 294
 rt_max = 28
 
 if debug:
@@ -121,12 +168,13 @@ else:
 if train_binary:
     nb_training_classes = 2
 else:
-    nb_training_classes = 296
+    nb_training_classes = 294
 
 
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
 unknown_exit_rt = [4.2550, 5.9220, 8.2368, 13.0090, 28.1661]
 
+# TODO: Need to update these thresholds
 known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
                     0.5123290032915468, 0.5468768758061252]
 unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
@@ -137,7 +185,7 @@ human_unknown_rt_max = 28
 machine_known_rt_max = 0.057930
 machine_unknown_rt_max = 0.071147
 
-# Data from pp_add
+# TODO: need to update these
 train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
 train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.071147]
 # valid_known_known_machine_rt_max = [0.024027, 0.049423, 0.055970, 0.061030, 0.063622]
@@ -147,7 +195,7 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 #########################################################################################
             # Define paths for saving model and data source #
 #########################################################################################
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr"
+save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
 if not run_test:
     save_path_with_date = save_path_base + "/" + date
 else:
@@ -193,14 +241,14 @@ if debug:
 else:
     if use_new_loader == False:
         train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                 "dataset_v1_3_partition/npy_json_files/train_known_known.json"
+                                 "dataset_v1_3_partition/npy_json_files_shuffled/train_known_known.json"
         train_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                   "dataset_v1_3_partition/npy_json_files/train_known_unknown.json"
+                                   "dataset_v1_3_partition/npy_json_files_shuffled/train_known_unknown.json"
 
         valid_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                 "dataset_v1_3_partition/npy_json_files/valid_known_known.json"
+                                 "dataset_v1_3_partition/npy_json_files_shuffled/valid_known_known.json"
         valid_known_unknown_path =  "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                    "dataset_v1_3_partition/npy_json_files/valid_known_unknown.json"
+                                    "dataset_v1_3_partition/npy_json_files_shuffled/valid_known_unknown.json"
     else:
         train_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/dataset_v1_3_partition/" \
                                  "npy_json_files/rt_group_json/train_known_known.json"
@@ -212,11 +260,11 @@ else:
                                  "npy_json_files/rt_group_json/valid_known_unknown.json"
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                            "dataset_v1_3_partition/npy_json_files/test_known_known_without_rt.json"
+                            "dataset_v1_3_partition/npy_json_files_shuffled/test_known_known_without_rt.json"
     test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                              "dataset_v1_3_partition/npy_json_files/test_known_unknown.json"
+                              "dataset_v1_3_partition/npy_json_files_shuffled/test_known_unknown.json"
     test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                                "dataset_v1_3_partition/npy_json_files/test_unknown_unknown.json"
+                                "dataset_v1_3_partition/npy_json_files_shuffled/test_unknown_unknown.json"
 
 
 #########################################################################################
@@ -301,7 +349,8 @@ def train_valid_one_epoch(known_loader,
 
     # Only train one batch for each step
     with open(save_txt_path, 'w') as f:
-        for i in range(nb_total_batches):
+        for i in tqdm(range(nb_total_batches)):
+        # for i in tqdm(range(5)):
             # print(i)
             ##########################################
             # Basic setups
@@ -495,7 +544,10 @@ def train_valid_one_epoch(known_loader,
                     ce_loss = criterion(output[j], target_var)
 
                     # Part 2: Performance psyphy loss
-                    perform_loss = get_perform_loss(rt=rts[j], rt_max=rt_max)
+                    try:
+                        perform_loss = get_perform_loss(rt=rts[j], rt_max=rt_max)
+                    except:
+                        perform_loss = 0.0
 
                     # Part 3: Exit psyphy loss
                     if use_exit_loss:
@@ -551,13 +603,13 @@ def train_valid_one_epoch(known_loader,
             end = time.time()
 
             if i % args.print_freq == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                              'Loss {loss.val:.4f}\t'
-                              'Acc@1 {top1.val:.4f}\t'
-                              'Acc@3 {top3.val:.4f}\t'
-                              'Acc@5 {top5.val:.4f}\n'.format(
-                    nb_epoch, i + 1, nb_total_batches,
-                    loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                # print('Epoch: [{0}][{1}/{2}]\t'
+                #               'Loss {loss.val:.4f}\t'
+                #               'Acc@1 {top1.val:.4f}\t'
+                #               'Acc@3 {top3.val:.4f}\t'
+                #               'Acc@5 {top5.val:.4f}\n'.format(
+                #     nb_epoch, i + 1, nb_total_batches,
+                #     loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
 
                 f.write('Epoch: [{0}][{1}/{2}]\t'
                               'Loss {loss.val:.4f}\t'
@@ -637,9 +689,11 @@ def train(model,
                 'valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5\n')
 
     # Train model
-    best_acc_top1 = 0.00
+    best_acc_top5 = 0.00
 
     for epoch in range(n_epochs):
+        print("*" * 60)
+        print("EPOCH:", epoch)
         if model_name == "msd_net":
             train_loss, train_acc_top1, \
             train_acc_top3, train_acc_top5 = train_valid_one_epoch(known_loader=train_known_known_loader,
@@ -668,9 +722,9 @@ def train(model,
 
         # Determine if model is the best
         if valid_loader:
-            if valid_acc_top1 > best_acc_top1:
-                best_acc_top1 = valid_acc_top1
-                print('New best top-1 accuracy: %.4f' % best_acc_top1)
+            if valid_acc_top5 > best_acc_top5:
+                best_acc_top5 = valid_acc_top5
+                print('New best top-5 validation accuracy: %.4f' % best_acc_top5)
             torch.save(model.state_dict(), save + "/model_epoch_" + str(epoch) + '.dat')
             torch.save(optimizer.state_dict(), save + "/optimizer_epoch_" + str(epoch) + '.dat')
         else:
@@ -707,31 +761,22 @@ def test_and_save_probs(test_loader,
     # Setup the paths for saving npy files
     if use_trained_weights:
         if get_train_valid_prob:
-            save_known_known_probs_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_original_label_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_known_rt_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_probs_path = npy_save_dir + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_original_label_path = npy_save_dir + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
+            save_known_known_rt_path = npy_save_dir + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
 
-            save_known_unknown_probs_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_original_label_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-            save_known_unknown_rt_path = save_path_with_date + "/" + save_path_sub + "/test/" + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_probs_path = npy_save_dir + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_original_label_path = npy_save_dir + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+            save_known_unknown_rt_path = npy_save_dir + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
 
         else:
-            save_prob_base_path = save_path_with_date + "/" + save_path_sub + "/test"
+            save_prob_base_path = npy_save_dir + "test"
 
             if not os.path.exists(save_prob_base_path):
                 print("Creating the directory %s" % save_prob_base_path)
                 os.mkdir(save_prob_base_path)
 
     else:
-        # Test the model with random initialized weights
-        # Test: train_known_known, train_known_unknown
-        # save_known_known_probs_path = save_path_base + "/" + save_path_sub + "/test/known_known_prob_rand_" + str(test_itr_index) + ".npy"
-        # save_known_known_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_known_labels_rand_" + str(test_itr_index) + ".npy"
-        # save_known_known_rt_path = save_path_base + "/" + save_path_sub + "/test/known_known_rts_rand_" + str(test_itr_index) + ".npy"
-        #
-        # save_known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_rand_" + str(test_itr_index) + ".npy"  # save_known_unknown_targets_path = save_path_base + "/" + save_path_sub + "/test/known_unknown/targets_epoch_" + str(epoch_index) + ".npy"
-        # save_known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_rand_" + str(test_itr_index) + ".npy"
-        # save_known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_rand_" + str(test_itr_index) + ".npy"
         pass
 
     # Set the model to evaluation mode
@@ -753,7 +798,10 @@ def test_and_save_probs(test_loader,
 
         for i in range(len(test_loader)):
         # for i in range(5):
-            batch = next(iter(test_loader))
+            try:
+                batch = next(iter(test_loader))
+            except:
+                continue
 
             input = batch["imgs"]
             target = batch["labels"] - 1
@@ -801,6 +849,7 @@ def test_and_save_probs(test_loader,
         full_rt_list_np = np.array(full_rt_list)
 
         if use_trained_weights:
+            # Getting training and validation results
             if get_train_valid_prob:
                 if test_type == "known_known":
                     print("Saving probabilities to %s" % save_known_known_probs_path)
@@ -817,7 +866,7 @@ def test_and_save_probs(test_loader,
                     np.save(save_known_unknown_original_label_path, full_original_label_list_np)
                     print("Saving RTs to %s" % save_known_unknown_rt_path)
                     np.save(save_known_unknown_rt_path, full_rt_list_np)
-
+            # Getting testing probs
             else:
                 if test_type == "known_known":
                     save_known_known_probs_path = save_prob_base_path + "/known_known_probs_epoch_" + str(epoch_index) + ".npy"
@@ -856,21 +905,22 @@ def test_and_save_probs(test_loader,
                     np.save(save_unknown_unknown_rt_path, full_rt_list_np)
 
         else:
-            if test_type == "known_known":
-                print("Saving probabilities to %s" % save_known_known_probs_path)
-                np.save(save_known_known_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_known_original_label_path)
-                np.save(save_known_known_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_known_rt_path)
-                np.save(save_known_known_rt_path, full_rt_list_np)
-
-            elif test_type == "known_unknown":
-                print("Saving probabilities to %s" % save_known_unknown_probs_path)
-                np.save(save_known_unknown_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_unknown_original_label_path)
-                np.save(save_known_unknown_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_unknown_rt_path)
-                np.save(save_known_unknown_rt_path, full_rt_list_np)
+            pass
+            # if test_type == "known_known":
+            #     print("Saving probabilities to %s" % save_known_known_probs_path)
+            #     np.save(save_known_known_probs_path, full_prob_list_np)
+            #     print("Saving original labels to %s" % save_known_known_original_label_path)
+            #     np.save(save_known_known_original_label_path, full_original_label_list_np)
+            #     print("Saving RTs to %s" % save_known_known_rt_path)
+            #     np.save(save_known_known_rt_path, full_rt_list_np)
+            #
+            # elif test_type == "known_unknown":
+            #     print("Saving probabilities to %s" % save_known_unknown_probs_path)
+            #     np.save(save_known_unknown_probs_path, full_prob_list_np)
+            #     print("Saving original labels to %s" % save_known_unknown_original_label_path)
+            #     np.save(save_known_unknown_original_label_path, full_original_label_list_np)
+            #     print("Saving RTs to %s" % save_known_unknown_rt_path)
+            #     np.save(save_known_unknown_rt_path, full_rt_list_np)
 
 
 
@@ -1189,12 +1239,12 @@ def demo(depth=100,
 
             if get_train_valid_prob:
                 print("Testing the training known_known samples...")
-                test_and_save_probs(test_loader=train_known_known_loader,
-                                    model=model,
-                                    test_type="known_known",
-                                    use_msd_net=True,
-                                    epoch_index=index,
-                                    data_type="train")
+                # test_and_save_probs(test_loader=train_known_known_loader,
+                #                     model=model,
+                #                     test_type="known_known",
+                #                     use_msd_net=True,
+                #                     epoch_index=index,
+                #                     data_type="train")
 
                 print("Testing the training known_unknown samples...")
                 test_and_save_probs(test_loader=train_known_unknown_loader,
@@ -1244,120 +1294,6 @@ def demo(depth=100,
                                     test_type="unknown_unknown",
                                     use_msd_net=True,
                                     epoch_index=index)
-
-            if run_one_sample:
-                pass
-                # if use_trained_weights:
-                #     model.load_state_dict(torch.load(test_model_path))
-                #
-                #     print("Loading MSD-Net model: %s" % test_model_path)
-                #
-                # for i in range(nb_itrs):
-                #     run_one_sample(test_loader=valid_known_unknown_loader,
-                #                    save_folder=save_one_sample_rt_folder,
-                #                    model=model,
-                #                    use_msd_net=True,
-                #                    test_itr_index=i)
-
-
-
-
-            else:
-                if use_trained_weights:
-                    # model.load_state_dict(torch.load(test_model_path))
-                    # print("Loading MSD-Net model: %s" % test_model_path)
-                    #
-                    # # Get the epoch index
-                    # index = test_model_path.split("/")[-1].split(".")[0].split("_")[-1]
-
-                    if get_train_valid_prob:
-                        pass
-                        # Getting prob for training and validation set
-                        # print("Testing the training known_known samples...")
-                        # test_and_save_probs(test_loader=train_known_known_loader,
-                        #                     model=model,
-                        #                     test_type="known_known",
-                        #                     use_msd_net=True,
-                        #                     epoch_index=index,
-                        #                     data_type="train")
-                        #
-                        # print("Testing the training known_unknown samples...")
-                        # test_and_save_probs(test_loader=train_known_unknown_loader,
-                        #                     model=model,
-                        #                     test_type="known_unknown",
-                        #                     use_msd_net=True,
-                        #                     epoch_index=index,
-                        #                     data_type="train")
-                        #
-                        # print("Testing the validation known_known samples...")
-                        # test_and_save_probs(test_loader=valid_known_known_loader,
-                        #                     model=model,
-                        #                     test_type="known_known",
-                        #                     use_msd_net=True,
-                        #                     epoch_index=index,
-                        #                     data_type="valid")
-                        #
-                        # print("Testing the validation known_known samples...")
-                        # test_and_save_probs(test_loader=valid_known_unknown_loader,
-                        #                     model=model,
-                        #                     test_type="known_unknown",
-                        #                     use_msd_net=True,
-                        #                     epoch_index=index,
-                        #                     data_type="valid")
-
-                    else:
-                        pass
-                        # print("Testing the trained models")
-                        #
-                        # print("Testing the known_known samples...")
-                        # test_and_save_probs(test_loader=test_known_known_loader,
-                        #                       model=model,
-                        #                       test_type="known_known",
-                        #                       use_msd_net=True,
-                        #                       epoch_index=index)
-                        #
-                        # print("Testing the known_unknown samples...")
-                        # test_and_save_probs(test_loader=test_known_unknown_loader,
-                        #                     model=model,
-                        #                     test_type="known_unknown",
-                        #                     use_msd_net=True,
-                        #                     epoch_index=index)
-                        #
-                        # print("testing the unknown samples...")
-                        # test_and_save_probs(test_loader=test_unknown_unknown_loader,
-                        #                       model=model,
-                        #                       test_type="unknown_unknown",
-                        #                       use_msd_net=True,
-                        #                       epoch_index=index)
-
-                else:
-                    pass
-                    # for i in range(nb_itr):
-                    #     print("Iteration: %d" % i)
-                    #
-                    #     print("Initializing the model.")
-                    #     model = getattr(models, args.arch)(args)
-                    #
-                    #     print("Testing the train known_known samples...")
-                    #     test_and_save_probs(test_loader=train_known_known_loader,
-                    #                         model=model,
-                    #                         test_type="known_known",
-                    #                         use_msd_net=True,
-                    #                         epoch_index=index,
-                    #                         test_itr_index=i)
-                    #
-                    #     print("Testing the known_unknown samples...")
-                    #     test_and_save_probs(test_loader=train_known_unknown_loader,
-                    #                         model=model,
-                    #                         test_type="known_unknown",
-                    #                         use_msd_net=True,
-                    #                         epoch_index=index,
-                    #                         test_itr_index=i)
-
-
-
-
-
 
         else:
             """

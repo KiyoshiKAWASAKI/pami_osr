@@ -13,33 +13,83 @@ import statistics
 
 
 test_binary = False
-model_type = "pp_full" # original/pp_add/pp_full
+model_type = "original" # original/pp_add/pp_full
 
 # test_epoch_list = [140] # for cross entropy
 # test_epoch_list = [174] # for ce + pfm
 # test_epoch_list = [190] # for ce + pfm + exit
-test_epoch_list = [121]
+# test_epoch_list = [121]
 
 # This is the path that needs to be changed
 # save_path_sub = "2021-04-29/cross_entropy_only" # Cross entropy
 # save_path_sub = "2021-04-29/cross_entropy_1.0_pfm_1.5" # CE + pfm
 # save_path_sub = "2021-04-29/cross_entropy_1.0_pfm_1.0_exit_2.0" # ce + pfm + exit
-save_path_sub = "2021-05-02/cross_entropy_1.0_pfm_3.0_exit_2.0"
+# save_path_sub = "2021-05-02/cross_entropy_1.0_pfm_3.0_exit_2.0"
+
+
+# CE seed 0
+# test_epoch_list = [167]
+# save_path_sub = "/cvpr/2021-10-24/cross_entropy_only/seed_0"
+
+# CE seed 0
+# test_epoch_list = [110]
+# test_epoch_list = [110]
+# save_path_sub = "/cvpr/2021-10-24/cross_entropy_only/seed_1"
+test_epoch_list = [195]
+save_path_sub = "2021-12-12/cross_entropy_only/seed_0"
+
+# CE seed 0
+# test_epoch_list = [95]
+# save_path_sub = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr/2021-10-24/cross_entropy_only/seed_2"
+
+# CE seed 0
+# test_epoch_list = [89]
+# save_path_sub = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr/2021-10-24/cross_entropy_only/seed_3"
+
+# CE seed 0
+# test_epoch_list = [88]
+# save_path_sub = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr/2021-10-24/cross_entropy_only/seed_4"
+
+# pfm1.0
+# test_epoch_list = [149]
+# save_path_sub = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_0"
+
+
 
 ##############################################################################################
 # Normally, no need to change these paths
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
-nb_training_classes = 296
+# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models"
+save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
+
+nb_training_classes = 294
 
 # NPY files paths
-original_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/original/test/valid_known_known_prob_epoch_141.npy"
-original_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/original/test/valid_known_unknown_probs_epoch_141.npy"
+# original_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                       "0225/original/test/valid_known_known_prob_epoch_141.npy"
+# original_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                         "0225/original/test/valid_known_unknown_probs_epoch_141.npy"
+#
+# pp_mul_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                     "0225/pp_loss/test/valid_known_known_prob_epoch_168.npy"
+# pp_mul_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                       "0225/pp_loss/test/valid_known_unknown_probs_epoch_168.npy"
+#
+# pp_add_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                     "0225/pp_loss_add/test/valid_known_known_prob_epoch_111.npy"
+# pp_add_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+#                                       "0225/pp_loss_add/test/valid_known_unknown_probs_epoch_111.npy"
 
-# pp_mul_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_known_prob_epoch_168.npy"
-# pp_mul_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss/test/valid_known_unknown_probs_epoch_168.npy"
+original_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+                                      "cvpr/2021-10-24/cross_entropy_only/seed_0/valid_known_known_prob_epoch_167.npy"
+original_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/" \
+                                        "cvpr/2021-10-24/cross_entropy_only/seed_0/valid_known_unknown_probs_epoch_167.npy"
 
-pp_add_valid_known_known_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss_add/test/valid_known_known_prob_epoch_111.npy"
-pp_add_valid_known_unknown_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/0225/pp_loss_add/test/valid_known_unknown_probs_epoch_111.npy"
+pp_mul_valid_known_known_npy_path = ""
+pp_mul_valid_known_unknown_npy_path = ""
+
+pp_add_valid_known_known_npy_path = ""
+pp_add_valid_known_unknown_npy_path = ""
 
 
 def get_known_exit_stats(original_labels,
@@ -69,6 +119,7 @@ def get_known_exit_stats(original_labels,
     exit_count = [0] * nb_clfs
 
     for i in range(len(original_labels)):
+        # print("*" * 30)
         # Loop thru each sample
         original_label = original_labels[i]
 
@@ -80,11 +131,18 @@ def get_known_exit_stats(original_labels,
         prob = probs[i]
         rt = rts[i]
 
+        # print(target_label)
+
+
         # check each classifier in order and decide when to exit
         for j in range(nb_clfs):
             one_prob = prob[j]
             pred = np.argmax(one_prob)
             max_prob = np.sort(one_prob)[-1]
+
+            # print("prob", one_prob)
+
+            # print(pred)
 
             # If this is not the last classifier
             if j != nb_clfs - 1:
@@ -97,9 +155,12 @@ def get_known_exit_stats(original_labels,
                     # whether the pred label is correct or wrong
                     known_as_known_count += 1
 
-                    if pred == target_label:
+                    if pred == target_label + 1:
                         nb_correct += 1
                     else:
+                        # print("pred", pred)
+                        # print("targte", target_label)
+
                         nb_wrong += 1
 
                     # Record the RT for this sample
@@ -137,8 +198,8 @@ def get_known_exit_stats(original_labels,
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
     print("Total number of samples: %d" % len(original_labels))
-    print("Known predicted as known: %d" % known_as_known_count)
-    print("Known predicted as unknown: %d" % known_as_unknown_count)
+    print("Known as known: %f" % (float(known_as_known_count)/float(len(original_labels))))
+    print("Known as unknown: %f" % (float(known_as_unknown_count)/float(len(original_labels))))
     print("Number of right prediction: %d" % nb_correct)
     print("Number of wrong prediction: %d" % nb_wrong)
     print("Accuracy: %4f" % acc)
@@ -550,17 +611,19 @@ def get_thresholds(npy_file_path):
     # thresh_3 = statistics.median(prob_clf_3)
     # thresh_4 = statistics.median(prob_clf_4)
 
-    thresh_0 = statistics.mean(prob_clf_0)
-    thresh_1 = statistics.mean(prob_clf_1)
-    thresh_2 = statistics.mean(prob_clf_2)
-    thresh_3 = statistics.mean(prob_clf_3)
-    thresh_4 = statistics.mean(prob_clf_4)
+    # thresh_0 = statistics.mean(prob_clf_0)
+    # thresh_1 = statistics.mean(prob_clf_1)
+    # thresh_2 = statistics.mean(prob_clf_2)
+    # thresh_3 = statistics.mean(prob_clf_3)
+    # thresh_4 = statistics.mean(prob_clf_4)
 
-    # thresh_0 = np.percentile(np.asarray(prob_clf_0), 10)
-    # thresh_1 = np.percentile(np.asarray(prob_clf_1), 10)
-    # thresh_2 = np.percentile(np.asarray(prob_clf_2), 10)
-    # thresh_3 = np.percentile(np.asarray(prob_clf_3), 10)
-    # thresh_4 = np.percentile(np.asarray(prob_clf_4), 10)
+    thresh_0 = np.percentile(np.asarray(prob_clf_0), 75)
+    thresh_1 = np.percentile(np.asarray(prob_clf_1), 75)
+    thresh_2 = np.percentile(np.asarray(prob_clf_2), 75)
+    thresh_3 = np.percentile(np.asarray(prob_clf_3), 75)
+    thresh_4 = np.percentile(np.asarray(prob_clf_4), 75)
+
+
 
     return [thresh_0, thresh_1, thresh_2, thresh_3, thresh_4]
 
@@ -584,23 +647,25 @@ if __name__ == '__main__':
         known_known_probs = np.load(known_known_probs_path)
         known_known_rts = np.load(known_known_rt_path)
 
-        # Known_unknown
-        known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-        known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-        known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+        print(np.unique(known_known_original_labels))
 
-        known_unknown_original_labels = np.load(known_unknown_original_label_path)
-        known_unknown_probs = np.load(known_unknown_probs_path)
-        known_unknown_rts = np.load(known_unknown_rt_path)
+        # Known_unknown
+        # known_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+        # known_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+        # known_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+        #
+        # known_unknown_original_labels = np.load(known_unknown_original_label_path)
+        # known_unknown_probs = np.load(known_unknown_probs_path)
+        # known_unknown_rts = np.load(known_unknown_rt_path)
 
         # unknown_unknown
-        unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-        unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-        unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_rts_epoch_" + str(epoch_index) + ".npy"
-
-        unknown_unknown_original_labels = np.load(unknown_unknown_original_label_path)
-        unknown_unknown_probs = np.load(unknown_unknown_probs_path)
-        unknown_unknown_rts = np.load(unknown_unknown_rt_path)
+        # unknown_unknown_probs_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+        # unknown_unknown_original_label_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+        # unknown_unknown_rt_path = save_path_base + "/" + save_path_sub + "/test/unknown_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+        #
+        # unknown_unknown_original_labels = np.load(unknown_unknown_original_label_path)
+        # unknown_unknown_probs = np.load(unknown_unknown_probs_path)
+        # unknown_unknown_rts = np.load(unknown_unknown_rt_path)
 
 
         ################################################################
@@ -613,17 +678,23 @@ if __name__ == '__main__':
 
         elif model_type == "pp_add":
             print("Getting thrshold for pp_add")
-            known_known_thresh = get_thresholds(npy_file_path=pp_add_valid_known_known_npy_path)
-            known_unknown_thresh = get_thresholds(npy_file_path=pp_add_valid_known_unknown_npy_path)
+            pass
+            # known_known_thresh = get_thresholds(npy_file_path=pp_add_valid_known_known_npy_path)
+            # known_unknown_thresh = get_thresholds(npy_file_path=pp_add_valid_known_unknown_npy_path)
 
         elif model_type == "pp_full":
             print("Getting thrshold for pp_full")
-            known_known_thresh = get_thresholds(npy_file_path=pp_full_valid_known_known_npy_path)
-            known_unknown_thresh = get_thresholds(npy_file_path=pp_full_valid_known_unknown_npy_path)
+            pass
+            # known_known_thresh = get_thresholds(npy_file_path=pp_full_valid_known_known_npy_path)
+            # known_unknown_thresh = get_thresholds(npy_file_path=pp_full_valid_known_unknown_npy_path)
 
         else:
             print("Something is wrong")
 
+        # known_known_thresh = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
+        #                     0.5123290032915468, 0.5468768758061252]
+        # known_unknown_thresh = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
+        #                       0.42355671497950664, 0.4600701578332428]
 
         print("known thresholds")
         print(known_known_thresh)
@@ -663,18 +734,18 @@ if __name__ == '__main__':
             print("@" * 40)
 
             # known_unknown
-            print("Processing known_unknown samples")
-            get_unknown_exit_stats(original_labels=known_unknown_original_labels,
-                                   probs=known_unknown_probs,
-                                   rts=known_unknown_rts,
-                                   top_1_threshold=known_unknown_thresh)
-            print("@" * 40)
-
-            # unknown_unknown
-            print("Processing unknown_unknown samples")
-            get_unknown_exit_stats(original_labels=unknown_unknown_original_labels,
-                                   probs=unknown_unknown_probs,
-                                   rts=unknown_unknown_rts,
-                                   top_1_threshold=known_unknown_thresh)
+            # print("Processing known_unknown samples")
+            # get_unknown_exit_stats(original_labels=known_unknown_original_labels,
+            #                        probs=known_unknown_probs,
+            #                        rts=known_unknown_rts,
+            #                        top_1_threshold=known_unknown_thresh)
+            # print("@" * 40)
+            #
+            # # unknown_unknown
+            # print("Processing unknown_unknown samples")
+            # get_unknown_exit_stats(original_labels=unknown_unknown_original_labels,
+            #                        probs=unknown_unknown_probs,
+            #                        rts=unknown_unknown_rts,
+            #                        top_1_threshold=known_unknown_thresh)
 
 

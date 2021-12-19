@@ -3,6 +3,7 @@
 
 import os
 import time
+import timeit
 import torch
 from torchvision import datasets, transforms
 from models import efficient_dense_net
@@ -14,6 +15,7 @@ from utils.customized_dataloader import msd_net_dataset, msd_net_with_grouped_rt
 import sys
 import warnings
 import torchvision
+from tqdm import tqdm
 
 warnings.filterwarnings("ignore")
 import random
@@ -33,20 +35,103 @@ args.bnFactor = list(map(int, args.bnFactor.split('-')))
 args.nScales = len(args.grFactor)
 
 date = datetime.today().strftime('%Y-%m-%d')
-model_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/"
+# model_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/"
+model_path_base = "/scratch365/jhuang24/sail-on/models/"
 
 ###################################################################
 # Change these for each model
 ###################################################################
 model_name = "msd_net"
+
+# TODO: All the cross entropy models
+# feat_ce
 # model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_0/"
 # model_used = "model_epoch_167.dat"
 
-model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_0/"
-model_used = "model_epoch_149.dat"
+# feat_ce_s1
+# model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_1/"
+# model_used = "model_epoch_110.dat"
 
+# feat_ce_s2
+# model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_2/"
+# model_used = "model_epoch_95.dat"
+
+# feat_01
+# model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_3/"
+# model_used = "model_epoch_89.dat"
+
+# feat_02
+# model_dir = "cvpr/2021-10-24/cross_entropy_only/seed_4/"
+# model_used = "model_epoch_88.dat"
+
+# pfm_1.0
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_0/"
+# model_used = "model_epoch_149.dat"
+
+# feat_03
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_1/"
+# model_used = "model_epoch_179.dat"
+
+# feat_04
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_2/"
+# model_used = "model_epoch_100.dat"
+
+
+# feat_04_2
+# model_dir = "/msd_net/2021-11-11/cross_entropy_1.0_pfm_1.0/seed_3/"
+# model_used = "model_epoch_91.dat"
+
+# feat_05
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0/seed_4/"
+# model_used = "model_epoch_154.dat"
+
+# TODO: pfm_1.5
+# feat_06
+# model_dir = "cvpr/2021-11-01/cross_entropy_1.0_pfm_1.5/seed_4/"
+# model_used = "model_epoch_188.dat"
+
+
+# TODO: pfm_1.0_exit_1.0
 # model_dir = "cvpr/2021-10-31/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_0/"
 # model_used = "model_epoch_151.dat"
+
+# feat_07
+# model_dir = "cvpr/2021-10-31/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_3/"
+# model_used = "model_epoch_170.dat"
+
+# TODO: pfm_1.0_exit_3.0
+# feat_08
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0_exit_3.0/seed_0/"
+# model_used = "model_epoch_122.dat"
+
+# feat_09
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0_exit_3.0/seed_1/"
+# model_used = "model_epoch_108.dat"
+
+# feat_10
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0_exit_3.0/seed_2/"
+# model_used = "model_epoch_97.dat"
+
+# feat_11
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0_exit_3.0/seed_3/"
+# model_used = "model_epoch_148.dat"
+
+# feat_12
+# model_dir = "cvpr/2021-10-27/cross_entropy_1.0_pfm_1.0_exit_3.0/seed_4/"
+# model_used = "model_epoch_124.dat"
+
+# feat_13
+# model_dir = "msd_net/2021-11-11/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_1/"
+# model_used = "model_epoch_199.dat"
+
+# feat_14
+model_dir = "msd_net/2021-11-11/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_2/"
+model_used = "model_epoch_168.dat"
+
+# feat_15
+# model_dir = "msd_net/2021-11-23/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4/"
+# model_used = "model_epoch_189.dat"
+
 
 # model_name = "resnet_50"
 # model_dir = "cvpr_resnet/2021-10-24/resnet_50_seed_0/"
@@ -110,9 +195,12 @@ def gen_feature(loader,
     full_feature_list = []
 
 
-    for i in range(len(loader)):
-        batch = next(iter(loader))
+    print("Total number of samples:", len(loader))
 
+    for i in tqdm(range(len(loader))):
+        start = time.time()
+
+        batch = next(iter(loader))
         input = batch["imgs"]
 
         if (data_category == "train_known_unknown") or (data_category == "test_known_unknown"):
@@ -123,9 +211,10 @@ def gen_feature(loader,
         input = input.cuda()
         target = target.cuda(async=True)
 
-        # Save original labels to the list
+        # Just use np array for label
+        full_feature_list = []
         original_label_list = np.array(target.cpu().tolist())
-        # print(original_label_list)
+
 
         try:
             for label in original_label_list:
@@ -137,12 +226,16 @@ def gen_feature(loader,
 
         # Get the features from model
         if model_name == "msd_net":
-            print("Generating feature for MSD-Net.")
+            # print("Generating feature for MSD-Net.")
             output, feature, end_time = model(input_var)
 
             feature = feature[0][0].cpu().detach().numpy()
-            print(feature.shape)
+            # print(feature.shape)
             feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
+
+            for one_feature in feature.tolist():
+                full_feature_list.append(one_feature)
+
 
 
         elif model_name == "resnet_50":
@@ -153,28 +246,32 @@ def gen_feature(loader,
             feature = feature.cpu().detach().numpy()
             feature = np.reshape(feature, (1, feature.shape[1] * feature.shape[2] * feature.shape[3]))
 
+            for one_feature in feature.tolist():
+                full_feature_list.append(one_feature)
+
         # TODO: Add other resnet arch
         else:
             pass
 
 
+        # if i == 0:
+        #     full_feature_list = feature
+        # else:
+        #     full_feature_list = np.concatenate((full_feature_list, feature), axis=0)
 
-        if i == 0:
-            full_feature_list = feature
-        else:
-            full_feature_list = np.concatenate((full_feature_list, feature), axis=0)
+        # end = time.time()
+        # print(end - start)
 
-        print(full_feature_list.shape)
-        print(len(full_original_label_list))
 
     # Save all results to npy
     full_label_list = np.array(full_original_label_list)
+    full_feature_list_np = np.array(full_feature_list)
 
     save_label_dir = save_dir + data_category + "_labels.npy"
     save_feature_dir = save_dir + data_category + "_features.npy"
 
     np.save(save_label_dir, full_label_list)
-    np.save(save_feature_dir, full_feature_list)
+    np.save(save_feature_dir, full_feature_list_np)
 
     print("NPY files saved!")
 
@@ -270,6 +367,12 @@ def demo(depth=100,
                                                               collate_fn=customized_dataloader.collate,
                                                               drop_last=True)
 
+    # print(len(train_known_known_loader))
+    # print(len(train_known_unknown_loader))
+    # print(len(test_known_known_loader))
+    # print(len(test_known_unknown_loader))
+    # print(len(test_unknown_unknown_loader))
+
     ########################################################################
     # Create model: MSD-Net or other networks
     ########################################################################
@@ -322,7 +425,6 @@ def demo(depth=100,
 
     gen_feature(loader=test_unknown_unknown_loader,
                 model=model,
-                use_msd_net=msd_net,
                 data_category="test_unknown_unknown",
                 save_dir=model_path_base + model_dir)
 

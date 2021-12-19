@@ -3,7 +3,9 @@
 #$ -M jhuang24@nd.edu
 #$ -m abe
 #$ -q gpu -l gpu=1
-#$ -N pfm_1.0_exit_2.0_seed_4
+#$ -l h=!qa-rtx6k-044
+#$ -e errors/
+#$ -N ce_seed_4
 
 # Required modules
 module load conda
@@ -12,7 +14,7 @@ source activate new_msd_net
 
 python demo.py --arch msdnet \
                --batch-size 16 \
-               --nb_training_classes 296 \
+               --nb_training_classes 294 \
                --optimizer sgd \
                --learning-rate 0.1 \
                --epochs 200 \

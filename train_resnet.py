@@ -82,7 +82,7 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 #########################################################################################
 # Define paths for saving model and data source #
 #########################################################################################
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/models/cvpr_resnet"
+save_path_base = "/scratch365/jhuang24/sail-on/models/resnet"
 save_path_with_date = save_path_base + "/" + date
 
 if not save_path_with_date:
