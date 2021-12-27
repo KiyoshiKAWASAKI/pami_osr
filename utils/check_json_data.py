@@ -45,6 +45,9 @@ path_10 = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recog
 path_11 = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
          "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/valid_known_unknown.json"
 
+path_12 = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
+         "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_known.json"
+
 
 train_rt_file = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
                 "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/known_train_rt.txt"
@@ -127,9 +130,11 @@ if __name__ == '__main__':
     # check_json_data(json_path=path_9)
     # check_json_data(json_path=path_11)
 
-    check_json_data(json_path=path_4)
-    check_json_data(json_path=path_5)
-    check_json_data(json_path=path_6)
-    check_json_data(json_path=path_7)
+    # check_json_data(json_path=path_4)
+    # check_json_data(json_path=path_5)
+    # check_json_data(json_path=path_6)
+    # check_json_data(json_path=path_7)
+
+    check_json_data(json_path=path_12)
 
 

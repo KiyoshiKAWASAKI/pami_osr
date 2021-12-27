@@ -260,7 +260,7 @@ else:
                                  "npy_json_files/rt_group_json/valid_known_unknown.json"
 
     test_known_known_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
-                            "dataset_v1_3_partition/npy_json_files_shuffled/test_known_known_without_rt.json"
+                            "dataset_v1_3_partition/npy_json_files_shuffled/test_known_known.json"
     test_known_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                               "dataset_v1_3_partition/npy_json_files_shuffled/test_known_unknown.json"
     test_unknown_unknown_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
@@ -923,97 +923,6 @@ def test_and_save_probs(test_loader,
             #     np.save(save_known_unknown_rt_path, full_rt_list_np)
 
 
-
-    # TODO: Test process for other networks - is it different??
-    else:
-        pass
-
-
-
-
-def run_one_sample(test_loader,
-                    model,
-                    use_msd_net,
-                   save_folder,
-                    test_itr_index):
-    """
-    Run one sample thru different models n times and
-    see whether there is a pattern for RTs.
-
-    :param test_loader:
-    :param model:
-    :param test_unknown:
-    :param use_msd_net:
-    :return:
-    """
-
-    # Set the model to evaluation mode
-    model.cuda()
-    model.eval()
-
-    # Define the softmax - do softmax to each block.
-    if use_msd_net:
-        print("Testing MSD-Net...")
-        sm = torch.nn.Softmax(dim=2)
-
-        # For MSD-Net, save everything into npy files
-        full_original_label_list = []
-        full_prob_list = []
-        full_rt_list = []
-        print(len(test_loader))
-
-        # Only process one image
-        for i in range(int(round(len(test_loader)/3))):
-            batch = next(iter(test_loader))
-
-            input = batch["imgs"]
-            target = batch["labels"] - 1
-
-            rts = []
-            input = input.cuda()
-            target = torch.tensor(target).cuda(async=True)
-
-            # Save original labels to the list
-            original_label_list = np.array(target.cpu().tolist())
-            for label in original_label_list:
-                full_original_label_list.append(label)
-
-            input_var = torch.autograd.Variable(input)
-
-            # Get the model outputs and RTs
-            start =timer()
-            output, feature, end_time = model(input_var)
-
-            # print(end_time)
-
-            # Save the RTs
-            # TODO: something is diff in RT - 0327
-            for end in end_time[0]:
-                print("Processes one sample in %f sec" % (end - start))
-                rts.append(end-start)
-            full_rt_list.append(rts)
-
-            # extract the probability and apply our threshold
-            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-            prob_list = np.array(prob.cpu().tolist())
-
-            # Reshape it into [batch, block, class]
-            prob_list = np.reshape(prob_list,
-                                    (prob_list.shape[1],
-                                     prob_list.shape[0],
-                                     prob_list.shape[2]))
-
-            for one_prob in prob_list.tolist():
-                full_prob_list.append(one_prob)
-
-        # Save all results to npy
-        full_original_label_list_np = np.array(full_original_label_list)
-        full_prob_list_np = np.array(full_prob_list)
-        full_rt_list_np = np.array(full_rt_list)
-
-        save_rt_path = save_folder + "/rt_itr_" + str(test_itr_index) + ".npy"
-        print("Saving RTs to %s" % save_rt_path)
-        np.save(save_rt_path, full_rt_list_np)
 
     # TODO: Test process for other networks - is it different??
     else:

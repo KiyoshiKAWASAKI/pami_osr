@@ -1137,6 +1137,54 @@ def gen_known_known_rt_json(train_list_path,
 
 
 
+def combine_test_json(test_known_known_with_rt_path,
+                      test_known_known_without_rt_path,
+                      save_test_json_path):
+    """
+
+    :param test_known_known_with_rt_path:
+    :param test_known_known_without_rt_path:
+    :param save_test_json_path:
+    :return:
+    """
+    with open(test_known_known_with_rt_path) as test_known_known_with_rt:
+        test_known_known_with_rt_json = json.load(test_known_known_with_rt)
+    with open(test_known_known_without_rt_path) as test_known_known_without_rt:
+        test_known_known_without_rt_json = json.load(test_known_known_without_rt)
+
+    # Merge Training Jsons
+    for i in range(len(test_known_known_without_rt_json)):
+        try:
+            one_entry = test_known_known_without_rt_json[str(i + 1)]
+            test_known_known_with_rt_json[str(len(test_known_known_with_rt_json) + i + 1)] = one_entry
+        except Exception as e:
+            print(e)
+            continue
+
+    print(len(test_known_known_with_rt_json.keys()))
+    print(len(test_known_known_with_rt_json.values()))
+
+    test_known_known_dict = {}
+
+    for i in range(len(test_known_known_with_rt_json.keys())):
+        one_entry = list(test_known_known_with_rt_json.values())[i]
+        test_known_known_dict[i] = one_entry
+
+    labels = []
+
+    for i in range(len(test_known_known_dict)):
+        try:
+            labels.append(test_known_known_dict[i]["label"])
+        except Exception as e:
+            print(e)
+            continue
+
+    print(np.unique(np.asarray(labels)))
+
+    with open(save_test_json_path, 'w') as f:
+        json.dump(test_known_known_dict, f)
+        print("Saving file to %s" % save_test_json_path)
+
 
 
 def combine_json(train_known_known_with_rt_path,
@@ -1457,22 +1505,22 @@ if __name__ == '__main__':
     #                     nb_known_classes=293)
 
     # Generate class label matching
-    class_mapping = gen_class_label_map(known_classes_with_rt=known_classes,
-                                        nb_known_without_rt=253)
+    # class_mapping = gen_class_label_map(known_classes_with_rt=known_classes,
+    #                                     nb_known_without_rt=253)
 
     # Generate known_known json (the part with RT)
-    gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
-                            valid_list_path=save_known_valid_txt_path,
-                            train_valid_known_known_dir=known_known_with_rt_train_val_path,
-                            test_known_known_dir=known_known_with_rt_test_path,
-                            save_train_path=train_known_known_with_rt_json_path,
-                            save_valid_path=valid_known_known_with_rt_json_path,
-                            save_test_path=test_known_known_with_rt_json_path,
-                            class_map=class_mapping,
-                            nb_known_classes_without_rt=253,
-                            gen_train_valid=True,
-                            gen_test=False,
-                            training_ratio=0.80)
+    # gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
+    #                         valid_list_path=save_known_valid_txt_path,
+    #                         train_valid_known_known_dir=known_known_with_rt_train_val_path,
+    #                         test_known_known_dir=known_known_with_rt_test_path,
+    #                         save_train_path=train_known_known_with_rt_json_path,
+    #                         save_valid_path=valid_known_known_with_rt_json_path,
+    #                         save_test_path=test_known_known_with_rt_json_path,
+    #                         class_map=class_mapping,
+    #                         nb_known_classes_without_rt=253,
+    #                         gen_train_valid=True,
+    #                         gen_test=False,
+    #                         training_ratio=0.80)
 
     # gen_known_known_rt_json(train_list_path=save_known_train_txt_path,
     #                         valid_list_path=save_known_valid_txt_path,
@@ -1488,12 +1536,16 @@ if __name__ == '__main__':
     #                         training_ratio=0.80)
 
     # Combine Json files and adjust the indices
-    combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
-                 train_known_known_without_rt_path=train_known_known_without_rt_json_path,
-                 valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
-                 valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
-                 save_training_json_path=train_known_known_json_path,
-                 save_valid_json_path=valid_known_known_json_path)
+    # combine_json(train_known_known_with_rt_path=train_known_known_with_rt_json_path,
+    #              train_known_known_without_rt_path=train_known_known_without_rt_json_path,
+    #              valid_known_known_with_rt_path=valid_known_known_with_rt_json_path,
+    #              valid_known_known_without_rt_path=valid_known_known_without_rt_json_path,
+    #              save_training_json_path=train_known_known_json_path,
+    #              save_valid_json_path=valid_known_known_json_path)
+
+    combine_test_json(test_known_known_with_rt_path=test_known_known_with_rt_json_path,
+                      test_known_known_without_rt_path=test_known_known_without_rt_json_path,
+                      save_test_json_path=test_known_known_json_path)
 
     # Adjust json: known_known
     # adjust_json_index(train_json_path=train_known_known_json_path,
