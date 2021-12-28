@@ -2,6 +2,8 @@
 # 07/30/2020: Getting the threshold for rejecting novelty
 # Author: Jin Huang
 
+# Generate subsets for known_unknowns
+
 
 import numpy as np
 # import statistics
@@ -351,29 +353,24 @@ def combine_rt_files(unknown_rt_first_round_path,
 
 
 
+def gen_partial_unknown(known_unknown_json_path,
+                        ratio,
+                        save_json_path):
+    """
+
+    :param known_unknown_json_path:
+    :param ratio:
+    :param save_json_path:
+    :return:
+    """
+
+
+
+
+
+
 
 
 
 if __name__ == "__main__":
-    # get_novelty_thresh(prob_file_path=prob_npy_path,
-    #                    label_file_path=label_npy_path,
-    #                    top_k=3)
 
-    # selected_class_list, left_255_classes = \
-    #         pick_unknown_unknown_classes(nb_total_classes=413,
-    #                                      first_round_unknown_classes=first_round_unknown_classes,
-    #                                      second_round_unknown_classes=second_round_unknown_classes,
-    #                                      known_classes=known_classes)
-    # selected_class_list: 40 unknown_unknown
-    # left_255_classes: 255 known_known_classes without RTs
-
-
-    # organize_and_copy_data(original_data_path=umd_data_path,
-    #                        target_data_path=organized_data_save_path,
-    #                        known_known_classes_with_rt=known_classes,
-    #                        known_known_classes_without_rt=left_255_classes,
-    #                        unknown_unknown_classes=selected_class_list)
-
-    combine_rt_files(unknown_rt_first_round_path=first_round_npy_path,
-                     unknown_rt_second_round_path=second_round_npy_path,
-                     save_unknown_rt_path=save_unknown_rt_path)

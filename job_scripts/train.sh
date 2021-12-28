@@ -12,7 +12,7 @@ module load conda
 conda init bash
 source activate new_msd_net
 
-python demo.py --arch msdnet \
+python train.py --arch msdnet \
                --batch-size 16 \
                --nb_training_classes 294 \
                --optimizer sgd \
