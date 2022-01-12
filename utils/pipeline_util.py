@@ -31,7 +31,6 @@ def train_valid_test_one_epoch(args,
                                cross_entropy_weight,
                                perform_loss_weight,
                                exit_loss_weight,
-                               test_msd_net,
                                unknown_unknown_loader=None,
                                known_exit_rt=None,
                                unknown_exit_rt=None,
@@ -45,7 +44,11 @@ def train_valid_test_one_epoch(args,
                                nb_classes=294,
                                nb_training_classes=294,
                                rt_max=28,
-                               nb_sample_per_bacth=16):
+                               nb_sample_per_bacth=16,
+                               human_known_rt_max=28,
+                               human_unknown_rt_max=28,
+                               machine_known_rt_max=0.057930,
+                               machine_unknown_rt_max=0.071147):
 
     ##########################################
     # Set up evaluation metrics
@@ -121,8 +124,11 @@ def train_valid_test_one_epoch(args,
                 batch_type = "known"
 
             elif i in unknown_indices:
-                batch = next(unknown_iter)
-                batch_type = "unknown"
+                try:
+                    batch = next(unknown_iter)
+                    batch_type = "unknown"
+                except:
+                    continue
 
             input = batch["imgs"]
             rts = batch["rts"]
@@ -287,13 +293,17 @@ def train_valid_test_one_epoch(args,
 
                     # Part 3: Exit psyphy loss
                     if use_exit_loss:
-                        exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
-                                                  target_exit_rt=target_exit_rt[j],
-                                                  human_known_rt_max=human_known_rt_max,
-                                                  human_unknown_rt_max=human_unknown_rt_max,
-                                                  machine_known_rt_max=machine_known_rt_max,
-                                                  machine_unknown_rt_max=machine_unknown_rt_max,
-                                                  batch_type=batch_type)
+                        try:
+                            exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
+                                                      target_exit_rt=target_exit_rt[j],
+                                                      human_known_rt_max=human_known_rt_max,
+                                                      human_unknown_rt_max=human_unknown_rt_max,
+                                                      machine_known_rt_max=machine_known_rt_max,
+                                                      machine_unknown_rt_max=machine_unknown_rt_max,
+                                                      batch_type=batch_type)
+                        except:
+                            exit_loss = 0.0
+
                     # 3 Cases
                     if (use_performance_loss == True) and (use_exit_loss == False):
                         # print("Using cross-entropy and performance loss")
@@ -367,22 +377,22 @@ def test_and_save_probs(test_loader,
     :param use_msd_net:
     :return:
     """
-    # Setup the paths for saving npy files
-    if get_train_valid_prob:
-        save_known_known_probs_path = npy_save_dir + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
-        save_known_known_original_label_path = npy_save_dir + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
-        save_known_known_rt_path = npy_save_dir + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
-
-        save_known_unknown_probs_path = npy_save_dir + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-        save_known_unknown_original_label_path = npy_save_dir + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-        save_known_unknown_rt_path = npy_save_dir + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
-
-    else:
-        save_prob_base_path = npy_save_dir + "test"
-
-        if not os.path.exists(save_prob_base_path):
-            print("Creating the directory %s" % save_prob_base_path)
-            os.mkdir(save_prob_base_path)
+    # # Setup the paths for saving npy files
+    # if get_train_valid_prob:
+    #     save_known_known_probs_path = npy_save_dir + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
+    #     save_known_known_original_label_path = npy_save_dir + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
+    #     save_known_known_rt_path = npy_save_dir + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
+    #
+    #     save_known_unknown_probs_path = npy_save_dir + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
+    #     save_known_unknown_original_label_path = npy_save_dir + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
+    #     save_known_unknown_rt_path = npy_save_dir + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
+    #
+    # else:
+    #     save_prob_base_path = npy_save_dir + "test"
+    #
+    #     if not os.path.exists(save_prob_base_path):
+    #         print("Creating the directory %s" % save_prob_base_path)
+    #         os.mkdir(save_prob_base_path)
 
     # Set the model to evaluation mode
     model.cuda()
@@ -509,6 +519,38 @@ def test_and_save_probs(test_loader,
     # TODO: Test process for other networks - is it different??
     else:
         pass
+
+
+
+
+def find_best_model(dir_to_models,
+                    model_format=".dat"):
+    """
+    Find the best model in a directory
+
+    :param dir_to_models:
+    :return:
+    """
+    # List all the models
+    all_models = []
+
+    for file in os.listdir(dir_to_models):
+        if file.endswith(model_format):
+            all_models.append(os.path.join(dir_to_models, file))
+
+    # Find the index for best model
+    all_indices = []
+
+    for one_model in all_models:
+        one_index = int(one_model.split("/")[-1].split(".")[0].split("_")[-1])
+        all_indices.append(one_index)
+
+    best_epoch = max(all_indices)
+
+    best_model_path = dir_to_models + "/model_epoch_" + str(best_epoch) + model_format
+
+    return best_epoch, best_model_path
+
 
 
 

@@ -11,7 +11,8 @@ import sys
 import os
 import glob
 from shutil import copyfile
-
+import json
+import random
 
 
 prob_npy_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/models/sail-on/msd_369_novel_44_general/probs_0809_thresh.npy"
@@ -348,14 +349,16 @@ def combine_rt_files(unknown_rt_first_round_path,
     np.save(save_unknown_rt_path, combined)
 
 
+json_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                 "dataset_v1_3_partition/npy_json_files_shuffled"
 
+training_known_unknown_json_path = os.path.join(json_path_base, "train_known_unknown.json")
 
 
 
 
 def gen_partial_unknown(known_unknown_json_path,
-                        ratio,
-                        save_json_path):
+                        ratio):
     """
 
     :param known_unknown_json_path:
@@ -364,13 +367,39 @@ def gen_partial_unknown(known_unknown_json_path,
     :return:
     """
 
+    with open(known_unknown_json_path) as json_path:
+        json_data = json.load(json_path)
 
+    nb_take = int(len(json_data) * ratio)
+    print("Taking samples:", nb_take)
 
+    indices = list(range(0, len(json_data)))
+    random.shuffle(indices)
+    indices_take = indices[:nb_take]
 
+    sub_json = {}
 
+    for index in indices_take:
+        sub_json[len(sub_json)] = json_data[str(index)]
+
+    print(len(sub_json))
+
+    save_json_path = json_path_base + "/train_known_unknown_" + str(ratio) + ".json"
+
+    with open(save_json_path, 'w') as f:
+        json.dump(sub_json, f)
+        print("Saving file to %s" % save_json_path)
 
 
 
 
 if __name__ == "__main__":
+    gen_partial_unknown(known_unknown_json_path=training_known_unknown_json_path,
+                        ratio=0.1)
+
+    gen_partial_unknown(known_unknown_json_path=training_known_unknown_json_path,
+                        ratio=0.2)
+
+    gen_partial_unknown(known_unknown_json_path=training_known_unknown_json_path,
+                        ratio=0.5)
 

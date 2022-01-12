@@ -10,7 +10,8 @@ from args import arg_parser
 import torch.nn as nn
 import models
 from datetime import datetime
-from utils.pipeline_util import train_valid_test_one_epoch, test_and_save_probs, find_best_model
+from utils.pipeline_util import train_valid_test_one_epoch, test_and_save_probs
+
 
 args = arg_parser.parse_args()
 
@@ -27,14 +28,13 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = True
-use_exit_loss = True
+use_performance_loss = False
+use_exit_loss = False
 thresh = 0.7
-cross_entropy_weight = 3.0
-perform_loss_weight = 1.0
+cross_entropy_weight = 1.0
+perform_loss_weight = 0.0
 exit_loss_weight = 1.0
 random_seed = 0
-unknown_ratio = 1.0
 
 ###################################################################
                     # Training options #
@@ -52,25 +52,20 @@ use_addition = True
 test_after_valid: testing MSD Net using the only last clf's prediction
 run_test: testing with psyphy and exits
 """
-
-run_test = True
+test_after_valid = True
+run_test = False
+get_train_valid_prob = False
 
 # TODO: Cross-entropy seed 0
-test_model_dir = "2021-12-30/cross_entropy_only_unknown_ratio_1.0/seed_0"
+test_model_path = ""
+npy_save_dir =  ""
 
 ##################################################
 nb_itrs = 1000
 use_trained_weights = True
 run_one_sample = False
 save_one_sample_rt_folder = None
-
-# TODO: May need to change this in the future
-save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
-
-test_model_path = save_path_base + "/" + test_model_dir
-
-if test_model_path is not None:
-    test_date = test_model_path.split("/")[-4]
+# test_date = test_model_path.split("/")[-4]
 
 
 ###################################################################
@@ -91,9 +86,6 @@ elif (use_performance_loss == True) and (use_exit_loss == True):
 else:
     save_path_sub = None
 
-if unknown_ratio is not None:
-    save_path_sub = save_path_sub + "_unknown_ratio_" + str(unknown_ratio)
-
 
 ####################################################################
     # Normally, there is no need to change these #
@@ -103,9 +95,9 @@ save_training_prob = False
 
 nb_itr = 30
 img_size = 224
-lr=0.1
-wd=0.0001
-momentum=0.9
+lr=0.1,
+wd=0.0001,
+momentum=0.9,
 
 if debug:
     n_epochs = 3
@@ -133,6 +125,10 @@ known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
 unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
                       0.42355671497950664, 0.4600701578332428]
 
+human_known_rt_max = 28
+human_unknown_rt_max = 28
+machine_known_rt_max = 0.057930
+machine_unknown_rt_max = 0.071147
 
 # TODO: need to update these
 train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
@@ -144,6 +140,9 @@ train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.
 #########################################################################################
             # Define paths for saving model and data source #
 #########################################################################################
+# TODO: May need to change this in the future
+save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
+
 # Normally, no need to change these
 json_data_base_debug = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/" \
                        "data/object_recognition/image_net/derivatives/" \
@@ -154,7 +153,7 @@ json_data_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
 if not run_test:
     save_path_with_date = save_path_base + "/" + date
 else:
-    save_path_with_date = test_model_path
+    save_path_with_date = save_path_base + "/" + test_date
 
 if not save_path_with_date:
     os.mkdir(save_path_with_date)
@@ -177,11 +176,7 @@ if debug:
 
 else:
     train_known_known_path = os.path.join(json_data_base, "train_known_known.json")
-
-    if unknown_ratio == 1.0:
-        train_known_unknown_path = os.path.join(json_data_base, "train_known_unknown.json")
-    else:
-        train_known_unknown_path = json_data_base + "/train_known_unknown_" + str(unknown_ratio) + ".json"
+    train_known_unknown_path = os.path.join(json_data_base, "train_known_unknown.json")
 
     valid_known_known_path = os.path.join(json_data_base, "valid_known_known.json")
     valid_known_unknown_path = os.path.join(json_data_base, "valid_known_unknown.json")
@@ -193,9 +188,9 @@ else:
 
 
 
-def pipeline(depth=100,
-            growth_rate=12,
-            efficient=True):
+def demo(depth=100,
+         growth_rate=12,
+         efficient=True):
 
     global args
 
@@ -330,7 +325,7 @@ def pipeline(depth=100,
 
 
     ########################################################################
-    # Training + validation
+    # Test-only or Training + validation
     ########################################################################
     if not run_test:
         # Make save directory
@@ -366,8 +361,7 @@ def pipeline(depth=100,
         with open(os.path.join(save_path, 'results.csv'), 'w') as f:
             f.write('epoch, '
                     'train_loss, train_acc_top1, train_acc_top3, train_acc_top5, '
-                    'valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5, '
-                    'test_acc_top1, test_acc_top3, test_acc_top5 \n')
+                    'valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5\n')
 
         # Train model
         best_acc_top5 = 0.00
@@ -386,6 +380,7 @@ def pipeline(depth=100,
                                                        nb_epoch=epoch,
                                                        use_msd_net=True,
                                                        train_phase=True,
+                                                       test_msd_net=test_after_valid,
                                                        save_path=save_path,
                                                        use_performance_loss=use_performance_loss,
                                                        use_exit_loss=use_exit_loss,
@@ -410,6 +405,7 @@ def pipeline(depth=100,
                                                        use_msd_net=True,
                                                        train_phase=False,
                                                        save_path=save_path,
+                                                       test_msd_net=test_after_valid,
                                                        use_performance_loss=use_performance_loss,
                                                        use_exit_loss=use_exit_loss,
                                                        cross_entropy_weight=cross_entropy_weight,
@@ -420,138 +416,101 @@ def pipeline(depth=100,
                                                        known_thresholds=known_thresholds,
                                                        unknown_thresholds=unknown_thresholds)
 
-            _, test_acc_top1, \
-            test_acc_top3, test_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                        known_loader=test_known_known_loader,
-                                                        unknown_loader=test_known_unknown_loader,
-                                                        unknown_unknown_loader=test_unknown_unknown_loader,
-                                                        model=model_wrapper,
-                                                        criterion=criterion,
-                                                        optimizer=optimizer,
-                                                        nb_epoch=epoch,
-                                                        use_msd_net=True,
-                                                        train_phase=False,
-                                                        save_path=save_path,
-                                                        use_performance_loss=use_performance_loss,
-                                                        use_exit_loss=use_exit_loss,
-                                                        cross_entropy_weight=cross_entropy_weight,
-                                                        perform_loss_weight=perform_loss_weight,
-                                                        exit_loss_weight=exit_loss_weight,
-                                                        known_exit_rt=known_exit_rt,
-                                                        unknown_exit_rt=unknown_exit_rt,
-                                                        known_thresholds=known_thresholds,
-                                                        unknown_thresholds=unknown_thresholds)
-
             # Determine if model is the best
             if valid_acc_top5 > best_acc_top5:
                 best_acc_top5 = valid_acc_top5
                 print('New best top-5 validation accuracy: %.4f' % best_acc_top5)
-                torch.save(model.state_dict(), save_path + "/model_epoch_" + str(epoch) + '.dat')
-                torch.save(optimizer.state_dict(), save_path + "/optimizer_epoch_" + str(epoch) + '.dat')
+            torch.save(model.state_dict(), save_path + "/model_epoch_" + str(epoch) + '.dat')
+            torch.save(optimizer.state_dict(), save_path + "/optimizer_epoch_" + str(epoch) + '.dat')
 
             # Log results
             with open(os.path.join(save_path, 'results.csv'), 'a') as f:
                 f.write('%03d, '
                         '%0.6f, %0.6f, %0.6f, %0.6f, '
-                        '%0.5f, %0.6f, %0.6f, %0.6f, '
-                        '%0.6f, %0.6f, %0.6f, \n' % ((epoch + 1),
+                        '%0.5f, %0.6f, %0.6f, %0.6f,\n' % ((epoch + 1),
                                                            train_loss, train_acc_top1, train_acc_top3, train_acc_top5,
-                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5,
-                                                           test_acc_top1, test_acc_top3, test_acc_top5))
+                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5))
 
 
-    ########################################################################
-    # testing
-    ########################################################################
+
     else:
         if model_name == "msd_net":
-            # TODO: find the best model in the given directory
-            best_epoch, best_model_path = find_best_model(test_model_path)
-
-            print("Best epoch:", best_epoch)
-            print("Best model path:", best_model_path)
-
-            model.load_state_dict(torch.load(best_model_path))
+            model.load_state_dict(torch.load(test_model_path))
             print("Loading MSD-Net model: %s" % test_model_path)
 
-            # Create directories
-            save_test_results_path = test_model_path + "/test_results"
-            if not os.path.exists(save_test_results_path):
-                os.mkdir(save_test_results_path)
+            # Get the epoch index
+            index = test_model_path.split("/")[-1].split(".")[0].split("_")[-1]
 
-            save_all_feature_path = test_model_path + "/features"
-            if not os.path.exists(save_all_feature_path):
-                os.mkdir(save_all_feature_path)
+            if get_train_valid_prob:
+                print("Testing the training known_known samples...")
+                test_and_save_probs(test_loader=train_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="train",
+                                    npy_save_dir=save_path)
 
-            #################################################################
-            # Run training and validation data
-            #################################################################
-            # TODO: Run process for testing and generating features
-            print("Generating featrures and probabilities")
-            test_and_save_probs(test_loader=train_known_known_loader,
-                                model=model,
-                                test_type="known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                data_type="train",
-                                npy_save_dir=save_all_feature_path)
+                print("Testing the training known_unknown samples...")
+                test_and_save_probs(test_loader=train_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="train",
+                                    npy_save_dir=save_path)
 
-            test_and_save_probs(test_loader=train_known_unknown_loader,
-                                model=model,
-                                test_type="known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                data_type="train",
-                                npy_save_dir=save_all_feature_path)
+                print("Testing the validation known_known samples...")
+                test_and_save_probs(test_loader=valid_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="valid",
+                                    npy_save_dir=save_path)
 
-            test_and_save_probs(test_loader=valid_known_known_loader,
-                                model=model,
-                                test_type="known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                data_type="valid",
-                                npy_save_dir=save_all_feature_path)
+                print("Testing the validation known_known samples...")
+                test_and_save_probs(test_loader=valid_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    data_type="valid",
+                                    npy_save_dir=save_path)
 
-            test_and_save_probs(test_loader=valid_known_unknown_loader,
-                                model=model,
-                                test_type="known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                data_type="valid",
-                                npy_save_dir=save_all_feature_path)
 
-            ########################################################################
-            # Testing data
-            ########################################################################
-            print("Testing models")
-            print("Testing the known_known samples...")
-            test_and_save_probs(test_loader=test_known_known_loader,
-                                model=model,
-                                test_type="known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
+            else:
+                print("Testing the trained models")
 
-            print("Testing the known_unknown samples...")
-            test_and_save_probs(test_loader=test_known_unknown_loader,
-                                model=model,
-                                test_type="known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
+                print("Testing the known_known samples...")
+                test_and_save_probs(test_loader=test_known_known_loader,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    npy_save_dir=save_path)
 
-            print("testing the unknown samples...")
-            test_and_save_probs(test_loader=test_unknown_unknown_loader,
-                                model=model,
-                                test_type="unknown_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
+                print("Testing the known_unknown samples...")
+                test_and_save_probs(test_loader=test_known_unknown_loader,
+                                    model=model,
+                                    test_type="known_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    npy_save_dir=save_path)
 
-            # TODO: post-process to get numbers
+                print("testing the unknown samples...")
+                test_and_save_probs(test_loader=test_unknown_unknown_loader,
+                                    model=model,
+                                    test_type="unknown_unknown",
+                                    use_msd_net=True,
+                                    epoch_index=index,
+                                    npy_save_dir=save_path)
 
         else:
             pass
 
+        return
+
+
 if __name__ == '__main__':
-    pipeline()
+    demo()
