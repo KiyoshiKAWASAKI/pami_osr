@@ -366,8 +366,7 @@ def test_and_save_probs(test_loader,
                         use_msd_net,
                         epoch_index,
                         npy_save_dir,
-                        get_train_valid_prob=True,
-                        data_type=None):
+                        get_train_valid_prob=True):
     """
     batch size is always one for testing.
 
@@ -377,28 +376,11 @@ def test_and_save_probs(test_loader,
     :param use_msd_net:
     :return:
     """
-    # # Setup the paths for saving npy files
-    # if get_train_valid_prob:
-    #     save_known_known_probs_path = npy_save_dir + data_type + "_known_known_prob_epoch_" + str(epoch_index) + ".npy"
-    #     save_known_known_original_label_path = npy_save_dir + data_type + "_known_known_epoch_labels_epoch_" + str(epoch_index) + ".npy"
-    #     save_known_known_rt_path = npy_save_dir + data_type + "_known_known_rts_epoch_" + str(epoch_index) + ".npy"
-    #
-    #     save_known_unknown_probs_path = npy_save_dir + data_type + "_known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-    #     save_known_unknown_original_label_path = npy_save_dir + data_type + "_known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-    #     save_known_unknown_rt_path = npy_save_dir + data_type + "_known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
-    #
-    # else:
-    #     save_prob_base_path = npy_save_dir + "test"
-    #
-    #     if not os.path.exists(save_prob_base_path):
-    #         print("Creating the directory %s" % save_prob_base_path)
-    #         os.mkdir(save_prob_base_path)
 
     # Set the model to evaluation mode
     model.cuda()
     model.eval()
 
-    # Define the softmax - do softmax to each block.
     if use_msd_net:
         print("Testing MSD-Net...")
         sm = torch.nn.Softmax(dim=2)
@@ -437,7 +419,6 @@ def test_and_save_probs(test_loader,
             output, feature, end_time = model(input_var)
 
             # Save the RTs
-            # TODO: something is diff in RT - 0327
             for end in end_time[0]:
                 print("Processes one sample in %f sec" % (end - start))
                 rts.append(end-start)
@@ -461,60 +442,17 @@ def test_and_save_probs(test_loader,
         full_prob_list_np = np.array(full_prob_list)
         full_rt_list_np = np.array(full_rt_list)
 
-        # Getting training and validation results
-        if get_train_valid_prob:
-            if test_type == "known_known":
-                print("Saving probabilities to %s" % save_known_known_probs_path)
-                np.save(save_known_known_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_known_original_label_path)
-                np.save(save_known_known_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_known_rt_path)
-                np.save(save_known_known_rt_path, full_rt_list_np)
+        save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
+        save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
+        save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
 
-            elif test_type == "known_unknown":
-                print("Saving probabilities to %s" % save_known_unknown_probs_path)
-                np.save(save_known_unknown_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_unknown_original_label_path)
-                np.save(save_known_unknown_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_unknown_rt_path)
-                np.save(save_known_unknown_rt_path, full_rt_list_np)
-        # Getting testing probs
-        else:
-            if test_type == "known_known":
-                save_known_known_probs_path = save_prob_base_path + "/known_known_probs_epoch_" + str(epoch_index) + ".npy"
-                save_known_known_original_label_path = save_prob_base_path + "/known_known_labels_epoch_" + str(epoch_index) + ".npy"
-                save_known_known_rt_path = save_prob_base_path + "/known_known_rts_epoch_" + str(epoch_index) + ".npy"
+        print("Saving probabilities to %s" % save_prob_path)
+        np.save(save_prob_path, full_prob_list_np)
+        print("Saving original labels to %s" % save_label_path)
+        np.save(save_label_path, full_original_label_list_np)
+        print("Saving RTs to %s" % save_rt_path)
+        np.save(save_rt_path, full_rt_list_np)
 
-                print("Saving probabilities to %s" % save_known_known_probs_path)
-                np.save(save_known_known_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_known_original_label_path)
-                np.save(save_known_known_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_known_rt_path)
-                np.save(save_known_known_rt_path, full_rt_list_np)
-
-            elif test_type == "known_unknown":
-                save_known_unknown_probs_path = save_prob_base_path + "/known_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-                save_known_unknown_original_label_path = save_prob_base_path + "/known_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-                save_known_unknown_rt_path = save_prob_base_path + "/known_unknown_rts_epoch_" + str(epoch_index) + ".npy"
-
-                print("Saving probabilities to %s" % save_known_unknown_probs_path)
-                np.save(save_known_unknown_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_known_unknown_original_label_path)
-                np.save(save_known_unknown_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_known_unknown_rt_path)
-                np.save(save_known_unknown_rt_path, full_rt_list_np)
-
-            else:
-                save_unknown_unknown_probs_path = save_prob_base_path + "/unknown_unknown_probs_epoch_" + str(epoch_index) + ".npy"
-                save_unknown_unknown_original_label_path = save_prob_base_path + "/unknown_unknown_labels_epoch_" + str(epoch_index) + ".npy"
-                save_unknown_unknown_rt_path = save_prob_base_path + "/unknown_unknown_rts_epoch_" + str(epoch_index) + ".npy"
-
-                print("Saving probabilities to %s" % save_unknown_unknown_probs_path)
-                np.save(save_unknown_unknown_probs_path, full_prob_list_np)
-                print("Saving original labels to %s" % save_unknown_unknown_original_label_path)
-                np.save(save_unknown_unknown_original_label_path, full_original_label_list_np)
-                print("Saving RTs to %s" % save_unknown_unknown_rt_path)
-                np.save(save_unknown_unknown_rt_path, full_rt_list_np)
 
     # TODO: Test process for other networks - is it different??
     else:

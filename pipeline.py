@@ -490,34 +490,30 @@ def pipeline(depth=100,
             print("Generating featrures and probabilities")
             test_and_save_probs(test_loader=train_known_known_loader,
                                 model=model,
-                                test_type="known_known",
+                                test_type="train_known_known",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
-                                data_type="train",
                                 npy_save_dir=save_all_feature_path)
 
             test_and_save_probs(test_loader=train_known_unknown_loader,
                                 model=model,
-                                test_type="known_unknown",
+                                test_type="train_known_unknown",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
-                                data_type="train",
                                 npy_save_dir=save_all_feature_path)
 
             test_and_save_probs(test_loader=valid_known_known_loader,
                                 model=model,
-                                test_type="known_known",
+                                test_type="valid_known_known",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
-                                data_type="valid",
                                 npy_save_dir=save_all_feature_path)
 
             test_and_save_probs(test_loader=valid_known_unknown_loader,
                                 model=model,
-                                test_type="known_unknown",
+                                test_type="valid_known_unknown",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
-                                data_type="valid",
                                 npy_save_dir=save_all_feature_path)
 
             ########################################################################
