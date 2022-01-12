@@ -10,7 +10,7 @@ from args import arg_parser
 import torch.nn as nn
 import models
 from datetime import datetime
-from utils.pipeline_util import train_valid_test_one_epoch, test_and_save_probs, find_best_model
+from utils.pipeline_util import train_valid_test_one_epoch, save_probs_and_features, find_best_model
 
 args = arg_parser.parse_args()
 
@@ -192,12 +192,12 @@ else:
 
 
 
+if __name__ == '__main__':
+    depth=100
+    growth_rate=12
+    efficient=True
 
-def pipeline(depth=100,
-            growth_rate=12,
-            efficient=True):
-
-    global args
+    # global args
 
     # Get densenet configuration
     if (depth - 4) % 3:
@@ -420,27 +420,33 @@ def pipeline(depth=100,
                                                        known_thresholds=known_thresholds,
                                                        unknown_thresholds=unknown_thresholds)
 
-            _, test_acc_top1, \
-            test_acc_top3, test_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                        known_loader=test_known_known_loader,
-                                                        unknown_loader=test_known_unknown_loader,
-                                                        unknown_unknown_loader=test_unknown_unknown_loader,
-                                                        model=model_wrapper,
-                                                        criterion=criterion,
-                                                        optimizer=optimizer,
-                                                        nb_epoch=epoch,
-                                                        use_msd_net=True,
-                                                        train_phase=False,
-                                                        save_path=save_path,
-                                                        use_performance_loss=use_performance_loss,
-                                                        use_exit_loss=use_exit_loss,
-                                                        cross_entropy_weight=cross_entropy_weight,
-                                                        perform_loss_weight=perform_loss_weight,
-                                                        exit_loss_weight=exit_loss_weight,
-                                                        known_exit_rt=known_exit_rt,
-                                                        unknown_exit_rt=unknown_exit_rt,
-                                                        known_thresholds=known_thresholds,
-                                                        unknown_thresholds=unknown_thresholds)
+            # TODO: Only test the model every few epochs
+            if epoch % 10 == 0:
+                _, test_acc_top1, \
+                test_acc_top3, test_acc_top5 = train_valid_test_one_epoch(args=args,
+                                                            known_loader=test_known_known_loader,
+                                                            unknown_loader=test_known_unknown_loader,
+                                                            unknown_unknown_loader=test_unknown_unknown_loader,
+                                                            model=model_wrapper,
+                                                            criterion=criterion,
+                                                            optimizer=optimizer,
+                                                            nb_epoch=epoch,
+                                                            use_msd_net=True,
+                                                            train_phase=False,
+                                                            save_path=save_path,
+                                                            use_performance_loss=use_performance_loss,
+                                                            use_exit_loss=use_exit_loss,
+                                                            cross_entropy_weight=cross_entropy_weight,
+                                                            perform_loss_weight=perform_loss_weight,
+                                                            exit_loss_weight=exit_loss_weight,
+                                                            known_exit_rt=known_exit_rt,
+                                                            unknown_exit_rt=unknown_exit_rt,
+                                                            known_thresholds=known_thresholds,
+                                                            unknown_thresholds=unknown_thresholds)
+            else:
+                test_acc_top1 = 0.000000000
+                test_acc_top3 = 0.000000000
+                test_acc_top5 = 0.000000000
 
             # Determine if model is the best
             if valid_acc_top5 > best_acc_top5:
@@ -488,28 +494,28 @@ def pipeline(depth=100,
             #################################################################
             # TODO: Run process for testing and generating features
             print("Generating featrures and probabilities")
-            test_and_save_probs(test_loader=train_known_known_loader,
+            save_probs_and_features(test_loader=train_known_known_loader,
                                 model=model,
                                 test_type="train_known_known",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_all_feature_path)
 
-            test_and_save_probs(test_loader=train_known_unknown_loader,
+            save_probs_and_features(test_loader=train_known_unknown_loader,
                                 model=model,
                                 test_type="train_known_unknown",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_all_feature_path)
 
-            test_and_save_probs(test_loader=valid_known_known_loader,
+            save_probs_and_features(test_loader=valid_known_known_loader,
                                 model=model,
                                 test_type="valid_known_known",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_all_feature_path)
 
-            test_and_save_probs(test_loader=valid_known_unknown_loader,
+            save_probs_and_features(test_loader=valid_known_unknown_loader,
                                 model=model,
                                 test_type="valid_known_unknown",
                                 use_msd_net=True,
@@ -521,7 +527,7 @@ def pipeline(depth=100,
             ########################################################################
             print("Testing models")
             print("Testing the known_known samples...")
-            test_and_save_probs(test_loader=test_known_known_loader,
+            save_probs_and_features(test_loader=test_known_known_loader,
                                 model=model,
                                 test_type="known_known",
                                 use_msd_net=True,
@@ -529,7 +535,7 @@ def pipeline(depth=100,
                                 npy_save_dir=save_test_results_path)
 
             print("Testing the known_unknown samples...")
-            test_and_save_probs(test_loader=test_known_unknown_loader,
+            save_probs_and_features(test_loader=test_known_unknown_loader,
                                 model=model,
                                 test_type="known_unknown",
                                 use_msd_net=True,
@@ -537,17 +543,12 @@ def pipeline(depth=100,
                                 npy_save_dir=save_test_results_path)
 
             print("testing the unknown samples...")
-            test_and_save_probs(test_loader=test_unknown_unknown_loader,
+            save_probs_and_features(test_loader=test_unknown_unknown_loader,
                                 model=model,
                                 test_type="unknown_unknown",
                                 use_msd_net=True,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_test_results_path)
 
-            # TODO: post-process to get numbers
-
         else:
             pass
-
-if __name__ == '__main__':
-    pipeline()

@@ -360,13 +360,12 @@ def train_valid_test_one_epoch(args,
 
 
 
-def test_and_save_probs(test_loader,
-                        model,
-                        test_type,
-                        use_msd_net,
-                        epoch_index,
-                        npy_save_dir,
-                        get_train_valid_prob=True):
+def save_probs_and_features(test_loader,
+                            model,
+                            test_type,
+                            use_msd_net,
+                            epoch_index,
+                            npy_save_dir):
     """
     batch size is always one for testing.
 
@@ -389,12 +388,12 @@ def test_and_save_probs(test_loader,
         full_original_label_list = []
         full_prob_list = []
         full_rt_list = []
+        full_feature_list = []
 
         print(len(test_loader))
         # sys.exit()
 
-        for i in range(len(test_loader)):
-        # for i in range(5):
+        for i in tqdm(range(len(test_loader))):
             try:
                 batch = next(iter(test_loader))
             except:
@@ -418,9 +417,16 @@ def test_and_save_probs(test_loader,
             start =timer()
             output, feature, end_time = model(input_var)
 
+            # Handle the features
+            feature = feature[0][0].cpu().detach().numpy()
+            feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
+
+            for one_feature in feature.tolist():
+                full_feature_list.append(one_feature)
+
             # Save the RTs
             for end in end_time[0]:
-                print("Processes one sample in %f sec" % (end - start))
+                # print("Processes one sample in %f sec" % (end - start))
                 rts.append(end-start)
             full_rt_list.append(rts)
 
@@ -445,6 +451,7 @@ def test_and_save_probs(test_loader,
         save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
         save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
         save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
+        save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_features.npy"
 
         print("Saving probabilities to %s" % save_prob_path)
         np.save(save_prob_path, full_prob_list_np)
@@ -452,11 +459,18 @@ def test_and_save_probs(test_loader,
         np.save(save_label_path, full_original_label_list_np)
         print("Saving RTs to %s" % save_rt_path)
         np.save(save_rt_path, full_rt_list_np)
+        print("Saving features to %s" % save_feature_path)
+        np.save(save_feature_path, full_feature_list)
 
 
     # TODO: Test process for other networks - is it different??
     else:
         pass
+
+
+
+
+
 
 
 
