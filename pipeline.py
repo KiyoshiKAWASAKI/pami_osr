@@ -28,9 +28,9 @@ date = datetime.today().strftime('%Y-%m-%d')
                             # Loss options #
 ###################################################################
 use_performance_loss = True
-use_exit_loss = True
+use_exit_loss = False
 thresh = 0.7
-cross_entropy_weight = 3.0
+cross_entropy_weight = 1.0
 perform_loss_weight = 1.0
 exit_loss_weight = 1.0
 random_seed = 0
@@ -39,6 +39,9 @@ unknown_ratio = 1.0
 ###################################################################
                     # Training options #
 ###################################################################
+run_test = True
+
+##########################
 model_name = "msd_net"
 debug = False
 train_binary = False
@@ -53,10 +56,18 @@ test_after_valid: testing MSD Net using the only last clf's prediction
 run_test: testing with psyphy and exits
 """
 
-run_test = True
+# TODO: Cross-entropy seed 0 -- test_01
+# test_model_dir = "2022-01-13/cross_entropy_only_unknown_ratio_1.0/seed_0"
 
-# TODO: Cross-entropy seed 0
-test_model_dir = "2021-12-30/cross_entropy_only_unknown_ratio_1.0/seed_0"
+# TODO: pfm 1.0 seed 0 -- test_02
+# test_model_dir = "2022-01-13/cross_entropy_1.0_pfm_1.0_unknown_ratio_1.0/seed_0"
+
+# TODO: pfm 1.0, exit 1.0 seed 0 -- test_03
+# test_model_dir = "2022-01-13/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+
+# TODO: pfm 3.0, exit 3.0 seed 0 -- test_04
+test_model_dir = "2022-01-10/cross_entropy_1.0_pfm_3.0_exit_3.0_unknown_ratio_1.0/seed_0"
+
 
 ##################################################
 nb_itrs = 1000
@@ -186,7 +197,11 @@ else:
     valid_known_known_path = os.path.join(json_data_base, "valid_known_known.json")
     valid_known_unknown_path = os.path.join(json_data_base, "valid_known_unknown.json")
 
-    test_known_known_path = os.path.join(json_data_base, "test_known_known.json")
+    test_known_known_path_p0 = os.path.join(json_data_base, "test_known_known_part_0.json")
+    test_known_known_path_p1 = os.path.join(json_data_base, "test_known_known_part_1.json")
+    test_known_known_path_p2 = os.path.join(json_data_base, "test_known_known_part_2.json")
+    test_known_known_path_p3 = os.path.join(json_data_base, "test_known_known_part_3.json")
+
     test_known_unknown_path = os.path.join(json_data_base, "test_known_unknown.json")
     test_unknown_unknown_path = os.path.join(json_data_base, "test_unknown_unknown.json")
 
@@ -271,9 +286,22 @@ if __name__ == '__main__':
                                                                  valid_known_unknown_index))
 
     # Test loaders
-    test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
+    test_known_known_dataset_p0 = msd_net_dataset(json_path=test_known_known_path_p0,
                                                transform=test_transform)
-    test_known_known_index = torch.randperm(len(test_known_known_dataset))
+    test_known_known_index_p0 = torch.randperm(len(test_known_known_dataset_p0))
+
+    test_known_known_dataset_p1 = msd_net_dataset(json_path=test_known_known_path_p1,
+                                                  transform=test_transform)
+    test_known_known_index_p1 = torch.randperm(len(test_known_known_dataset_p1))
+
+    test_known_known_dataset_p2 = msd_net_dataset(json_path=test_known_known_path_p2,
+                                                  transform=test_transform)
+    test_known_known_index_p2 = torch.randperm(len(test_known_known_dataset_p2))
+
+    test_known_known_dataset_p3 = msd_net_dataset(json_path=test_known_known_path_p3,
+                                                  transform=test_transform)
+    test_known_known_index_p3 = torch.randperm(len(test_known_known_dataset_p3))
+
 
     test_known_unknown_dataset = msd_net_dataset(json_path=test_known_unknown_path,
                                                  transform=test_transform)
@@ -284,13 +312,37 @@ if __name__ == '__main__':
     test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
 
     # When doing test, set the batch size to 1 to test the time one by one accurately
-    test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+    test_known_known_loader_p0 = torch.utils.data.DataLoader(test_known_known_dataset_p0,
                                                           batch_size=batch_size,
                                                           shuffle=False,
                                                           sampler=torch.utils.data.RandomSampler(
-                                                              test_known_known_index),
+                                                              test_known_known_index_p0),
                                                           collate_fn=customized_dataloader.collate,
                                                           drop_last=True)
+
+    test_known_known_loader_p1 = torch.utils.data.DataLoader(test_known_known_dataset_p1,
+                                                             batch_size=batch_size,
+                                                             shuffle=False,
+                                                             sampler=torch.utils.data.RandomSampler(
+                                                                 test_known_known_index_p1),
+                                                             collate_fn=customized_dataloader.collate,
+                                                             drop_last=True)
+
+    test_known_known_loader_p2 = torch.utils.data.DataLoader(test_known_known_dataset_p2,
+                                                             batch_size=batch_size,
+                                                             shuffle=False,
+                                                             sampler=torch.utils.data.RandomSampler(
+                                                                 test_known_known_index_p2),
+                                                             collate_fn=customized_dataloader.collate,
+                                                             drop_last=True)
+
+    test_known_known_loader_p3 = torch.utils.data.DataLoader(test_known_known_dataset_p3,
+                                                             batch_size=batch_size,
+                                                             shuffle=False,
+                                                             sampler=torch.utils.data.RandomSampler(
+                                                                 test_known_known_index_p3),
+                                                             collate_fn=customized_dataloader.collate,
+                                                             drop_last=True)
 
     test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
                                                             batch_size=batch_size,
@@ -526,21 +578,46 @@ if __name__ == '__main__':
             # Testing data
             ########################################################################
             print("Testing models")
-            print("Testing the known_known samples...")
-            save_probs_and_features(test_loader=test_known_known_loader,
-                                model=model,
-                                test_type="known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
-
-            print("Testing the known_unknown samples...")
-            save_probs_and_features(test_loader=test_known_unknown_loader,
-                                model=model,
-                                test_type="known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
+            # print("Testing the known_known samples...")
+            # save_probs_and_features(test_loader=test_known_known_loader_p0,
+            #                     model=model,
+            #                     test_type="known_known",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_test_results_path,
+            #                     part_index=0)
+            #
+            # save_probs_and_features(test_loader=test_known_known_loader_p1,
+            #                         model=model,
+            #                         test_type="known_known",
+            #                         use_msd_net=True,
+            #                         epoch_index=best_epoch,
+            #                         npy_save_dir=save_test_results_path,
+            #                         part_index=1)
+            #
+            # save_probs_and_features(test_loader=test_known_known_loader_p2,
+            #                         model=model,
+            #                         test_type="known_known",
+            #                         use_msd_net=True,
+            #                         epoch_index=best_epoch,
+            #                         npy_save_dir=save_test_results_path,
+            #                         part_index=2)
+            #
+            # save_probs_and_features(test_loader=test_known_known_loader_p3,
+            #                         model=model,
+            #                         test_type="known_known",
+            #                         use_msd_net=True,
+            #                         epoch_index=best_epoch,
+            #                         npy_save_dir=save_test_results_path,
+            #                         part_index=3)
+            #
+            # print("Testing the known_unknown samples...")
+            # save_probs_and_features(test_loader=test_known_unknown_loader,
+            #                     model=model,
+            #                     test_type="known_unknown",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_test_results_path)
 
             print("testing the unknown samples...")
             save_probs_and_features(test_loader=test_unknown_unknown_loader,

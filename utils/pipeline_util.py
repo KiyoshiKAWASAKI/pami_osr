@@ -31,7 +31,6 @@ def train_valid_test_one_epoch(args,
                                cross_entropy_weight,
                                perform_loss_weight,
                                exit_loss_weight,
-                               unknown_unknown_loader=None,
                                known_exit_rt=None,
                                unknown_exit_rt=None,
                                known_thresholds=None,
@@ -365,7 +364,8 @@ def save_probs_and_features(test_loader,
                             test_type,
                             use_msd_net,
                             epoch_index,
-                            npy_save_dir):
+                            npy_save_dir,
+                            part_index=None):
     """
     batch size is always one for testing.
 
@@ -448,10 +448,17 @@ def save_probs_and_features(test_loader,
         full_prob_list_np = np.array(full_prob_list)
         full_rt_list_np = np.array(full_rt_list)
 
-        save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
-        save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
-        save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
-        save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_features.npy"
+        if part_index is not None:
+            save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_probs.npy"
+            save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_labels.npy"
+            save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_rts.npy"
+            save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_features.npy"
+
+        else:
+            save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
+            save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
+            save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
+            save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_features.npy"
 
         print("Saving probabilities to %s" % save_prob_path)
         np.save(save_prob_path, full_prob_list_np)

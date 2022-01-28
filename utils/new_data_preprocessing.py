@@ -145,6 +145,9 @@ valid_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_s
 test_known_known_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/data/object_recognition/image_net/" \
                               "derivatives/dataset_v1_3_partition/npy_json_files_shuffle/test_known_known.json"
 
+save_split_json_path = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
+                       "dataset_v1_3_partition/npy_json_files_shuffled/"
+
 
 #################################################################################
 # Functions
@@ -1299,63 +1302,6 @@ def combine_json(train_known_known_with_rt_path,
 
 
 
-    # for i in range(len(train_known_known_with_rt_json)):
-    #     print(train_known_known_with_rt_json[str(i+1)])
-    # print("Training json before combining json has %d entries." % len(train_known_known_with_rt_json))
-    # for i in range(len(train_known_known_without_rt_json)):
-    #     try:
-    #         one_entry = train_known_known_without_rt_json[str(i+1)]
-    #         print(one_entry)
-    #         sys.exit()
-    #         train_known_known_with_rt_json[len(train_known_known_with_rt_json) + i] = one_entry
-    #     except Exception as e:
-    #         print(e)
-    #         continue
-    #
-    # print("Training json after combining json has %d entries." % len(train_known_known_with_rt_json))
-    #
-    # with open(save_training_json_path, 'w') as f:
-    #     json.dump(train_known_known_with_rt_json, f)
-    #     print("Saving file to %s" % save_training_json_path)
-    #
-    # labels = []
-    #
-    # print(train_known_known_with_rt_json["0"])
-
-    # try:
-    #     for i in range(len(train_known_known_with_rt_json)):
-    #         labels.append(train_known_known_with_rt_json[i]["label"])
-    # except:
-    #     for i in range(len(train_known_known_with_rt_json)):
-    #         labels.append(train_known_known_with_rt_json[i+1]["label"])
-    #
-    # print(np.unique(np.asarray(labels)))
-    #
-    # print("*" * 40)
-    # # Merge valid Jsons
-    # print("Valid json before combining json has %d entries." % len(valid_known_known_with_rt_json))
-    # for i in range(len(valid_known_known_without_rt_json)):
-    #     one_entry = valid_known_known_without_rt_json[str(i+1)]
-    #     valid_known_known_with_rt_json[len(valid_known_known_with_rt_json) + i] = one_entry
-    # print("Valid json after combining json has %d entries." % len(valid_known_known_with_rt_json))
-    #
-    #
-    # try:
-    #     for i in range(len(valid_known_known_with_rt_json)):
-    #         labels.append(valid_known_known_with_rt_json[str(i)]["label"])
-    # except:
-    #     for i in range(len(valid_known_known_with_rt_json)):
-    #         labels.append(valid_known_known_with_rt_json[str(i+1)]["label"])
-    #
-    # print(np.unique(np.asarray(labels)))
-    #
-    #
-    # with open(save_valid_json_path, 'w') as f:
-    #     json.dump(valid_known_known_with_rt_json, f)
-    #     print("Saving file to %s" % save_valid_json_path)
-
-
-
 
 def adjust_json_index(train_json_path,
                       valid_json_path):
@@ -1417,13 +1363,77 @@ def adjust_json_index(train_json_path,
 
 
 
+def split_json_file(json_path,
+                    save_json_path,
+                    nb_split=4):
+    """
+    Split a large json into several small jsons
+
+    :param json_path:
+    :return:
+    """
+    # Load Json file
+    with open(json_path) as f_train:
+        json_file = json.load(f_train)
 
 
+    nb_img_per_file = round(len(json_file)/nb_split)
+    print("Number of images per file:", nb_img_per_file)
+
+
+    # Loop thru the Json and save
+    test_dict = {}
+    count = 0
+    json_index = 0
+
+    for i in range(len(json_file)):
+        # When we haven't finished on one json
+        if count != nb_img_per_file:
+            if i != len(json_file) - 1:
+                one_entry = json_file[str(i)]
+                test_dict[str(i)] = one_entry
+                count +=1
+            else:
+                print("Processing last sub-json")
+                # Adjust the indices of the jsons
+                final_dict = {}
+                for (j, key) in enumerate(test_dict.keys()):
+                    final_dict[str(j)] = test_dict[key]
+
+                # Save this sub-json
+                save_sub_json_path = save_json_path + "test_known_known_part_" + str(json_index) + ".json"
+
+                with open(save_sub_json_path, 'w') as f:
+                    json.dump(final_dict, f)
+                    print("Saving file to %s" % save_sub_json_path)
+
+
+        # After we get a json done
+        else:
+            print("Processing one sub-json")
+            # Adjust the indices of the jsons
+            final_dict = {}
+            for (j, key) in enumerate(test_dict.keys()):
+                final_dict[str(j)] = test_dict[key]
+
+            # Save this sub-json
+            save_sub_json_path = save_json_path + "test_known_known_part_" + str(json_index) + ".json"
+
+            with open(save_sub_json_path, 'w') as f:
+                json.dump(final_dict, f)
+                print("Saving file to %s" % save_sub_json_path)
+
+            # Reset everything
+            test_dict = {}
+            count = 0
+            json_index += 1
 
 
 
 
 if __name__ == '__main__':
+    split_json_file(json_path=test_known_known_json_path,
+                    save_json_path=save_split_json_path)
 
     # Process RT file with known and unknown respectively
     # known_class_labels, known_image_names, known_rts = remove_outliers(instance_rt_path=known_rt_path)
@@ -1543,9 +1553,9 @@ if __name__ == '__main__':
     #              save_training_json_path=train_known_known_json_path,
     #              save_valid_json_path=valid_known_known_json_path)
 
-    combine_test_json(test_known_known_with_rt_path=test_known_known_with_rt_json_path,
-                      test_known_known_without_rt_path=test_known_known_without_rt_json_path,
-                      save_test_json_path=test_known_known_json_path)
+    # combine_test_json(test_known_known_with_rt_path=test_known_known_with_rt_json_path,
+    #                   test_known_known_without_rt_path=test_known_known_without_rt_json_path,
+    #                   save_test_json_path=test_known_known_json_path)
 
     # Adjust json: known_known
     # adjust_json_index(train_json_path=train_known_known_json_path,
