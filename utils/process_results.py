@@ -378,20 +378,20 @@ if __name__ == '__main__':
         # Run test process
         ################################################################
         # known_known
-        # print("@" * 40)
-        # print("Processing known_known samples")
-        # get_known_exit_stats(labels=test_known_known_labels,
-        #                      probs=test_known_known_probs,
-        #                      rts=test_known_known_rts,
-        #                      top_1_threshold=known_known_thresh)
-        #
-        # # known_unknown
-        # print("@" * 40)
-        # print("Processing known_unknown samples")
-        # get_unknown_exit_stats(labels=test_known_unknown_labels,
-        #                        probs=test_known_unknown_probs,
-        #                        rts=test_known_unknown_rts,
-        #                        top_1_threshold=known_unknown_thresh)
+        print("@" * 40)
+        print("Processing known_known samples")
+        get_known_exit_stats(labels=test_known_known_labels,
+                             probs=test_known_known_probs,
+                             rts=test_known_known_rts,
+                             top_1_threshold=known_known_thresh)
+
+        # known_unknown
+        print("@" * 40)
+        print("Processing known_unknown samples")
+        get_unknown_exit_stats(labels=test_known_unknown_labels,
+                               probs=test_known_unknown_probs,
+                               rts=test_known_unknown_rts,
+                               top_1_threshold=known_unknown_thresh)
 
         # # unknown_unknown
         print("@" * 40)
