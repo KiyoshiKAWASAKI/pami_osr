@@ -14,6 +14,379 @@ from tqdm import tqdm
 
 
 
+def train_valid_test_one_epoch_for_known(args,
+                                       loader_with_rt,
+                                       loader_without_rt,
+                                       model,
+                                       criterion,
+                                       optimizer,
+                                       nb_epoch,
+                                       use_msd_net,
+                                       train_phase,
+                                       save_path,
+                                       use_performance_loss,
+                                       use_exit_loss,
+                                       cross_entropy_weight,
+                                       perform_loss_weight,
+                                       exit_loss_weight,
+                                       known_exit_rt=None,
+                                       known_thresholds=None,
+                                       debug=False,
+                                       model_name="msd_net",
+                                       nb_clfs=5,
+                                       nBlocks=5,
+                                       nb_rt_classes=40,
+                                       nb_no_rt_classes=253,
+                                       nb_classes=294,
+                                       rt_max=28,
+                                       nb_sample_per_bacth=16,
+                                       human_known_rt_max=28,
+                                       human_unknown_rt_max=28,
+                                       machine_known_rt_max=0.057930,
+                                       machine_unknown_rt_max=0.071147):
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+
+    top1, top3, top5 = [], [], []
+    top1_rt, top3_rt, top5_rt = [], [], []
+    top1_no_rt, top3_no_rt, top5_no_rt = [], [], []
+
+    if use_msd_net:
+        for i in range(nBlocks):
+            top1.append(AverageMeter())
+            top3.append(AverageMeter())
+            top5.append(AverageMeter())
+
+            top1_rt.append(AverageMeter())
+            top3_rt.append(AverageMeter())
+            top5_rt.append(AverageMeter())
+
+            top1_no_rt.append(AverageMeter())
+            top3_no_rt.append(AverageMeter())
+            top5_no_rt.append(AverageMeter())
+    else:
+        top1.append(AverageMeter())
+        top3.append(AverageMeter())
+        top5.append(AverageMeter())
+
+        top1_rt.append(AverageMeter())
+        top3_rt.append(AverageMeter())
+        top5_rt.append(AverageMeter())
+
+        top1_no_rt.append(AverageMeter())
+        top3_no_rt.append(AverageMeter())
+        top5_no_rt.append(AverageMeter())
+
+    if train_phase:
+        model.train()
+    else:
+        model.eval()
+
+    end = time.time()
+    running_lr = None
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    if train_phase:
+        save_txt_path = os.path.join(save_path, "train_stats_epoch_" + str(nb_epoch) + ".txt")
+    else:
+        save_txt_path = os.path.join(save_path, "valid_stats_epoch_" + str(nb_epoch) + ".txt")
+
+    # Count number of batches for known and unknown respectively
+    nb_rt_batches = len(loader_with_rt)
+    nb_no_rt_batches = len(loader_without_rt)
+    nb_total_batches = nb_rt_batches + nb_no_rt_batches
+
+    print("There are %d batches in RT loader" % nb_rt_batches)
+    print("There are %d batches in no RT loader" % nb_no_rt_batches)
+
+    # Generate index for known and unknown and shuffle
+    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
+    rt_indices = all_indices[:nb_rt_batches]
+    no_rt_indices = all_indices[nb_rt_batches:]
+
+    # Create iterator
+    rt_iter = iter(loader_with_rt)
+    no_rt_iter = iter(loader_without_rt)
+
+    # Only train one batch for each step
+    with open(save_txt_path, 'w') as f:
+        for i in tqdm(range(nb_total_batches)):
+            ##########################################
+            # Basic setups
+            ##########################################
+            lr = adjust_learning_rate(optimizer, nb_epoch, args, batch=i,
+                                      nBatch=nb_total_batches, method=args.lr_type)
+            if running_lr is None:
+                running_lr = lr
+
+            data_time.update(time.time() - end)
+            loss = 0.0
+
+            ##########################################
+            # Get a batch
+            ##########################################
+            if i in rt_indices:
+                batch = next(rt_iter)
+
+            elif i in no_rt_indices:
+                try:
+                    batch = next(no_rt_iter)
+                except:
+                    continue
+
+            input = batch["imgs"]
+            rts = batch["rts"]
+            target = batch["labels"]
+
+            # Convert into PyTorch tensor
+            input_var = torch.autograd.Variable(input).cuda()
+            target = target.cuda(async=True)
+            target_var = torch.autograd.Variable(target).long()
+
+            start = timer()
+            output, feature, end_time = model(input_var)
+
+            full_rt_list = []
+            for end in end_time[0]:
+                full_rt_list.append(end - start)
+
+            # len(output) = 5
+            if not isinstance(output, list):
+                output = [output]
+
+            # TODO: need to double check this section when using psyphy
+            if use_exit_loss == True:
+                ##########################################
+                # Get exits for each sample
+                ##########################################
+                # Define the RT cuts and the thresholds
+                exit_rt_cut = known_exit_rt
+                top_1_threshold = known_thresholds
+
+                """
+                Find the target exit RT for each sample according to its RT:
+                    If a batch has human RT: check the 5 intervals from human RT distribution
+                    If a batch doesn't have human RT: assign zeroes
+                """
+                target_exit_rt = []
+
+                if rts[0] != 0:
+                    for one_rt in rts:
+                        if (one_rt < exit_rt_cut[0]):
+                            target_exit_rt.append(exit_rt_cut[0])
+                        if (one_rt >= exit_rt_cut[0]) and (one_rt < exit_rt_cut[1]):
+                            target_exit_rt.append(exit_rt_cut[1])
+                        if (one_rt >= exit_rt_cut[1]) and (one_rt < exit_rt_cut[2]):
+                            target_exit_rt.append(exit_rt_cut[2])
+                        if (one_rt >= exit_rt_cut[2]) and (one_rt < exit_rt_cut[3]):
+                            target_exit_rt.append(exit_rt_cut[3])
+                        if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
+                            target_exit_rt.append(exit_rt_cut[4])
+                else:
+                    target_exit_rt = [0.0] * nb_sample_per_bacth
+
+                if debug:
+                    print("Human RTs from batch:")
+                    print(rts)
+                    print("Exit RT cut:")
+                    print(exit_rt_cut)
+                    print("Obtained target exit RT")
+                    print(target_exit_rt)
+
+                """
+                Find the actual/predicted RT for each sample
+
+                Case 1:
+                    prob > threshold && prediction is correct - exit right away
+                Case 2:
+                    prob < threshold && not at the last exit 
+                    or
+                    prob > threshold but predicition is wrong - check next exit
+                Case 3:
+                    prob < threshold && at the last exit - exit no matter what
+                """
+                full_prob_list = []
+
+                # Logits to probs: Extract the probability and apply our threshold
+                sm = torch.nn.Softmax(dim=2)
+
+                prob = sm(torch.stack(output).to())  # Shape is [block, batch, class]
+                prob_list = np.array(prob.cpu().tolist())
+
+                # Reshape it into [batch, block, class]
+                prob_list = np.reshape(prob_list,
+                                       (prob_list.shape[1],
+                                        prob_list.shape[0],
+                                        prob_list.shape[2]))
+
+                for one_prob in prob_list.tolist():
+                    full_prob_list.append(one_prob)
+
+                # Thresholding - check for each exit
+                pred_exit_rt = []
+
+                for i in range(len(full_prob_list)):
+                    # Get probs and GT labels
+                    prob = full_prob_list[i]
+                    gt_label = target[i]
+
+                    # check each classifier in order and decide when to exit
+                    for j in range(nb_clfs):
+                        one_prob = prob[j]
+                        max_prob = np.sort(one_prob)[-1]
+                        pred = np.argmax(one_prob)
+
+                        # If this is not the last classifier
+                        if j != nb_clfs - 1:
+                            # Updated - use different threshold for each exit
+                            if (max_prob > top_1_threshold[j]) and (pred == gt_label):
+                                # Case 1
+                                pred_rt = full_rt_list[j]
+                                pred_exit_rt.append(pred_rt)
+                                break
+                            else:
+                                # Case 2
+                                continue
+                        # Case 3
+                        else:
+                            pred_rt = full_rt_list[-1]
+                            pred_exit_rt.append(pred_rt)
+
+                # Check the human RTs and machine RTs
+                if debug:
+                    print("Machine RT:")
+                    print(pred_exit_rt)
+
+            ##########################################
+            # Only MSD-Net
+            ##########################################
+            if model_name == "msd_net":
+                for j in range(len(output)):
+                    # Part 1: Cross-entropy loss
+                    ce_loss = criterion(output[j], target_var)
+
+                    # Part 2: Performance psyphy loss
+                    try:
+                        perform_loss = get_perform_loss(rt=rts[j], rt_max=rt_max)
+                    except:
+                        perform_loss = 0.0
+
+                    # Part 3: Exit psyphy loss
+                    if use_exit_loss:
+                        try:
+                            exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
+                                                      target_exit_rt=target_exit_rt[j],
+                                                      human_known_rt_max=human_known_rt_max,
+                                                      human_unknown_rt_max=human_unknown_rt_max,
+                                                      machine_known_rt_max=machine_known_rt_max,
+                                                      machine_unknown_rt_max=machine_unknown_rt_max,
+                                                      batch_type=None)
+                        except:
+                            exit_loss = 0.0
+
+                    # 3 Cases
+                    if (use_performance_loss == True) and (use_exit_loss == False):
+                        loss += cross_entropy_weight * ce_loss + \
+                                perform_loss_weight * perform_loss
+
+                    if (use_exit_loss == True) and (use_exit_loss == True):
+                        loss += cross_entropy_weight * ce_loss + \
+                                perform_loss_weight * perform_loss + \
+                                exit_loss_weight * exit_loss
+
+                    if (use_performance_loss == False) and (use_exit_loss == False):
+                        loss += ce_loss
+
+
+            else:
+                # TODO(low priority): other networks -
+                #  may be the same with MSD Net cause 5 weights are gone?
+                pass
+
+            ##########################################
+            # Calculate loss and BP
+            ##########################################
+            losses.update(loss.item(), input.size(0))
+
+            for j in range(len(output)): # shape of output: [nb_exit, batch, nb_classes]
+                # Calculate acc for all classes
+                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                top1[j].update(prec1.item(), input.size(0))
+                top3[j].update(prec3.item(), input.size(0))
+                top5[j].update(prec5.item(), input.size(0))
+
+                print()
+
+                # TODO: Calculate acc for no RT
+                output_without_rt = []
+                for k in range(nb_sample_per_bacth):
+                    one_output_without_rt = output[j][k][:nb_no_rt_classes]
+                    output_without_rt.append(list(one_output_without_rt))
+
+                prec1_without_rt, prec3_without_rt, prec5_without_rt = accuracy(
+                    torch.Tensor(output_without_rt).cuda().data,
+                    target_var[:nb_no_rt_classes],
+                    topk=(1, 3, 5))
+
+                top1_no_rt[j].update(prec1_without_rt.item(), input.size(0))
+                top3_no_rt[j].update(prec3_without_rt.item(), input.size(0))
+                top5_no_rt[j].update(prec5_without_rt.item(), input.size(0))
+
+                print(prec1_without_rt, prec3_without_rt, prec5_without_rt)
+
+                # TODO: Calculate acc for RT
+                output_with_rt = []
+                for k in range(nb_sample_per_bacth):
+                    one_output_with_rt = output[j][k][nb_no_rt_classes:]
+                    output_with_rt.append(list(one_output_with_rt))
+
+                prec1_with_rt, prec3_with_rt, prec5_with_rt = accuracy(
+                    torch.Tensor(output_with_rt).cuda().data,
+                    target_var[nb_no_rt_classes:],
+                    topk=(1, 3, 5))
+
+                top1_rt[j].update(prec1_with_rt.item(), input.size(0))
+                top3_rt[j].update(prec3_with_rt.item(), input.size(0))
+                top5_rt[j].update(prec5_with_rt.item(), input.size(0))
+
+                print(prec1_with_rt, prec3_with_rt, prec5_with_rt)
+
+
+
+                # TODO: add other metrics (low priority for now)
+
+
+            if train_phase:
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+
+            # TODO: Update resultes with RT and without RT separately
+            f.write('Epoch: [{0}][{1}/{2}]\t'
+                    'Loss {loss.val:.4f}\t'
+                    'Acc@1 {top1.val:.4f}\t'
+                    'Acc@3 {top3.val:.4f}\t'
+                    'Acc@5 {top5.val:.4f}\n'.format(
+                nb_epoch, i + 1, nb_total_batches,
+                loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+
+
+
 
 
 def train_valid_test_one_epoch(args,
@@ -43,7 +416,7 @@ def train_valid_test_one_epoch(args,
                                nb_classes=294,
                                nb_training_classes=294,
                                rt_max=28,
-                               nb_sample_per_bacth=16,
+                               nb_sample_per_batch=16,
                                human_known_rt_max=28,
                                human_unknown_rt_max=28,
                                machine_known_rt_max=0.057930,
@@ -202,7 +575,7 @@ def train_valid_test_one_epoch(args,
                         if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
                             target_exit_rt.append(exit_rt_cut[4])
                 else:
-                    target_exit_rt = [0.0] * nb_sample_per_bacth
+                    target_exit_rt = [0.0] * nb_sample_per_batch
 
                 if debug:
                     print("Human RTs from batch:")
@@ -400,7 +773,7 @@ def save_probs_and_features(test_loader,
                 continue
 
             input = batch["imgs"]
-            target = batch["labels"] - 1
+            target = batch["labels"]
 
             rts = []
             input = input.cuda()
@@ -476,12 +849,6 @@ def save_probs_and_features(test_loader,
 
 
 
-
-
-
-
-
-
 def find_best_model(dir_to_models,
                     model_format=".dat"):
     """
@@ -541,7 +908,7 @@ def get_exit_loss(pred_exit_rt,
                   human_unknown_rt_max,
                   machine_known_rt_max,
                   machine_unknown_rt_max,
-                  batch_type):
+                  batch_type=None):
     """
 
     :param pred_exit_rt:
@@ -553,13 +920,15 @@ def get_exit_loss(pred_exit_rt,
     :param batch_type:
     :return:
     """
-    if batch_type == "known":
-        exit_loss = abs((target_exit_rt/human_known_rt_max) - (pred_exit_rt/machine_known_rt_max))
-    elif batch_type == "unknown":
-        exit_loss = abs((target_exit_rt/human_unknown_rt_max) - (pred_exit_rt/machine_unknown_rt_max))
+    if batch_type is not None:
+        if batch_type == "known":
+            exit_loss = abs((target_exit_rt/human_known_rt_max) - (pred_exit_rt/machine_known_rt_max))
+        elif batch_type == "unknown":
+            exit_loss = abs((target_exit_rt/human_unknown_rt_max) - (pred_exit_rt/machine_unknown_rt_max))
+        else:
+            sys.exit()
     else:
-        print("Invalid batch type.")
-        sys.exit()
+        exit_loss = abs((target_exit_rt / human_known_rt_max) - (pred_exit_rt / machine_known_rt_max))
 
     return exit_loss
 

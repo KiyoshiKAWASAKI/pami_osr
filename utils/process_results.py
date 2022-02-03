@@ -14,16 +14,16 @@ import statistics
 
 
 #TODO: change this for each model
-percentile = [50, 55, 60, 65, 70]
+percentile = [50]
 
 # save_path_sub = "2022-01-13/cross_entropy_only_unknown_ratio_1.0/seed_0"
 # epoch = 144
 
-# save_path_sub = "2022-01-13/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
-# epoch = 162
-
 # save_path_sub = "2022-01-13/cross_entropy_1.0_pfm_1.0_unknown_ratio_1.0/seed_0"
 # epoch = 193
+
+# save_path_sub = "2022-01-13/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+# epoch = 162
 
 save_path_sub = "2022-01-10/cross_entropy_1.0_pfm_3.0_exit_3.0_unknown_ratio_1.0/seed_0"
 epoch = 107
@@ -61,10 +61,9 @@ def get_known_exit_stats(labels,
     for i in range(len(labels)):
         original_label = labels[i]
 
-        if original_label < nb_training_classes-1:
-            target_label = original_label
-        else:
-            target_label = -1
+        print("*" * 30)
+
+        target_label = original_label + 1
 
         prob = probs[i]
         rt = rts[i]
@@ -75,8 +74,8 @@ def get_known_exit_stats(labels,
             pred = np.argmax(one_prob)
             max_prob = np.sort(one_prob)[-1]
 
-            # print("pred", pred)
-            # print("target", target_label)
+            print("GT:", target_label)
+            print("prediction", pred)
 
             # If this is not the last classifier
             if j != nb_clfs - 1:
@@ -85,6 +84,8 @@ def get_known_exit_stats(labels,
                     exit_count[j] += 1
                     known_as_known_count += 1
                     nb_correct += 1
+
+                    break
 
                 else:
                     continue
@@ -96,7 +97,7 @@ def get_known_exit_stats(labels,
                 if max_prob > top_1_threshold[-1]:
                     known_as_known_count += 1
 
-                    if pred == target_label+1:
+                    if pred == target_label:
                         nb_correct += 1
                     else:
                         nb_wrong += 1
@@ -127,12 +128,12 @@ def get_known_exit_stats(labels,
     print(exit_count_percentage)
 
     # Deal with RTs
-    # exit_rt_np = np.asarray(exit_rt)
-    #
-    # print("Known RT avg:")
-    # print(np.mean(exit_rt_np))
-    # print("Known RT median:")
-    # print(np.median(exit_rt_np))
+    exit_rt_np = np.asarray(exit_rt)
+
+    print("Known RT avg:")
+    print(np.mean(exit_rt_np))
+    print("Known RT median:")
+    print(np.median(exit_rt_np))
 
 
 
@@ -207,7 +208,7 @@ def get_unknown_exit_stats(labels,
 
     print("Total number of samples: %d" % len(labels))
     print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
-    print("Unknown predicted as known: %d" % unknown_as_unknown_count)
+    print("Unknown predicted as known: %d" % unknown_as_known_count)
     print("Number of right prediction: %d" % nb_correct)
     print("Number of wrong prediction: %d" % nb_wrong)
     print("Accuracy: %4f" % acc)
@@ -222,12 +223,12 @@ def get_unknown_exit_stats(labels,
     print(exit_count_percentage)
 
     # Deal with RTs
-    # exit_rt_np = np.asarray(exit_rt)
+    exit_rt_np = np.asarray(exit_rt)
 
-    # print("Unknown RT avg:")
-    # print(np.mean(exit_rt_np))
-    # print("Unknown RT median:")
-    # print(np.median(exit_rt_np))
+    print("Unknown RT avg:")
+    print(np.mean(exit_rt_np))
+    print("Unknown RT median:")
+    print(np.median(exit_rt_np))
 
 
 
@@ -360,6 +361,12 @@ if __name__ == '__main__':
     test_unknown_unknown_rts = np.load(test_unknown_unknown_rt_path)
 
 
+    # print(np.unique(test_known_known_labels))
+    # print(np.unique(test_known_unknown_labels))
+    # print(np.unique(test_unknown_unknown_labels))
+    # sys.exit()
+
+
     for one_perct in percentile:
         print("#" * 50)
         print("Current percentile:", one_perct)
@@ -378,7 +385,7 @@ if __name__ == '__main__':
         # Run test process
         ################################################################
         # known_known
-        print("@" * 40)
+        # print("@" * 40)
         print("Processing known_known samples")
         get_known_exit_stats(labels=test_known_known_labels,
                              probs=test_known_known_probs,
@@ -386,19 +393,19 @@ if __name__ == '__main__':
                              top_1_threshold=known_known_thresh)
 
         # known_unknown
-        print("@" * 40)
-        print("Processing known_unknown samples")
-        get_unknown_exit_stats(labels=test_known_unknown_labels,
-                               probs=test_known_unknown_probs,
-                               rts=test_known_unknown_rts,
-                               top_1_threshold=known_unknown_thresh)
+        # print("@" * 40)
+        # print("Processing known_unknown samples")
+        # get_known_exit_stats(labels=test_known_unknown_labels,
+        #                        probs=test_known_unknown_probs,
+        #                        rts=test_known_unknown_rts,
+        #                        top_1_threshold=known_unknown_thresh)
 
         # # unknown_unknown
-        print("@" * 40)
-        print("Processing unknown_unknown samples")
-        get_unknown_exit_stats(labels=test_unknown_unknown_labels,
-                               probs=test_unknown_unknown_probs,
-                               rts=test_unknown_unknown_rts,
-                               top_1_threshold=known_unknown_thresh)
+        # print("@" * 40)
+        # print("Processing unknown_unknown samples")
+        # get_unknown_exit_stats(labels=test_unknown_unknown_labels,
+        #                        probs=test_unknown_unknown_probs,
+        #                        rts=test_unknown_unknown_rts,
+        #                        top_1_threshold=known_unknown_thresh)
 
 

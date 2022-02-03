@@ -10,7 +10,9 @@ from args import arg_parser
 import torch.nn as nn
 import models
 from datetime import datetime
-from utils.pipeline_util import train_valid_test_one_epoch, save_probs_and_features, find_best_model
+from utils.pipeline_util import train_valid_test_one_epoch, \
+    save_probs_and_features, find_best_model, \
+    train_valid_test_one_epoch_for_known
 
 args = arg_parser.parse_args()
 
@@ -32,8 +34,7 @@ use_exit_loss = False
 cross_entropy_weight = 1.0
 perform_loss_weight = 1.0
 exit_loss_weight = 1.0
-random_seed = 3
-unknown_ratio = 1.0
+random_seed = 0
 
 ###################################################################
                     # Training options #
@@ -65,7 +66,7 @@ run_test: testing with psyphy and exits
 # test_model_dir = "2022-01-13/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
 
 # TODO: pfm 3.0, exit 3.0 seed 0 -- test_04
-test_model_dir = ""
+test_model_dir = None
 
 
 ##################################################
@@ -76,32 +77,27 @@ save_one_sample_rt_folder = None
 # TODO: May need to change this in the future
 save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
 
-test_model_path = save_path_base + "/" + test_model_dir
-
-if test_model_path is not None:
+if run_test:
+    test_model_path = save_path_base + "/" + test_model_dir
     test_date = test_model_path.split("/")[-4]
-
 
 ###################################################################
                 # Paths for saving results #
 ###################################################################
 if (use_performance_loss == False) and (use_exit_loss == False):
-    save_path_sub = "cross_entropy_only"
+    save_path_sub = "known_only_cross_entropy"
 
 elif (use_performance_loss == True) and (use_exit_loss == False):
-    save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
+    save_path_sub = "known_only_cross_entropy_" + str(cross_entropy_weight) + \
                     "_pfm_" + str(perform_loss_weight)
 
 elif (use_performance_loss == True) and (use_exit_loss == True):
-    save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
+    save_path_sub = "known_only_cross_entropy_" + str(cross_entropy_weight) + \
                     "_pfm_" + str(perform_loss_weight) + \
                     "_exit_" + str(exit_loss_weight)
 
 else:
     save_path_sub = None
-
-if unknown_ratio is not None:
-    save_path_sub = save_path_sub + "_unknown_ratio_" + str(unknown_ratio)
 
 
 ####################################################################
@@ -136,12 +132,6 @@ else:
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
 unknown_exit_rt = [4.2550, 5.9220, 8.2368, 13.0090, 28.1661]
 
-# TODO: Need to update these thresholds
-# known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
-#                     0.5123290032915468, 0.5468768758061252]
-# unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
-#                       0.42355671497950664, 0.4600701578332428]
-
 known_thresholds = [0.0, 0.0, 0.0, 0.0, 0.0]
 unknown_thresholds = [0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -173,45 +163,44 @@ else:
     save_path = save_path_with_date + "/" + save_path_sub + "/seed_" + str(random_seed)
 
 if debug:
-    train_known_known_path = os.path.join(json_data_base_debug, "debug_known_known.json")
-    train_known_unknown_path = os.path.join(json_data_base_debug, "debug_known_unknown.json")
+    train_known_known_with_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
+    train_known_known_without_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
 
-    valid_known_known_path = os.path.join(json_data_base_debug, "debug_known_known.json")
-    valid_known_unknown_path = os.path.join(json_data_base_debug, "debug_known_unknown.json")
+    valid_known_known_with_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
+    valid_known_known_without_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
 
     test_known_known_path = os.path.join(json_data_base_debug, "debug_known_known.json")
-    test_known_unknown_path = os.path.join(json_data_base_debug, "debug_known_unknown.json")
-    test_unknown_unknown_path = os.path.join(json_data_base_debug, "debug_known_unknown.json")
+    test_known_known_with_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
+    test_known_known_without_rt_path = os.path.join(json_data_base_debug, "debug_known_known.json")
+
+    test_known_known_path_p0 = None
+    test_known_known_path_p1 = None
+    test_known_known_path_p2 = None
+    test_known_known_path_p3 = None
 
 else:
-    train_known_known_path = os.path.join(json_data_base, "train_known_known.json")
+    # TODO: Add known_known w RT and known_known w/o RT and remove unknown
+    train_known_known_with_rt_path = os.path.join(json_data_base, "train_known_known_with_rt.json")
+    train_known_known_without_rt_path = os.path.join(json_data_base, "train_known_known_without_rt.json")
 
-    if unknown_ratio == 1.0:
-        train_known_unknown_path = os.path.join(json_data_base, "train_known_unknown.json")
-    else:
-        train_known_unknown_path = json_data_base + "/train_known_unknown_" + str(unknown_ratio) + ".json"
-
-    valid_known_known_path = os.path.join(json_data_base, "valid_known_known.json")
-    valid_known_unknown_path = os.path.join(json_data_base, "valid_known_unknown.json")
+    valid_known_known_with_rt_path = os.path.join(json_data_base, "valid_known_known_with_rt.json")
+    valid_known_known_without_rt_path = os.path.join(json_data_base, "valid_known_known_without_rt.json")
 
     test_known_known_path = os.path.join(json_data_base, "test_known_known.json")
+
+    test_known_known_with_rt_path = os.path.join(json_data_base, "test_known_known_with_rt.json")
+    test_known_known_without_rt_path = os.path.join(json_data_base, "test_known_known_without_rt.json")
 
     test_known_known_path_p0 = os.path.join(json_data_base, "test_known_known_part_0.json")
     test_known_known_path_p1 = os.path.join(json_data_base, "test_known_known_part_1.json")
     test_known_known_path_p2 = os.path.join(json_data_base, "test_known_known_part_2.json")
     test_known_known_path_p3 = os.path.join(json_data_base, "test_known_known_part_3.json")
 
-    test_known_unknown_path = os.path.join(json_data_base, "test_known_unknown.json")
-    test_unknown_unknown_path = os.path.join(json_data_base, "test_unknown_unknown.json")
-
-
 
 if __name__ == '__main__':
     depth=100
     growth_rate=12
     efficient=True
-
-    # global args
 
     # Get densenet configuration
     if (depth - 4) % 3:
@@ -238,56 +227,61 @@ if __name__ == '__main__':
     # Create dataset and data loader
     #######################################################################
     # Training
-    train_known_known_dataset = msd_net_dataset(json_path=train_known_known_path,
+    train_known_known_with_rt_dataset = msd_net_dataset(json_path=train_known_known_with_rt_path,
                                                          transform=train_transform)
-    train_known_unknown_dataset = msd_net_dataset(json_path=train_known_unknown_path,
+    train_known_known_without_rt_dataset = msd_net_dataset(json_path=train_known_known_without_rt_path,
                                                            transform=train_transform)
 
-    train_known_known_index = torch.randperm(len(train_known_known_dataset))
-    train_known_unknown_index = torch.randperm(len(train_known_unknown_dataset))
+    train_known_known_with_rt_index = torch.randperm(len(train_known_known_with_rt_dataset))
+    train_known_known_without_rt_index = torch.randperm(len(train_known_known_without_rt_dataset))
 
-    train_known_known_loader = torch.utils.data.DataLoader(train_known_known_dataset,
-                                                           batch_size=batch_size,
-                                                           shuffle=False,
-                                                           drop_last=True,
-                                                           collate_fn=customized_dataloader.collate,
-                                                           sampler=torch.utils.data.RandomSampler(
-                                                               train_known_known_index))
-    train_known_unknown_loader = torch.utils.data.DataLoader(train_known_unknown_dataset,
-                                                             batch_size=batch_size,
-                                                             shuffle=False,
-                                                             drop_last=True,
-                                                             collate_fn=customized_dataloader.collate,
-                                                             sampler=torch.utils.data.RandomSampler(
-                                                                 train_known_unknown_index))
+    train_known_known_with_rt_loader = torch.utils.data.DataLoader(train_known_known_with_rt_dataset,
+                                                                   batch_size=batch_size,
+                                                                   shuffle=False,
+                                                                   drop_last=True,
+                                                                   collate_fn=customized_dataloader.collate,
+                                                                   sampler=torch.utils.data.RandomSampler(
+                                                                   train_known_known_with_rt_index))
+    train_known_known_without_rt_loader = torch.utils.data.DataLoader(train_known_known_without_rt_dataset,
+                                                                       batch_size=batch_size,
+                                                                       shuffle=False,
+                                                                       drop_last=True,
+                                                                       collate_fn=customized_dataloader.collate,
+                                                                       sampler=torch.utils.data.RandomSampler(
+                                                                       train_known_known_with_rt_index))
+
 
     # Validation
-    valid_known_known_dataset = msd_net_dataset(json_path=valid_known_known_path,
+    valid_known_known_with_rt_dataset = msd_net_dataset(json_path=valid_known_known_with_rt_path,
                                                          transform=valid_transform)
-    valid_known_unknown_dataset = msd_net_dataset(json_path=valid_known_unknown_path,
-                                                           transform=valid_transform)
+    valid_known_known_without_rt_dataset = msd_net_dataset(json_path=valid_known_known_without_rt_path,
+                                                        transform=valid_transform)
 
-    valid_known_known_index = torch.randperm(len(valid_known_known_dataset))
-    valid_known_unknown_index = torch.randperm(len(valid_known_unknown_dataset))
+    valid_known_known_with_rt_index = torch.randperm(len(valid_known_known_with_rt_dataset))
+    valid_known_known_without_rt_index = torch.randperm(len(valid_known_known_without_rt_dataset))
 
-    valid_known_known_loader = torch.utils.data.DataLoader(valid_known_known_dataset,
-                                                           batch_size=batch_size,
-                                                           shuffle=False,
-                                                           collate_fn=customized_dataloader.collate,
-                                                           sampler=torch.utils.data.RandomSampler(
-                                                               valid_known_known_index))
-    valid_known_unknown_loader = torch.utils.data.DataLoader(valid_known_unknown_dataset,
-                                                             batch_size=batch_size,
-                                                             shuffle=False,
-                                                             drop_last=True,
-                                                             collate_fn=customized_dataloader.collate,
-                                                             sampler=torch.utils.data.RandomSampler(
-                                                                 valid_known_unknown_index))
+    valid_known_known_with_rt_loader = torch.utils.data.DataLoader(valid_known_known_with_rt_dataset,
+                                                                   batch_size=batch_size,
+                                                                   shuffle=False,
+                                                                   collate_fn=customized_dataloader.collate,
+                                                                   sampler=torch.utils.data.RandomSampler(
+                                                                       valid_known_known_with_rt_index))
+    valid_known_known_without_rt_loader = torch.utils.data.DataLoader(valid_known_known_without_rt_dataset,
+                                                                   batch_size=batch_size,
+                                                                   shuffle=False,
+                                                                   collate_fn=customized_dataloader.collate,
+                                                                   sampler=torch.utils.data.RandomSampler(
+                                                                       valid_known_known_without_rt_index))
 
-    # Test loaders
-    test_known_known_dataset = msd_net_dataset(json_path=test_known_known_path,
+    # if not debug:
+        # Test loaders
+    test_known_known_with_rt_dataset = msd_net_dataset(json_path=test_known_known_with_rt_path,
                                                   transform=test_transform)
-    test_known_known_index = torch.randperm(len(test_known_known_dataset))
+    test_known_known_with_rt_index = torch.randperm(len(test_known_known_with_rt_dataset))
+
+    test_known_known_without_rt_dataset = msd_net_dataset(json_path=test_known_known_without_rt_path,
+                                                       transform=test_transform)
+    test_known_known_without_rt_index = torch.randperm(len(test_known_known_without_rt_dataset))
 
     test_known_known_dataset_p0 = msd_net_dataset(json_path=test_known_known_path_p0,
                                                transform=test_transform)
@@ -306,22 +300,22 @@ if __name__ == '__main__':
     test_known_known_index_p3 = torch.randperm(len(test_known_known_dataset_p3))
 
 
-    test_known_unknown_dataset = msd_net_dataset(json_path=test_known_unknown_path,
-                                                 transform=test_transform)
-    test_known_unknown_index = torch.randperm(len(test_known_unknown_dataset))
-
-    test_unknown_unknown_dataset = msd_net_dataset(json_path=test_unknown_unknown_path,
-                                                   transform=test_transform)
-    test_unknown_unknown_index = torch.randperm(len(test_unknown_unknown_dataset))
-
     # When doing test, set the batch size to 1 to test the time one by one accurately
-    test_known_known_loader = torch.utils.data.DataLoader(test_known_known_dataset,
+    test_known_known_with_rt_loader = torch.utils.data.DataLoader(test_known_known_with_rt_dataset,
                                                          batch_size=batch_size,
                                                          shuffle=False,
                                                          sampler=torch.utils.data.RandomSampler(
-                                                             test_known_known_index),
+                                                             test_known_known_with_rt_index),
                                                          collate_fn=customized_dataloader.collate,
                                                          drop_last=True)
+
+    test_known_known_without_rt_loader = torch.utils.data.DataLoader(test_known_known_without_rt_dataset,
+                                                                  batch_size=batch_size,
+                                                                  shuffle=False,
+                                                                  sampler=torch.utils.data.RandomSampler(
+                                                                      test_known_known_without_rt_index),
+                                                                  collate_fn=customized_dataloader.collate,
+                                                                  drop_last=True)
 
     test_known_known_loader_p0 = torch.utils.data.DataLoader(test_known_known_dataset_p0,
                                                           batch_size=batch_size,
@@ -355,21 +349,6 @@ if __name__ == '__main__':
                                                              collate_fn=customized_dataloader.collate,
                                                              drop_last=True)
 
-    test_known_unknown_loader = torch.utils.data.DataLoader(test_known_unknown_dataset,
-                                                            batch_size=batch_size,
-                                                            shuffle=False,
-                                                            sampler=torch.utils.data.RandomSampler(
-                                                                test_known_unknown_index),
-                                                            collate_fn=customized_dataloader.collate,
-                                                            drop_last=True)
-
-    test_unknown_unknown_loader = torch.utils.data.DataLoader(test_unknown_unknown_dataset,
-                                                              batch_size=batch_size,
-                                                              shuffle=False,
-                                                              sampler=torch.utils.data.RandomSampler(
-                                                                  test_unknown_unknown_index),
-                                                              collate_fn=customized_dataloader.collate,
-                                                              drop_last=True)
 
     ########################################################################
     # Create model: MSD-Net or other networks
@@ -440,9 +419,9 @@ if __name__ == '__main__':
             print("EPOCH:", epoch)
 
             train_loss, train_acc_top1,\
-            train_acc_top3, train_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                       known_loader=train_known_known_loader,
-                                                       unknown_loader=train_known_unknown_loader,
+            train_acc_top3, train_acc_top5 = train_valid_test_one_epoch_for_known(args=args,
+                                                       loader_with_rt=train_known_known_with_rt_loader,
+                                                       loader_without_rt=train_known_known_without_rt_loader,
                                                        model=model_wrapper,
                                                        criterion=criterion,
                                                        optimizer=optimizer,
@@ -456,16 +435,14 @@ if __name__ == '__main__':
                                                        perform_loss_weight=perform_loss_weight,
                                                        exit_loss_weight=exit_loss_weight,
                                                        known_exit_rt=known_exit_rt,
-                                                       unknown_exit_rt=unknown_exit_rt,
-                                                       known_thresholds=known_thresholds,
-                                                       unknown_thresholds=unknown_thresholds)
+                                                       known_thresholds=known_thresholds)
 
             scheduler.step()
 
             valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                       known_loader=valid_known_known_loader,
-                                                       unknown_loader=valid_known_unknown_loader,
+            valid_acc_top3, valid_acc_top5 = train_valid_test_one_epoch_for_known(args=args,
+                                                       loader_with_rt=valid_known_known_with_rt_loader,
+                                                       loader_without_rt=valid_known_known_without_rt_loader,
                                                        model=model_wrapper,
                                                        criterion=criterion,
                                                        optimizer=optimizer,
@@ -479,16 +456,14 @@ if __name__ == '__main__':
                                                        perform_loss_weight=perform_loss_weight,
                                                        exit_loss_weight=exit_loss_weight,
                                                        known_exit_rt=known_exit_rt,
-                                                       unknown_exit_rt=unknown_exit_rt,
-                                                       known_thresholds=known_thresholds,
-                                                       unknown_thresholds=unknown_thresholds)
+                                                       known_thresholds=known_thresholds)
 
             # TODO: Only test the model every few epochs
             if epoch % 10 == 0 or epoch == n_epochs:
                 _, test_acc_top1, \
-                test_acc_top3, test_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                            known_loader=test_known_known_loader,
-                                                            unknown_loader=test_known_unknown_loader,
+                test_acc_top3, test_acc_top5 = train_valid_test_one_epoch_for_known(args=args,
+                                                            loader_with_rt=test_known_known_with_rt_loader,
+                                                            loader_without_rt=test_known_known_without_rt_loader,
                                                             model=model_wrapper,
                                                             criterion=criterion,
                                                             optimizer=optimizer,
@@ -502,9 +477,7 @@ if __name__ == '__main__':
                                                             perform_loss_weight=perform_loss_weight,
                                                             exit_loss_weight=exit_loss_weight,
                                                             known_exit_rt=known_exit_rt,
-                                                            unknown_exit_rt=unknown_exit_rt,
-                                                            known_thresholds=known_thresholds,
-                                                            unknown_thresholds=unknown_thresholds)
+                                                            known_thresholds=known_thresholds)
             else:
                 test_acc_top1 = 0.000000000
                 test_acc_top3 = 0.000000000

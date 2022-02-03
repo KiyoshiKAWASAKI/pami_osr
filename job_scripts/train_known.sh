@@ -12,11 +12,11 @@ module load conda
 conda init bash
 source activate new_msd_net
 
-python train_known_only.py --arch msdnet \
-                           --batch-size 16 \
-                           --nb_training_classes 294 \
-                           --optimizer sgd \
-                           --learning-rate 0.1 \
-                           --epochs 200 \
-                           --test_with_novel True \
-                           --print-freq 1
+python known_pipeline.py --arch msdnet \
+                         --batch-size 16 \
+                         --nb_training_classes 294 \
+                         --optimizer sgd \
+                         --learning-rate 0.1 \
+                         --epochs 200 \
+                         --test_with_novel True \
+                         --print-freq 1
