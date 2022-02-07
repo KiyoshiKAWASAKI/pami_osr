@@ -29,7 +29,7 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = False
+use_performance_loss = True
 use_exit_loss = False
 cross_entropy_weight = 1.0
 perform_loss_weight = 1.0
@@ -248,7 +248,7 @@ if __name__ == '__main__':
                                                                        drop_last=True,
                                                                        collate_fn=customized_dataloader.collate,
                                                                        sampler=torch.utils.data.RandomSampler(
-                                                                       train_known_known_with_rt_index))
+                                                                       train_known_known_without_rt_index))
 
 
     # Validation

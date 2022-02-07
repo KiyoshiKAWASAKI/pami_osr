@@ -53,8 +53,6 @@ def train_valid_test_one_epoch_for_known(args,
     losses = AverageMeter()
 
     top1, top3, top5 = [], [], []
-    top1_rt, top3_rt, top5_rt = [], [], []
-    top1_no_rt, top3_no_rt, top5_no_rt = [], [], []
 
     if use_msd_net:
         for i in range(nBlocks):
@@ -62,25 +60,11 @@ def train_valid_test_one_epoch_for_known(args,
             top3.append(AverageMeter())
             top5.append(AverageMeter())
 
-            top1_rt.append(AverageMeter())
-            top3_rt.append(AverageMeter())
-            top5_rt.append(AverageMeter())
-
-            top1_no_rt.append(AverageMeter())
-            top3_no_rt.append(AverageMeter())
-            top5_no_rt.append(AverageMeter())
     else:
         top1.append(AverageMeter())
         top3.append(AverageMeter())
         top5.append(AverageMeter())
 
-        top1_rt.append(AverageMeter())
-        top3_rt.append(AverageMeter())
-        top5_rt.append(AverageMeter())
-
-        top1_no_rt.append(AverageMeter())
-        top3_no_rt.append(AverageMeter())
-        top5_no_rt.append(AverageMeter())
 
     if train_phase:
         model.train()
@@ -232,10 +216,10 @@ def train_valid_test_one_epoch_for_known(args,
                 # Thresholding - check for each exit
                 pred_exit_rt = []
 
-                for i in range(len(full_prob_list)):
+                for k in range(len(full_prob_list)):
                     # Get probs and GT labels
-                    prob = full_prob_list[i]
-                    gt_label = target[i]
+                    prob = full_prob_list[k]
+                    gt_label = target[k]
 
                     # check each classifier in order and decide when to exit
                     for j in range(nb_clfs):
@@ -321,46 +305,6 @@ def train_valid_test_one_epoch_for_known(args,
                 top1[j].update(prec1.item(), input.size(0))
                 top3[j].update(prec3.item(), input.size(0))
                 top5[j].update(prec5.item(), input.size(0))
-
-                print()
-
-                # TODO: Calculate acc for no RT
-                output_without_rt = []
-                for k in range(nb_sample_per_bacth):
-                    one_output_without_rt = output[j][k][:nb_no_rt_classes]
-                    output_without_rt.append(list(one_output_without_rt))
-
-                prec1_without_rt, prec3_without_rt, prec5_without_rt = accuracy(
-                    torch.Tensor(output_without_rt).cuda().data,
-                    target_var[:nb_no_rt_classes],
-                    topk=(1, 3, 5))
-
-                top1_no_rt[j].update(prec1_without_rt.item(), input.size(0))
-                top3_no_rt[j].update(prec3_without_rt.item(), input.size(0))
-                top5_no_rt[j].update(prec5_without_rt.item(), input.size(0))
-
-                print(prec1_without_rt, prec3_without_rt, prec5_without_rt)
-
-                # TODO: Calculate acc for RT
-                output_with_rt = []
-                for k in range(nb_sample_per_bacth):
-                    one_output_with_rt = output[j][k][nb_no_rt_classes:]
-                    output_with_rt.append(list(one_output_with_rt))
-
-                prec1_with_rt, prec3_with_rt, prec5_with_rt = accuracy(
-                    torch.Tensor(output_with_rt).cuda().data,
-                    target_var[nb_no_rt_classes:],
-                    topk=(1, 3, 5))
-
-                top1_rt[j].update(prec1_with_rt.item(), input.size(0))
-                top3_rt[j].update(prec3_with_rt.item(), input.size(0))
-                top5_rt[j].update(prec5_with_rt.item(), input.size(0))
-
-                print(prec1_with_rt, prec3_with_rt, prec5_with_rt)
-
-
-
-                # TODO: add other metrics (low priority for now)
 
 
             if train_phase:
