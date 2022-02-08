@@ -12,9 +12,9 @@ module load conda
 conda init bash
 source activate new_msd_net
 
-python generate_features.py --arch msdnet \
-                            --batch-size 1 \
-                            --generate_feature True \
-                            --nb_training_classes 296 \
-                            --test_with_novel True \
-                            --print-freq 1
+python obtain_init_threshold.py --arch msdnet \
+                             --batch-size 16 \
+                             --generate_feature True \
+                             --nb_training_classes 294 \
+                             --test_with_novel True \
+                             --print-freq 1

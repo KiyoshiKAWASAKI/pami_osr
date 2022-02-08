@@ -527,9 +527,8 @@ if __name__ == '__main__':
                                                            valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5,
                                                            test_acc_top1, test_acc_top3, test_acc_top5))
 
-
     ########################################################################
-    # testing
+    # Testing trained model
     ########################################################################
     else:
         if model_name == "msd_net":

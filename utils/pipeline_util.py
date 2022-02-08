@@ -707,8 +707,6 @@ def save_probs_and_features(test_loader,
         full_rt_list = []
         full_feature_list = []
 
-        print(len(test_loader))
-        # sys.exit()
 
         for i in tqdm(range(len(test_loader))):
             try:
@@ -743,7 +741,6 @@ def save_probs_and_features(test_loader,
 
             # Save the RTs
             for end in end_time[0]:
-                # print("Processes one sample in %f sec" % (end - start))
                 rts.append(end-start)
             full_rt_list.append(rts)
 
