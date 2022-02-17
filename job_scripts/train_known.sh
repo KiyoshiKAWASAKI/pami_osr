@@ -5,7 +5,7 @@
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
 #$ -e errors/
-#$ -N sam_1.0_s0
+#$ -N pp_1_2_1_s0
 
 # Required modules
 module load conda
@@ -14,7 +14,7 @@ source activate new_msd_net
 
 python known_pipeline.py --arch msdnet \
                          --batch-size 16 \
-                         --nb_training_classes 294 \
+                         --nb_training_classes 293 \
                          --optimizer sgd \
                          --learning-rate 0.1 \
                          --epochs 200 \

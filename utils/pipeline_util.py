@@ -29,27 +29,17 @@ def train_valid_test_one_epoch_for_known(args,
                                        cross_entropy_weight,
                                        perform_loss_weight,
                                        exit_loss_weight,
-                                       known_exit_rt=None,
-                                       known_thresholds=None,
-                                       debug=False,
+                                       known_thresholds,
+                                       exit_rt_cut,
                                        model_name="msd_net",
                                        nb_clfs=5,
                                        nBlocks=5,
-                                       nb_rt_classes=40,
-                                       nb_no_rt_classes=253,
-                                       nb_classes=294,
-                                       rt_max=28,
-                                       nb_sample_per_bacth=16,
-                                       human_known_rt_max=28,
-                                       human_unknown_rt_max=28,
-                                       machine_known_rt_max=0.057930,
-                                       machine_unknown_rt_max=0.071147):
+                                       rt_max=28):
 
     ##########################################
     # Set up evaluation metrics
     ##########################################
     batch_time = AverageMeter()
-    data_time = AverageMeter()
     losses = AverageMeter()
 
     top1, top3, top5 = [], [], []
@@ -110,7 +100,6 @@ def train_valid_test_one_epoch_for_known(args,
             if running_lr is None:
                 running_lr = lr
 
-            data_time.update(time.time() - end)
             loss = 0.0
 
             ##########################################
@@ -134,14 +123,8 @@ def train_valid_test_one_epoch_for_known(args,
             target = target.cuda(async=True)
             target_var = torch.autograd.Variable(target).long()
 
-            start = timer()
+
             output, feature, end_time = model(input_var)
-
-            full_rt_list = []
-            for end in end_time[0]:
-                full_rt_list.append(end - start)
-
-            # len(output) = 5
             if not isinstance(output, list):
                 output = [output]
 
@@ -151,38 +134,23 @@ def train_valid_test_one_epoch_for_known(args,
                 # Get exits for each sample
                 ##########################################
                 # Define the RT cuts and the thresholds
-                exit_rt_cut = known_exit_rt
                 top_1_threshold = known_thresholds
+                target_exit_index = []
 
-                """
-                Find the target exit RT for each sample according to its RT:
-                    If a batch has human RT: check the 5 intervals from human RT distribution
-                    If a batch doesn't have human RT: assign zeroes
-                """
-                target_exit_rt = []
+                # Find the target exits
+                for one_rt in rts:
+                    if (one_rt < exit_rt_cut[0]):
+                        target_exit_index.append(0)
+                    if (one_rt >= exit_rt_cut[0]) and (one_rt < exit_rt_cut[1]):
+                        target_exit_index.append(1)
+                    if (one_rt >= exit_rt_cut[1]) and (one_rt < exit_rt_cut[2]):
+                        target_exit_index.append(2)
+                    if (one_rt >= exit_rt_cut[2]) and (one_rt < exit_rt_cut[3]):
+                        target_exit_index.append(3)
+                    if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
+                        target_exit_index.append(4)
 
-                if rts[0] != 0:
-                    for one_rt in rts:
-                        if (one_rt < exit_rt_cut[0]):
-                            target_exit_rt.append(exit_rt_cut[0])
-                        if (one_rt >= exit_rt_cut[0]) and (one_rt < exit_rt_cut[1]):
-                            target_exit_rt.append(exit_rt_cut[1])
-                        if (one_rt >= exit_rt_cut[1]) and (one_rt < exit_rt_cut[2]):
-                            target_exit_rt.append(exit_rt_cut[2])
-                        if (one_rt >= exit_rt_cut[2]) and (one_rt < exit_rt_cut[3]):
-                            target_exit_rt.append(exit_rt_cut[3])
-                        if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
-                            target_exit_rt.append(exit_rt_cut[4])
-                else:
-                    target_exit_rt = [0.0] * nb_sample_per_bacth
-
-                if debug:
-                    print("Human RTs from batch:")
-                    print(rts)
-                    print("Exit RT cut:")
-                    print(exit_rt_cut)
-                    print("Obtained target exit RT")
-                    print(target_exit_rt)
+                # print("target_exit_index", target_exit_index)
 
                 """
                 Find the actual/predicted RT for each sample
@@ -214,9 +182,9 @@ def train_valid_test_one_epoch_for_known(args,
                     full_prob_list.append(one_prob)
 
                 # Thresholding - check for each exit
-                pred_exit_rt = []
+                pred_exit_index = []
 
-                for k in range(len(full_prob_list)):
+                for k in range(len(full_prob_list)): # length is batch size: [16, 5, 293]
                     # Get probs and GT labels
                     prob = full_prob_list[k]
                     gt_label = target[k]
@@ -232,21 +200,16 @@ def train_valid_test_one_epoch_for_known(args,
                             # Updated - use different threshold for each exit
                             if (max_prob > top_1_threshold[j]) and (pred == gt_label):
                                 # Case 1
-                                pred_rt = full_rt_list[j]
-                                pred_exit_rt.append(pred_rt)
+                                pred_exit_index.append(j)
                                 break
                             else:
                                 # Case 2
                                 continue
                         # Case 3
                         else:
-                            pred_rt = full_rt_list[-1]
-                            pred_exit_rt.append(pred_rt)
+                            pred_exit_index.append(j)
 
-                # Check the human RTs and machine RTs
-                if debug:
-                    print("Machine RT:")
-                    print(pred_exit_rt)
+                # print("pred_exit_index", pred_exit_index)
 
             ##########################################
             # Only MSD-Net
@@ -265,15 +228,9 @@ def train_valid_test_one_epoch_for_known(args,
                     # Part 3: Exit psyphy loss
                     if use_exit_loss:
                         try:
-                            exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
-                                                      target_exit_rt=target_exit_rt[j],
-                                                      human_known_rt_max=human_known_rt_max,
-                                                      human_unknown_rt_max=human_unknown_rt_max,
-                                                      machine_known_rt_max=machine_known_rt_max,
-                                                      machine_unknown_rt_max=machine_unknown_rt_max,
-                                                      batch_type=None)
+                            exit_loss = pred_exit_index[j] - target_exit_index[j]
                         except:
-                            exit_loss = 0.0
+                            pass
 
                     # 3 Cases
                     if (use_performance_loss == True) and (use_exit_loss == False):
@@ -676,6 +633,101 @@ def train_valid_test_one_epoch(args,
 
 
 
+def update_thresholds(loader,
+                      model,
+                      use_msd_net,
+                      percentile=50):
+    """
+
+    :param test_loader:
+    :param model:
+    :param test_type:
+    :param use_msd_net:
+    :return:
+    """
+
+    # Set the model to evaluation mode
+    model.cuda()
+    model.eval()
+
+    if use_msd_net:
+        sm = torch.nn.Softmax(dim=2)
+
+        # For MSD-Net, save everything into npy files
+        full_prob_list = []
+
+        for i in tqdm(range(len(loader))):
+            try:
+                batch = next(iter(loader))
+            except:
+                continue
+
+            input = batch["imgs"]
+
+            input = input.cuda()
+            input_var = torch.autograd.Variable(input)
+
+            # Get the model outputs and RTs
+            output, feature, _ = model(input_var)
+
+            # extract the probability and apply our threshold
+            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+            prob_list = np.array(prob.cpu().tolist())
+
+            # Reshape it into [batch, block, class]
+            prob_list = np.reshape(prob_list,
+                                    (prob_list.shape[1],
+                                     prob_list.shape[0],
+                                     prob_list.shape[2]))
+
+            for one_prob in prob_list.tolist():
+                full_prob_list.append(one_prob)
+
+        # Save all results to npy
+        full_prob = np.array(full_prob_list)
+
+        # TODO: Find new thresholds
+        prob_clf_0, prob_clf_1, prob_clf_2, prob_clf_3, prob_clf_4 = [], [], [], [], []
+
+        for i in range(full_prob.shape[0]):
+            one_sample_probs = full_prob[i, :, :]
+            one_sample_probs = np.reshape(one_sample_probs, (full_prob.shape[1],
+                                                             full_prob.shape[2]))
+
+            # Check each classifier in each sample
+            for j in range(one_sample_probs.shape[0]):
+                one_clf_probs = one_sample_probs[j, :]
+
+                # Find the max prob
+                max_prob = np.max(one_clf_probs)
+
+                if j == 0:
+                    prob_clf_0.append(max_prob)
+                elif j == 1:
+                    prob_clf_1.append(max_prob)
+                elif j == 2:
+                    prob_clf_2.append(max_prob)
+                elif j == 3:
+                    prob_clf_3.append(max_prob)
+                elif j == 4:
+                    prob_clf_4.append(max_prob)
+
+        thresh_0 = np.percentile(np.asarray(prob_clf_0), percentile)
+        thresh_1 = np.percentile(np.asarray(prob_clf_1), percentile)
+        thresh_2 = np.percentile(np.asarray(prob_clf_2), percentile)
+        thresh_3 = np.percentile(np.asarray(prob_clf_3), percentile)
+        thresh_4 = np.percentile(np.asarray(prob_clf_4), percentile)
+
+        return [thresh_0, thresh_1, thresh_2, thresh_3, thresh_4]
+
+
+    # TODO: Test process for other networks - is it different??
+    else:
+        pass
+
+
+
+
 def save_probs_and_features(test_loader,
                             model,
                             test_type,
@@ -698,7 +750,6 @@ def save_probs_and_features(test_loader,
     model.eval()
 
     if use_msd_net:
-        print("Testing MSD-Net...")
         sm = torch.nn.Softmax(dim=2)
 
         # For MSD-Net, save everything into npy files
