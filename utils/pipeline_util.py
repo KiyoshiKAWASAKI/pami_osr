@@ -31,6 +31,7 @@ def train_valid_test_one_epoch_for_known(args,
                                        exit_loss_weight,
                                        known_thresholds,
                                        exit_rt_cut,
+                                       modified_loss=False,
                                        model_name="msd_net",
                                        nb_clfs=5,
                                        nBlocks=5,
@@ -209,7 +210,6 @@ def train_valid_test_one_epoch_for_known(args,
                         else:
                             pred_exit_index.append(j)
 
-                # print("pred_exit_index", pred_exit_index)
 
             ##########################################
             # Only MSD-Net
@@ -229,6 +229,9 @@ def train_valid_test_one_epoch_for_known(args,
                     if use_exit_loss:
                         try:
                             exit_loss = pred_exit_index[j] - target_exit_index[j]
+
+                            if modified_loss:
+                                exit_loss = float(exit_loss)/4.0 + 1.0
                         except:
                             pass
 

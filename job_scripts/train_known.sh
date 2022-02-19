@@ -5,7 +5,7 @@
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
 #$ -e errors/
-#$ -N pp_1_2_1_s0
+#$ -N mpp_133_s0
 
 # Required modules
 module load conda

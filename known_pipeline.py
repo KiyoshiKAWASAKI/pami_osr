@@ -32,14 +32,16 @@ date = datetime.today().strftime('%Y-%m-%d')
 use_performance_loss = True
 use_exit_loss = True
 cross_entropy_weight = 1.0
-perform_loss_weight = 2.0
-exit_loss_weight = 1.0
+perform_loss_weight = 3.0
+exit_loss_weight = 3.0
 random_seed = 0
+
+use_modified_loss = True
 
 ###################################################################
                     # Training options #
 ###################################################################
-run_test = True
+run_test = False
 
 ##########################
 model_name = "msd_net"
@@ -70,22 +72,22 @@ run_test: testing with psyphy and exits
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
 
 # TODO: Cross-entropy seed 4 -- test_04
-test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
 
 
-# TODO: Sam seed 0 -- test_sam_00
+# TODO: Sam seed 0 -- test_sam_0
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_0"
 
-# TODO: Sam seed 1 -- test_sam_01
+# TODO: Sam seed 1 -- test_sam_1
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_1"
 
-# TODO: Sam seed 2 -- test_sam_02
+# TODO: Sam seed 2 -- test_sam_2
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_2"
 
-# TODO: Sam seed 3 -- test_sam_03
+# TODO: Sam seed 3 -- test_sam_3
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_3"
 
-# TODO: Sam seed 4 -- test_sam_04
+# TODO: Sam seed 4 -- test_sam_4
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_4"
 
 
@@ -102,7 +104,7 @@ test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
 # test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0_exit_1.0/seed_3"
 
 # TODO: PP seed 4 -- test_pp4
-# test_model_dir = ""
+test_model_dir = "2022-02-17/known_only_cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4"
 
 
 ##################################################
@@ -153,11 +155,7 @@ if debug:
 else:
     n_epochs = 200
 
-# if run_test:
-#     batch_size = 1
-# else:
 batch_size = 16
-
 
 if train_binary:
     nb_training_classes = 2
@@ -172,9 +170,6 @@ known_thresholds = [0.0035834426525980234, 0.0035834424197673798,
                     0.0035834426525980234, 0.0035834424197673798, 0.0035834424197673798]
 unknown_thresholds = [0.0035834426525980234, 0.0035834424197673798,
                       0.0035834426525980234, 0.0035834424197673798, 0.0035834424197673798]
-
-# train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
-# train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.071147]
 
 
 #########################################################################################
@@ -199,6 +194,9 @@ if debug:
     save_path = save_path_with_date + "/debug_" + save_path_sub + "/seed_" + str(random_seed)
 else:
     save_path = save_path_with_date + "/" + save_path_sub + "/seed_" + str(random_seed)
+
+if use_modified_loss:
+    save_path = save_path_with_date + "/modified_" + save_path_sub + "/seed_" + str(random_seed)
 
 if debug:
     train_known_known_path = os.path.join(json_data_base_debug, "debug_known_known.json")
@@ -509,7 +507,8 @@ if __name__ == '__main__':
                                                        perform_loss_weight=perform_loss_weight,
                                                        exit_loss_weight=exit_loss_weight,
                                                        known_thresholds=known_thresholds,
-                                                       exit_rt_cut=known_exit_rt)
+                                                       exit_rt_cut=known_exit_rt,
+                                                       modified_loss=use_modified_loss)
 
             scheduler.step()
 
@@ -530,7 +529,8 @@ if __name__ == '__main__':
                                                        perform_loss_weight=perform_loss_weight,
                                                        exit_loss_weight=exit_loss_weight,
                                                        known_thresholds=known_thresholds,
-                                                       exit_rt_cut=known_exit_rt)
+                                                       exit_rt_cut=known_exit_rt,
+                                                       modified_loss=use_modified_loss)
 
             if epoch % update_threshold_freq == 0:
                 print("Updating thresholds")
@@ -613,19 +613,19 @@ if __name__ == '__main__':
             #################################################################
             # TODO: Run process for testing and generating features
             print("Generating featrures and probabilities")
-            # save_probs_and_features(test_loader=train_known_known_loader,
-            #                     model=model,
-            #                     test_type="train_known_known",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
-            #
-            # save_probs_and_features(test_loader=valid_known_known_loader,
-            #                     model=model,
-            #                     test_type="valid_known_known",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
+            save_probs_and_features(test_loader=train_known_known_loader,
+                                model=model,
+                                test_type="train_known_known",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
+
+            save_probs_and_features(test_loader=valid_known_known_loader,
+                                model=model,
+                                test_type="valid_known_known",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
 
             save_probs_and_features(test_loader=test_known_known_loader,
                                     model=model,

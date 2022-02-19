@@ -4,7 +4,7 @@
 #$ -m abe
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
-#$ -N test_pp3
+#$ -N test_pp4
 
 # Required modules
 module load conda
