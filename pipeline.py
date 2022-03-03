@@ -27,13 +27,14 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = False
-use_exit_loss = False
+use_performance_loss = True
+use_exit_loss = True
 cross_entropy_weight = 1.0
 perform_loss_weight = 1.0
 exit_loss_weight = 1.0
-random_seed = 3
+random_seed = 4
 unknown_ratio = 1.0
+unknown_weight = 0.004
 
 ###################################################################
                     # Training options #
@@ -137,16 +138,10 @@ known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
 unknown_exit_rt = [4.2550, 5.9220, 8.2368, 13.0090, 28.1661]
 
 # TODO: Need to update these thresholds
-# known_thresholds = [0.4692796697553254, 0.5056925101425871, 0.5137719005140328,
-#                     0.5123290032915468, 0.5468768758061252]
-# unknown_thresholds = [0.39571245688620443, 0.41746665012570583, 0.4149690186488925,
-#                       0.42355671497950664, 0.4600701578332428]
-
-known_thresholds = [0.0, 0.0, 0.0, 0.0, 0.0]
-unknown_thresholds = [0.0, 0.0, 0.0, 0.0, 0.0]
-
-train_known_known_machine_rt_max = [0.026294, 0.045157, 0.051007, 0.055542, 0.057930]
-train_known_unknown_machine_rt_max = [0.032500, 0.064224, 0.067660, 0.070082, 0.071147]
+known_thresholds = [0.0035834426525980234, 0.0035834424197673798,
+                    0.0035834426525980234, 0.0035834424197673798, 0.0035834424197673798]
+unknown_thresholds = [0.0035834426525980234, 0.0035834424197673798,
+                      0.0035834426525980234, 0.0035834424197673798, 0.0035834424197673798]
 
 
 #########################################################################################
@@ -458,7 +453,8 @@ if __name__ == '__main__':
                                                        known_exit_rt=known_exit_rt,
                                                        unknown_exit_rt=unknown_exit_rt,
                                                        known_thresholds=known_thresholds,
-                                                       unknown_thresholds=unknown_thresholds)
+                                                       unknown_thresholds=unknown_thresholds,
+                                                        unknown_loss_weight=unknown_weight)
 
             scheduler.step()
 
@@ -481,34 +477,8 @@ if __name__ == '__main__':
                                                        known_exit_rt=known_exit_rt,
                                                        unknown_exit_rt=unknown_exit_rt,
                                                        known_thresholds=known_thresholds,
-                                                       unknown_thresholds=unknown_thresholds)
-
-            # TODO: Only test the model every few epochs
-            if epoch % 10 == 0 or epoch == n_epochs:
-                _, test_acc_top1, \
-                test_acc_top3, test_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                            known_loader=test_known_known_loader,
-                                                            unknown_loader=test_known_unknown_loader,
-                                                            model=model_wrapper,
-                                                            criterion=criterion,
-                                                            optimizer=optimizer,
-                                                            nb_epoch=epoch,
-                                                            use_msd_net=True,
-                                                            train_phase=False,
-                                                            save_path=save_path,
-                                                            use_performance_loss=use_performance_loss,
-                                                            use_exit_loss=use_exit_loss,
-                                                            cross_entropy_weight=cross_entropy_weight,
-                                                            perform_loss_weight=perform_loss_weight,
-                                                            exit_loss_weight=exit_loss_weight,
-                                                            known_exit_rt=known_exit_rt,
-                                                            unknown_exit_rt=unknown_exit_rt,
-                                                            known_thresholds=known_thresholds,
-                                                            unknown_thresholds=unknown_thresholds)
-            else:
-                test_acc_top1 = 0.000000000
-                test_acc_top3 = 0.000000000
-                test_acc_top5 = 0.000000000
+                                                       unknown_thresholds=unknown_thresholds,
+                                                       unknown_loss_weight=unknown_weight)
 
             # Determine if model is the best
             if valid_acc_top5 > best_acc_top5:
@@ -521,11 +491,9 @@ if __name__ == '__main__':
             with open(os.path.join(save_path, 'results.csv'), 'a') as f:
                 f.write('%03d, '
                         '%0.6f, %0.6f, %0.6f, %0.6f, '
-                        '%0.5f, %0.6f, %0.6f, %0.6f, '
-                        '%0.6f, %0.6f, %0.6f, \n' % ((epoch + 1),
+                        '%0.5f, %0.6f, %0.6f, %0.6f, \n' % ((epoch + 1),
                                                            train_loss, train_acc_top1, train_acc_top3, train_acc_top5,
-                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5,
-                                                           test_acc_top1, test_acc_top3, test_acc_top5))
+                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5))
 
     ########################################################################
     # Testing trained model

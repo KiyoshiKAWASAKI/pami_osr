@@ -308,6 +308,8 @@ def train_valid_test_one_epoch(args,
                                cross_entropy_weight,
                                perform_loss_weight,
                                exit_loss_weight,
+                               unknown_loss_weight,
+                               modified_loss=False,
                                known_exit_rt=None,
                                unknown_exit_rt=None,
                                known_thresholds=None,
@@ -320,11 +322,7 @@ def train_valid_test_one_epoch(args,
                                nb_classes=294,
                                nb_training_classes=294,
                                rt_max=28,
-                               nb_sample_per_batch=16,
-                               human_known_rt_max=28,
-                               human_unknown_rt_max=28,
-                               machine_known_rt_max=0.057930,
-                               machine_unknown_rt_max=0.071147):
+                               nb_sample_per_batch=16):
 
     ##########################################
     # Set up evaluation metrics
@@ -464,20 +462,19 @@ def train_valid_test_one_epoch(args,
                     If a batch has human RT: check the 5 intervals from human RT distribution
                     If a batch doesn't have human RT: assign zeroes
                 """
-                target_exit_rt = []
+                target_exit_index = []
 
-                if rts[0] != 0:
-                    for one_rt in rts:
-                        if (one_rt < exit_rt_cut[0]):
-                            target_exit_rt.append(exit_rt_cut[0])
-                        if (one_rt >= exit_rt_cut[0]) and (one_rt < exit_rt_cut[1]):
-                            target_exit_rt.append(exit_rt_cut[1])
-                        if (one_rt >= exit_rt_cut[1]) and (one_rt < exit_rt_cut[2]):
-                            target_exit_rt.append(exit_rt_cut[2])
-                        if (one_rt >= exit_rt_cut[2]) and (one_rt < exit_rt_cut[3]):
-                            target_exit_rt.append(exit_rt_cut[3])
-                        if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
-                            target_exit_rt.append(exit_rt_cut[4])
+                for one_rt in rts:
+                    if (one_rt < exit_rt_cut[0]):
+                        target_exit_index.append(0)
+                    if (one_rt >= exit_rt_cut[0]) and (one_rt < exit_rt_cut[1]):
+                        target_exit_index.append(1)
+                    if (one_rt >= exit_rt_cut[1]) and (one_rt < exit_rt_cut[2]):
+                        target_exit_index.append(2)
+                    if (one_rt >= exit_rt_cut[2]) and (one_rt < exit_rt_cut[3]):
+                        target_exit_index.append(3)
+                    if (one_rt >= exit_rt_cut[3]) and (one_rt < exit_rt_cut[4]):
+                        target_exit_index.append(4)
                 else:
                     target_exit_rt = [0.0] * nb_sample_per_batch
 
@@ -519,7 +516,7 @@ def train_valid_test_one_epoch(args,
                     full_prob_list.append(one_prob)
 
                 # Thresholding - check for each exit
-                pred_exit_rt = []
+                pred_exit_index = []
 
                 for i in range(len(full_prob_list)):
                     # Get probs and GT labels
@@ -537,21 +534,15 @@ def train_valid_test_one_epoch(args,
                             # Updated - use different threshold for each exit
                             if (max_prob > top_1_threshold[j]) and (pred == gt_label):
                                 # Case 1
-                                pred_rt = full_rt_list[j]
-                                pred_exit_rt.append(pred_rt)
+                                pred_exit_index.append(j)
                                 break
                             else:
                                 # Case 2
                                 continue
                         # Case 3
                         else:
-                            pred_rt = full_rt_list[-1]
-                            pred_exit_rt.append(pred_rt)
+                            pred_exit_index.append(j)
 
-                # Check the human RTs and machine RTs
-                if debug:
-                    print("Machine RT:")
-                    print(pred_exit_rt)
 
             ##########################################
             # Only MSD-Net
@@ -560,6 +551,9 @@ def train_valid_test_one_epoch(args,
                 for j in range(len(output)):
                     # Part 1: Cross-entropy loss
                     ce_loss = criterion(output[j], target_var)
+
+                    if batch_type == "unknown":
+                        ce_loss = ce_loss * unknown_loss_weight
 
                     # Part 2: Performance psyphy loss
                     try:
@@ -570,15 +564,12 @@ def train_valid_test_one_epoch(args,
                     # Part 3: Exit psyphy loss
                     if use_exit_loss:
                         try:
-                            exit_loss = get_exit_loss(pred_exit_rt=pred_exit_rt[j],
-                                                      target_exit_rt=target_exit_rt[j],
-                                                      human_known_rt_max=human_known_rt_max,
-                                                      human_unknown_rt_max=human_unknown_rt_max,
-                                                      machine_known_rt_max=machine_known_rt_max,
-                                                      machine_unknown_rt_max=machine_unknown_rt_max,
-                                                      batch_type=batch_type)
+                            exit_loss = pred_exit_index[j] - target_exit_index[j]
+
+                            if modified_loss:
+                                exit_loss = float(exit_loss) / 4.0 + 1.0
                         except:
-                            exit_loss = 0.0
+                            pass
 
                     # 3 Cases
                     if (use_performance_loss == True) and (use_exit_loss == False):

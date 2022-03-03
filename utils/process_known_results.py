@@ -10,13 +10,9 @@ import statistics
 
 
 
-
-#TODO: change this for each model
-percentile = [50]
-
 # TODO: Cross-entropy seed 0 -- test_00
-save_path_sub = "2022-02-13/known_only_cross_entropy/seed_0"
-epoch = 147
+# save_path_sub = "2022-02-13/known_only_cross_entropy/seed_0"
+# epoch = 147
 
 # TODO: Cross-entropy seed 1 -- test_01
 # save_path_sub = "2022-02-13/known_only_cross_entropy/seed_1"
@@ -73,12 +69,18 @@ epoch = 147
 # epoch = 121
 
 # TODO: PP seed 4 -- test_pp4
-# save_path_sub = ""
+save_path_sub = "2022-02-17/known_only_cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4"
+epoch = 186
 
 
 ####################################################################
 # Paths (usually, no need to change these)
 ####################################################################
+test_known = False
+test_unknown = True
+
+percentile = [50]
+
 test_binary = False
 nb_training_classes = 293
 save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
@@ -91,9 +93,9 @@ print(test_result_dir)
 ####################################################################
 # functions
 ####################################################################
-def get_known_exit_stats(labels,
-                         probs,
-                         nb_clfs=5):
+def get_known_acc(labels,
+                  probs,
+                  nb_clfs=5):
 
     nb_correct_top_1 = [0] * nb_clfs
     nb_correct_top_3 = [0] * nb_clfs
@@ -137,134 +139,113 @@ def get_known_exit_stats(labels,
 
 
 
-def get_known_exit_stats_old(labels,
-                         probs,
-                         rts,
-                         top_1_threshold,
-                         nb_clfs=5):
+def cal_accuracy_sep(labels,
+                     probs,
+                     nb_classes_without_rt=253,
+                     nb_clfs=5):
+    """
+    Calculate the accuracy for samples with RT and without RT separately
 
-    known_as_known_count = 0
-    known_as_unknown_count = 0
+    :return:
+    """
+    nb_correct_top_1_no_rt = [0] * nb_clfs
+    nb_correct_top_3_no_rt = [0] * nb_clfs
+    nb_correct_top_5_no_rt = [0] * nb_clfs
 
-    nb_correct = 0
-    nb_wrong = 0
+    nb_correct_top_1_rt = [0] * nb_clfs
+    nb_correct_top_3_rt = [0] * nb_clfs
+    nb_correct_top_5_rt = [0] * nb_clfs
 
-    exit_count = [0] * nb_clfs
+    nb_no_rt_count = 0
+    nb_rt_count = 0
 
     for i in range(len(labels)):
-        original_label = labels[i]
-
-        # print("*" * 30)
-
-        target_label = original_label
-
+        target_label = labels[i]
         prob = probs[i]
+
+        if target_label < nb_classes_without_rt-1:
+            nb_no_rt_count +=1
+            rt = False
+        else:
+            nb_rt_count += 1
+            rt = True
 
         # check each classifier in order and decide when to exit
         for j in range(nb_clfs):
             one_prob = prob[j]
-            pred = np.argmax(one_prob)
-            max_prob = np.sort(one_prob)[-1]
 
-            # print("GT:", target_label)
-            # print("prediction", pred)
+            # TODO: Adding top3 and top5
+            top_1 = np.argmax(one_prob)
+            top_3 = np.argpartition(one_prob, -3)[-3:]
+            top_5 = np.argpartition(one_prob, -5)[-5:]
 
-            # If this is not the last classifier
-            if j != nb_clfs - 1:
-                # Only consider top-1 if it is not the last classifier
-                # if (max_prob > top_1_threshold[j]) and (pred == target_label):
-                if (pred == target_label):
-                    exit_count[j] += 1
-                    known_as_known_count += 1
-                    nb_correct += 1
 
-                    break
-
+            # TODO: Check for top-1, top-3 and top-5 separately
+            if top_1 == target_label:
+                if rt:
+                    nb_correct_top_1_rt[j] += 1
                 else:
-                    continue
+                    nb_correct_top_1_no_rt[j] += 1
 
-            # If this is the last classifier
-            else:
-                exit_count[j] += 1
-
-                # if max_prob > top_1_threshold[-1]:
-                #     known_as_known_count += 1
-
-                if pred == target_label:
-                    nb_correct += 1
+            if target_label in top_3:
+                if rt:
+                    nb_correct_top_3_rt[j] += 1
                 else:
-                    nb_wrong += 1
+                    nb_correct_top_3_no_rt[j] += 1
 
-                # else:
-                #     known_as_unknown_count += 1
-                #     nb_wrong += 1
+            if target_label in top_5:
+                if rt:
+                    nb_correct_top_5_rt[j] += 1
+                else:
+                    nb_correct_top_5_no_rt[j] += 1
 
-    acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
+    acc_top_1_no_rt = np.asarray(nb_correct_top_1_no_rt)/(float(nb_no_rt_count))
+    acc_top_3_no_rt = np.asarray(nb_correct_top_3_no_rt)/(float(nb_no_rt_count))
+    acc_top_5_no_rt = np.asarray(nb_correct_top_5_no_rt)/(float(nb_no_rt_count))
+
+    acc_top_1_rt = np.asarray(nb_correct_top_1_rt) / (float(nb_rt_count))
+    acc_top_3_rt = np.asarray(nb_correct_top_3_rt) / (float(nb_rt_count))
+    acc_top_5_rt = np.asarray(nb_correct_top_5_rt) / (float(nb_rt_count))
 
     print("Total number of samples: %d" % len(labels))
-    print("Known as known: %f" % (float(known_as_known_count)/float(len(labels))))
-    print("Known as unknown: %f" % (float(known_as_unknown_count)/float(len(labels))))
-    print("Number of right prediction: %d" % nb_correct)
-    print("Number of wrong prediction: %d" % nb_wrong)
-    print("Accuracy: %4f" % acc)
-    print("Known exit counts:")
-    print(exit_count)
 
-    exit_count_percentage = []
-    for one_count in exit_count:
-        one_percentage = float(one_count)/float(len(labels))
-        exit_count_percentage.append(round(one_percentage*100, 2))
+    print("Accuracy top-1 (no RT):",  acc_top_1_no_rt)
+    print("Accuracy top-3 (no RT):",  acc_top_3_no_rt)
+    print("Accuracy top-5 (no RT):",  acc_top_5_no_rt)
 
-    print(exit_count_percentage)
+    print("Accuracy top-1 (RT):", acc_top_1_rt)
+    print("Accuracy top-3 (RT):", acc_top_3_rt)
+    print("Accuracy top-5 (RT):", acc_top_5_rt)
 
 
 
 
-
-def get_unknown_exit_stats(labels,
-                           probs,
-                           rts,
-                           top_1_threshold,
-                           nb_clfs=5):
-
-    unknown_as_known_count = 0
-    unknown_as_unknown_count = 0
+def get_unknown_acc(labels,
+                    probs,
+                    top_1_threshold,
+                    nb_clfs=5):
 
     nb_correct = 0
     nb_wrong = 0
-    exit_rt = []
-    exit_count = [0] * nb_clfs
+
 
     for i in range(len(labels)):
+        # print("*" * 40)
         # Loop thru each sample
         prob = probs[i]
-        rt = rts[i]
 
         # check each classifier in order and decide when to exit
         for j in range(nb_clfs):
             one_prob = prob[j]
             max_prob = np.sort(one_prob)[-1]
+
+            # print(max_prob)
 
             # If this is not the last classifier
             if j != nb_clfs - 1:
                 # Only consider top-1 if it is not the last classifier
                 if max_prob > top_1_threshold[j]:
-                    # First of all, this sample exits
-                    exit_count[j] += 1
-
-                    # Also, this sample is predicted as known no matter
-                    # whether the pred label is correct or wrong
-                    unknown_as_known_count += 1
-
-                    # If max prob is larger than threshold for an unknown sample,
-                    # the prediction must be wrong
                     nb_wrong += 1
-
-                    # Record the RT for this sample
-                    exit_rt.append(rt[j])
-
-                    # If top-1 is larger than threshold,
-                    # then directly go to next sample
                     break
 
                 else:
@@ -273,45 +254,19 @@ def get_unknown_exit_stats(labels,
 
             # If this is the last classifier
             else:
-                # First of all, this sample exits no matter what...
-                exit_count[j] += 1
-
                 if max_prob > top_1_threshold[-1]:
-                    unknown_as_known_count += 1
                     nb_wrong += 1
 
                 else:
-                    unknown_as_unknown_count += 1
                     nb_correct += 1
-
-                # Record the RT for this sample
-                exit_rt.append(rt[j])
 
     acc = float(nb_correct)/(float(nb_correct)+float(nb_wrong))
 
     print("Total number of samples: %d" % len(labels))
-    print("Unknown predicted as unknown: %d" % unknown_as_unknown_count)
-    print("Unknown predicted as known: %d" % unknown_as_known_count)
-    print("Number of right prediction: %d" % nb_correct)
-    print("Number of wrong prediction: %d" % nb_wrong)
+    print("Unknown predicted as unknown: %d" % nb_correct)
+    print("Unknown predicted as known: %d" % nb_wrong)
     print("Accuracy: %4f" % acc)
-    print("Unknown exit counts:")
-    print(exit_count)
 
-    exit_count_percentage = []
-    for one_count in exit_count:
-        one_percentage = float(one_count) / float(len(labels))
-        exit_count_percentage.append(round(one_percentage*100, 2))
-
-    print(exit_count_percentage)
-
-    # Deal with RTs
-    exit_rt_np = np.asarray(exit_rt)
-
-    print("Unknown RT avg:")
-    print(np.mean(exit_rt_np))
-    print("Unknown RT median:")
-    print(np.median(exit_rt_np))
 
 
 
@@ -376,11 +331,15 @@ if __name__ == '__main__':
     ################################################################
     # Find valid probs
     ################################################################
-    valid_known_known_probs_path = valid_prob_dir + "/valid_known_known_epoch_" + str(epoch) + "_probs.npy"
-    # valid_known_unknown_probs_path = valid_prob_dir + "/valid_known_unknown_epoch_" + str(epoch) + "_probs.npy"
+    valid_known_unknown_probs_path = valid_prob_dir + "/valid_known_unknown_epoch_" + str(epoch) + "_probs.npy"
+    valid_known_unknown_probs = np.load(valid_known_unknown_probs_path)
 
+    valid_known_known_probs_path = valid_prob_dir + "/valid_known_known_epoch_" + str(epoch) + "_probs.npy"
     valid_known_known_probs = np.load(valid_known_known_probs_path)
-    # valid_known_unknown_probs = np.load(valid_known_unknown_probs_path)
+
+    train_known_known_probs_path = valid_prob_dir + "/train_known_known_epoch_" + str(epoch) + "_probs.npy"
+    train_known_known_probs = np.load(train_known_known_probs_path)
+
 
     ################################################################
     # known known is split into 4 parts
@@ -423,6 +382,13 @@ if __name__ == '__main__':
 
     print(np.unique(test_known_known_labels))
 
+    test_unknown_unknown_probs_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_probs.npy"
+    test_unknown_unknown_label_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_labels.npy"
+    test_unknown_unknown_rt_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_rts.npy"
+    test_unknown_unknown_labels = np.load(test_unknown_unknown_label_path)
+    test_unknown_unknown_probs = np.load(test_unknown_unknown_probs_path)
+    test_unknown_unknown_rts = np.load(test_unknown_unknown_rt_path)
+
 
     for one_perct in percentile:
         print("#" * 50)
@@ -433,7 +399,13 @@ if __name__ == '__main__':
         known_known_thresh = get_thresholds(npy_file_path=valid_known_known_probs_path,
                                             percentile=one_perct)
 
-        print("known thresholds:", known_known_thresh)
+        # known_known_thresh = get_thresholds(npy_file_path=train_known_known_probs_path,
+        #                                     percentile=one_perct)
+
+        print("thresholds:", known_known_thresh)
+
+        # known_unknown_thresh = get_thresholds(npy_file_path=valid_known_unknown_probs_path,
+        #                                       percentile=one_perct)
 
 
         ################################################################
@@ -441,9 +413,20 @@ if __name__ == '__main__':
         ################################################################
         # known_known
         print("@" * 40)
-        print("Processing known_known samples")
-        get_known_exit_stats(labels=test_known_known_labels,
-                             probs=test_known_known_probs)
 
+        if test_known:
+            print("Processing known_known samples")
+            get_known_acc(labels=test_known_known_labels,
+                                 probs=test_known_known_probs)
 
+            cal_accuracy_sep(labels=test_known_known_labels,
+                             probs=test_known_known_probs,
+                             nb_classes_without_rt=253,
+                             nb_clfs=5)
 
+        if test_unknown:
+            print("Processing unknown samples")
+            get_unknown_acc(labels=test_unknown_unknown_labels,
+                            probs=test_unknown_unknown_probs,
+                            top_1_threshold=known_known_thresh,
+                            nb_clfs=5)
