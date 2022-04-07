@@ -4,8 +4,9 @@
 #$ -m abe
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
+#$ -l h=!qa-xp-012
 #$ -e errors/
-#$ -N mpp_133_s0
+#$ -N known_only_pp_1.0_seed_4
 
 # Required modules
 module load conda

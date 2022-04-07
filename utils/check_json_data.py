@@ -110,8 +110,12 @@ def check_json_data(json_path):
 
     # print(np.sort(label_class_pair))
     print(len(data))
-    print(len(label_class_pair))
+    # print(np.unique(np.asarray(label_class_pair),axis=0))
 
+    pairs = np.unique(np.asarray(label_class_pair),axis=0)
+
+    for item in pairs:
+        print(len(np.where(pairs==item)))
 
 
 
@@ -122,7 +126,7 @@ if __name__ == '__main__':
 
     # check_json_data(json_path=path_0)
     # check_json_data(json_path=path_1)
-    # check_json_data(json_path=path_8)
+    check_json_data(json_path=path_8)
     # check_json_data(json_path=path_10)
 
     # check_json_data(json_path=path_2)
@@ -135,6 +139,6 @@ if __name__ == '__main__':
     # check_json_data(json_path=path_6)
     # check_json_data(json_path=path_7)
 
-    check_json_data(json_path=path_12)
+    # check_json_data(json_path=path_12)
 
 

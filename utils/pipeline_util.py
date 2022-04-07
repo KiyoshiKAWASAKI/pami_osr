@@ -323,6 +323,9 @@ def train_valid_test_one_epoch(args,
                                nb_training_classes=294,
                                rt_max=28,
                                nb_sample_per_batch=16):
+    """
+    # TODO: Modified - training without known unknown
+    """
 
     ##########################################
     # Set up evaluation metrics
@@ -331,6 +334,7 @@ def train_valid_test_one_epoch(args,
     data_time = AverageMeter()
     losses = AverageMeter()
 
+    # This is the usually acc
     top1, top3, top5 = [], [], []
 
     if use_msd_net:
@@ -361,20 +365,22 @@ def train_valid_test_one_epoch(args,
 
     # Count number of batches for known and unknown respectively
     nb_known_batches = len(known_loader)
-    nb_unknown_batches = len(unknown_loader)
-    nb_total_batches = nb_known_batches + nb_unknown_batches
+    nb_total_batches = nb_known_batches
+
+    # nb_unknown_batches = len(unknown_loader)
+    # nb_total_batches = nb_known_batches + nb_unknown_batches
 
     print("There are %d batches in known_known loader" % nb_known_batches)
-    print("There are %d batches in known_unknown loader" % nb_unknown_batches)
+    # print("There are %d batches in known_unknown loader" % nb_unknown_batches)
 
     # Generate index for known and unknown and shuffle
-    all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
-    known_indices = all_indices[:nb_known_batches]
-    unknown_indices = all_indices[nb_known_batches:]
+    # all_indices = random.sample(list(range(nb_total_batches)), len(list(range(nb_total_batches))))
+    # known_indices = all_indices[:nb_known_batches]
+    # unknown_indices = all_indices[nb_known_batches:]
 
     # Create iterator
     known_iter = iter(known_loader)
-    unknown_iter = iter(unknown_loader)
+    # unknown_iter = iter(unknown_loader)
 
     # Only train one batch for each step
     with open(save_txt_path, 'w') as f:
@@ -393,16 +399,16 @@ def train_valid_test_one_epoch(args,
             ##########################################
             # Get a batch
             ##########################################
-            if i in known_indices:
-                batch = next(known_iter)
-                batch_type = "known"
+            # if i in known_indices:
+            batch = next(known_iter)
+            batch_type = "known"
 
-            elif i in unknown_indices:
-                try:
-                    batch = next(unknown_iter)
-                    batch_type = "unknown"
-                except:
-                    continue
+            # elif i in unknown_indices:
+            #     try:
+            #         batch = next(unknown_iter)
+            #         batch_type = "unknown"
+            #     except:
+            #         continue
 
             input = batch["imgs"]
             rts = batch["rts"]
@@ -419,9 +425,9 @@ def train_valid_test_one_epoch(args,
                         target[i] = 1
 
             # Adjust the label for unknown
-            if batch_type == "unknown":
-                for i in range(len(target)):
-                    target[i] = nb_training_classes - 1
+            # if batch_type == "unknown":
+            #     for i in range(len(target)):
+            #         target[i] = nb_training_classes - 1
 
             # Convert into PyTorch tensor
             input_var = torch.autograd.Variable(input).cuda()
@@ -441,9 +447,9 @@ def train_valid_test_one_epoch(args,
 
             if use_exit_loss == True:
                 ##########################################
-                # TODO: Get exits for each sample
+                # Get exits for each sample
                 ##########################################
-                # TODO: Define the RT cuts for known and unknown, and the thresholds
+                # Define the RT cuts for known and unknown, and the thresholds
                 if batch_type == "known":
                     exit_rt_cut = known_exit_rt
                     top_1_threshold = known_thresholds
@@ -515,8 +521,14 @@ def train_valid_test_one_epoch(args,
                 for one_prob in prob_list.tolist():
                     full_prob_list.append(one_prob)
 
-                # Thresholding - check for each exit
-                pred_exit_index = []
+                # TODO: Thresholding - update acc with exit strategy
+                pred_exit_top_1 = []
+                pred_exit_top_3 = []
+                pred_exit_top_5 = []
+
+                nb_correct_top_1 = 0
+                nb_correct_top_3 = 0
+                nb_correct_top_5 = 0
 
                 for i in range(len(full_prob_list)):
                     # Get probs and GT labels
@@ -527,21 +539,80 @@ def train_valid_test_one_epoch(args,
                     for j in range(nb_clfs):
                         one_prob = prob[j]
                         max_prob = np.sort(one_prob)[-1]
-                        pred = np.argmax(one_prob)
+                        pred_top_1 = np.argmax(one_prob)
 
-                        # If this is not the last classifier
                         if j != nb_clfs - 1:
                             # Updated - use different threshold for each exit
-                            if (max_prob > top_1_threshold[j]) and (pred == gt_label):
+                            if (max_prob > top_1_threshold[j]) and (pred_top_1 == gt_label):
                                 # Case 1
-                                pred_exit_index.append(j)
+                                nb_correct_top_1 += 1
+                                pred_exit_top_1.append(j)
                                 break
                             else:
                                 # Case 2
                                 continue
                         # Case 3
                         else:
-                            pred_exit_index.append(j)
+                            pred_exit_top_1.append(j)
+
+                    # check each classifier in order and decide when to exit
+                    for j in range(nb_clfs):
+                        one_prob = prob[j]
+                        top_3_prob = np.sort(one_prob)[-3]
+                        pred_top_3 = np.argpartition(one_prob, -3)[-3:]
+
+                        # If this is not the last classifier
+                        if j != nb_clfs - 1:
+                            # Updated - use different threshold for each exit
+                            # print(top_3_prob)
+                            # print(top_1_threshold[j])
+                            # print(gt_label)
+                            # print(pred_top_3)
+
+                            if (top_3_prob > top_1_threshold[j]) and (gt_label.detach().cpu().numpy() in pred_top_3):
+                                # Case 1
+                                nb_correct_top_3 += 1
+                                pred_exit_top_3.append(j)
+                                break
+
+                            else:
+                                # Case 2
+                                continue
+                        # Case 3
+                        else:
+                            pred_exit_top_3.append(j)
+
+                    # check each classifier in order and decide when to exit
+                    for j in range(nb_clfs):
+                        one_prob = prob[j]
+                        top_5_prob = np.sort(one_prob)[-5]
+                        pred_top_5 = np.argpartition(one_prob, -5)[-5:]
+
+                        # If this is not the last classifier
+                        if j != nb_clfs - 1:
+                            # Updated - use different threshold for each exit
+                            if (top_5_prob > top_1_threshold[j]) and (gt_label.detach().cpu().numpy() in pred_top_5):
+                                # Case 1
+                                nb_correct_top_5 += 1
+                                pred_exit_top_5.append(j)
+                                break
+
+                            else:
+                                # Case 2
+                                continue
+                        # Case 3
+                        else:
+                            pred_exit_top_5.append(j)
+
+                # TODO: calculate accuracy
+                acc_top_1_exit = float(nb_correct_top_1) / float(nb_sample_per_batch * nb_total_batches)
+                acc_top_3_exit = float(nb_correct_top_3) / float(nb_sample_per_batch * nb_total_batches)
+                acc_top_5_exit = float(nb_correct_top_5) / float(nb_sample_per_batch * nb_total_batches)
+
+            else:
+                acc_top_1_exit = 0.0000
+                acc_top_3_exit = 0.0000
+                acc_top_5_exit = 0.0000
 
 
             ##########################################
@@ -564,7 +635,7 @@ def train_valid_test_one_epoch(args,
                     # Part 3: Exit psyphy loss
                     if use_exit_loss:
                         try:
-                            exit_loss = pred_exit_index[j] - target_exit_index[j]
+                            exit_loss = pred_exit_top_1[j] - target_exit_index[j]
 
                             if modified_loss:
                                 exit_loss = float(exit_loss) / 4.0 + 1.0
@@ -581,6 +652,11 @@ def train_valid_test_one_epoch(args,
                         # print("Using all 3 losses")
                         loss += cross_entropy_weight * ce_loss + \
                                 perform_loss_weight * perform_loss + \
+                                exit_loss_weight * exit_loss
+
+                    if (use_exit_loss == False) and (use_exit_loss == True):
+                        # print("Using all 3 losses")
+                        loss += cross_entropy_weight * ce_loss + \
                                 exit_loss_weight * exit_loss
 
                     if (use_performance_loss == False) and (use_exit_loss == False):
@@ -618,11 +694,18 @@ def train_valid_test_one_epoch(args,
                     'Loss {loss.val:.4f}\t'
                     'Acc@1 {top1.val:.4f}\t'
                     'Acc@3 {top3.val:.4f}\t'
-                    'Acc@5 {top5.val:.4f}\n'.format(
-                nb_epoch, i + 1, nb_total_batches,
-                loss=losses, top1=top1[-1], top3=top3[-1], top5=top5[-1]))
+                    'Acc@5 {top5.val:.4f}\t'
+                    'Exit Acc@1 {top1_exit:.4f}\t'
+                    'Exit Acc@3 {top3_exit:.4f}\t'
+                    'Exit Acc@5 {top5_exit:.4f}\n'.format(nb_epoch, i + 1, nb_total_batches,
+                                                loss=losses, top1=top1[-1],
+                                                top3=top3[-1], top5=top5[-1],
+                                                top1_exit=acc_top_1_exit,
+                                                top3_exit=acc_top_3_exit,
+                                                top5_exit=acc_top_5_exit))
 
-    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg
+    return losses.avg, top1[-1].avg, top3[-1].avg, top5[-1].avg, \
+           acc_top_1_exit, acc_top_3_exit, acc_top_5_exit
 
 
 

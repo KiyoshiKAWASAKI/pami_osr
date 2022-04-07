@@ -10,7 +10,8 @@ from args import arg_parser
 import torch.nn as nn
 import models
 from datetime import datetime
-from utils.pipeline_util import train_valid_test_one_epoch, save_probs_and_features, find_best_model
+from utils.pipeline_util import train_valid_test_one_epoch, \
+    save_probs_and_features, find_best_model, update_thresholds
 
 args = arg_parser.parse_args()
 
@@ -27,19 +28,23 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = True
+use_performance_loss = False
 use_exit_loss = True
+
+random_seed = 0
+
 cross_entropy_weight = 1.0
-perform_loss_weight = 1.0
-exit_loss_weight = 1.0
-random_seed = 4
+perform_loss_weight = 0.0
+exit_loss_weight = 4.0
+
 unknown_ratio = 1.0
-unknown_weight = 0.004
+unknown_weight = 0.5
+update_threshold_freq = 5
 
 ###################################################################
                     # Training options #
 ###################################################################
-run_test = False
+run_test = True
 
 ##########################
 model_name = "msd_net"
@@ -56,17 +61,68 @@ test_after_valid: testing MSD Net using the only last clf's prediction
 run_test: testing with psyphy and exits
 """
 
-# TODO: Cross-entropy seed 0 -- test_01
-# test_model_dir = "2022-01-13/cross_entropy_only_unknown_ratio_1.0/seed_0"
+# TODO: Cross-entropy seed 0 -- test_ce_00
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
 
-# TODO: pfm 1.0 seed 0 -- test_02
-# test_model_dir = "2022-01-13/cross_entropy_1.0_pfm_1.0_unknown_ratio_1.0/seed_0"
+# TODO: Cross-entropy seed 1 -- test_ce_01
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_1"
 
-# TODO: pfm 1.0, exit 1.0 seed 0 -- test_03
-# test_model_dir = "2022-01-13/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+# TODO: Cross-entropy seed 2 -- test_ce_02
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_2"
 
-# TODO: pfm 3.0, exit 3.0 seed 0 -- test_04
-test_model_dir = ""
+# TODO: Cross-entropy seed 3 -- test_ce_03
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
+
+# TODO: Cross-entropy seed 4 -- test_ce_04
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
+
+#*******************************************************************#
+# TODO: Cross-entropy + sam seed 0 -- test_sam_00
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_0"
+
+# TODO: Cross-entropy + sam seed 1 -- test_sam_01
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_1"
+
+# TODO: Cross-entropy + sam seed 2 -- test_sam_02
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_2"
+
+# TODO: Cross-entropy + sam seed 3 -- test_sam_03
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_3"
+
+# TODO: Cross-entropy + sam seed 4 -- test_sam_04
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_4"
+
+#*******************************************************************#
+# TODO: All 3 losses seed 0 -- test_all_loss_00
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+
+# TODO: All 3 losses seed 1 -- test_all_loss_01
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
+
+# TODO: All 3 losses seed 2 -- test_all_loss_02
+test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+
+# TODO: All 3 losses seed 3 -- test_all_loss_03
+# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
+
+# TODO: All 3 losses seed 4 -- test_all_loss_04
+# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
+
+#*******************************************************************#
+# TODO: CE + pp seed 0 -- test_ce_pp_00
+# test_model_dir = "2022-03-25/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+
+# TODO: CE + pp seed 1 -- test_ce_pp_01
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
+
+# TODO: CE + pp seed 2 -- test_ce_pp_02
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+
+# TODO: CE + pp seed 3 -- test_ce_pp_03
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
+
+# TODO: CE + pp seed 4 -- test_ce_pp_04
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
 
 
 ##################################################
@@ -75,7 +131,7 @@ run_one_sample = False
 save_one_sample_rt_folder = None
 
 # TODO: May need to change this in the future
-save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
 
 test_model_path = save_path_base + "/" + test_model_dir
 
@@ -96,6 +152,10 @@ elif (use_performance_loss == True) and (use_exit_loss == False):
 elif (use_performance_loss == True) and (use_exit_loss == True):
     save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
                     "_pfm_" + str(perform_loss_weight) + \
+                    "_exit_" + str(exit_loss_weight)
+
+elif (use_performance_loss == False) and (use_exit_loss == True):
+    save_path_sub = "cross_entropy_" + str(cross_entropy_weight) + \
                     "_exit_" + str(exit_loss_weight)
 
 else:
@@ -131,7 +191,7 @@ else:
 if train_binary:
     nb_training_classes = 2
 else:
-    nb_training_classes = 294
+    nb_training_classes = 293
 
 
 known_exit_rt = [3.5720, 4.9740, 7.0156, 11.6010, 27.5720]
@@ -424,8 +484,9 @@ if __name__ == '__main__':
         with open(os.path.join(save_path, 'results.csv'), 'w') as f:
             f.write('epoch, '
                     'train_loss, train_acc_top1, train_acc_top3, train_acc_top5, '
+                    'train_exit_acc_top1, train_exit_acc_top3, train_exit_acc_top5,'
                     'valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5, '
-                    'test_acc_top1, test_acc_top3, test_acc_top5 \n')
+                    'valid_exit_acc_top1, valid_exit_acc_top3, valid_exit_acc_top5\n')
 
         # Train model
         best_acc_top5 = 0.00
@@ -435,31 +496,35 @@ if __name__ == '__main__':
             print("EPOCH:", epoch)
 
             train_loss, train_acc_top1,\
-            train_acc_top3, train_acc_top5 = train_valid_test_one_epoch(args=args,
-                                                       known_loader=train_known_known_loader,
-                                                       unknown_loader=train_known_unknown_loader,
-                                                       model=model_wrapper,
-                                                       criterion=criterion,
-                                                       optimizer=optimizer,
-                                                       nb_epoch=epoch,
-                                                       use_msd_net=True,
-                                                       train_phase=True,
-                                                       save_path=save_path,
-                                                       use_performance_loss=use_performance_loss,
-                                                       use_exit_loss=use_exit_loss,
-                                                       cross_entropy_weight=cross_entropy_weight,
-                                                       perform_loss_weight=perform_loss_weight,
-                                                       exit_loss_weight=exit_loss_weight,
-                                                       known_exit_rt=known_exit_rt,
-                                                       unknown_exit_rt=unknown_exit_rt,
-                                                       known_thresholds=known_thresholds,
-                                                       unknown_thresholds=unknown_thresholds,
-                                                        unknown_loss_weight=unknown_weight)
+            train_acc_top3, train_acc_top5, \
+            train_exit_acc_top1, train_exit_acc_top3, \
+            train_exit_acc_top5 = train_valid_test_one_epoch(args=args,
+                                                           known_loader=train_known_known_loader,
+                                                           unknown_loader=train_known_unknown_loader,
+                                                           model=model_wrapper,
+                                                           criterion=criterion,
+                                                           optimizer=optimizer,
+                                                           nb_epoch=epoch,
+                                                           use_msd_net=True,
+                                                           train_phase=True,
+                                                           save_path=save_path,
+                                                           use_performance_loss=use_performance_loss,
+                                                           use_exit_loss=use_exit_loss,
+                                                           cross_entropy_weight=cross_entropy_weight,
+                                                           perform_loss_weight=perform_loss_weight,
+                                                           exit_loss_weight=exit_loss_weight,
+                                                           known_exit_rt=known_exit_rt,
+                                                           unknown_exit_rt=unknown_exit_rt,
+                                                           known_thresholds=known_thresholds,
+                                                           unknown_thresholds=unknown_thresholds,
+                                                            unknown_loss_weight=unknown_weight)
 
             scheduler.step()
 
             valid_loss, valid_acc_top1, \
-            valid_acc_top3, valid_acc_top5 = train_valid_test_one_epoch(args=args,
+            valid_acc_top3, valid_acc_top5, \
+            valid_exit_acc_top1, valid_exit_acc_top3, \
+            valid_exit_acc_top5 = train_valid_test_one_epoch(args=args,
                                                        known_loader=valid_known_known_loader,
                                                        unknown_loader=valid_known_unknown_loader,
                                                        model=model_wrapper,
@@ -480,6 +545,19 @@ if __name__ == '__main__':
                                                        unknown_thresholds=unknown_thresholds,
                                                        unknown_loss_weight=unknown_weight)
 
+
+
+            if epoch % update_threshold_freq == 0:
+                # TODO: Update known known thresholds for deciding exits
+                print("Updating known known thresholds")
+                updated_known_thresholds = update_thresholds(loader=valid_known_known_loader,
+                                                      model=model_wrapper,
+                                                      use_msd_net=True,
+                                                      percentile=50)
+
+                known_thresholds = updated_known_thresholds
+                print("New known threshold: ", updated_known_thresholds)
+
             # Determine if model is the best
             if valid_acc_top5 > best_acc_top5:
                 best_acc_top5 = valid_acc_top5
@@ -491,9 +569,13 @@ if __name__ == '__main__':
             with open(os.path.join(save_path, 'results.csv'), 'a') as f:
                 f.write('%03d, '
                         '%0.6f, %0.6f, %0.6f, %0.6f, '
-                        '%0.5f, %0.6f, %0.6f, %0.6f, \n' % ((epoch + 1),
+                        '%0.6f, %0.6f, %0.6f,'
+                        '%0.5f, %0.6f, %0.6f, %0.6f'
+                        ' %0.6f, %0.6f, %0.6f \n'% ((epoch + 1),
                                                            train_loss, train_acc_top1, train_acc_top3, train_acc_top5,
-                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5))
+                                                            train_exit_acc_top1, train_exit_acc_top3, train_exit_acc_top5,
+                                                           valid_loss, valid_acc_top1, valid_acc_top3, valid_acc_top5,
+                                                            valid_exit_acc_top1, valid_exit_acc_top3, valid_exit_acc_top5))
 
     ########################################################################
     # Testing trained model
@@ -521,65 +603,52 @@ if __name__ == '__main__':
             #################################################################
             # Run training and validation data
             #################################################################
-            # TODO: Run process for testing and generating features
-            print("Generating featrures and probabilities")
-            save_probs_and_features(test_loader=train_known_known_loader,
-                                model=model,
-                                test_type="train_known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_all_feature_path)
+            # Run process for testing and generating features
+            # print("Generating featrures and probabilities")
 
-            save_probs_and_features(test_loader=train_known_unknown_loader,
-                                model=model,
-                                test_type="train_known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_all_feature_path)
-
-            save_probs_and_features(test_loader=valid_known_known_loader,
-                                model=model,
-                                test_type="valid_known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_all_feature_path)
-
-            save_probs_and_features(test_loader=valid_known_unknown_loader,
-                                model=model,
-                                test_type="valid_known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_all_feature_path)
+            # save_probs_and_features(test_loader=valid_known_known_loader,
+            #                     model=model,
+            #                     test_type="valid_known_known",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_all_feature_path)
+            #
+            # save_probs_and_features(test_loader=valid_known_unknown_loader,
+            #                     model=model,
+            #                     test_type="valid_known_unknown",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_all_feature_path)
 
             ########################################################################
             # Testing data
             ########################################################################
             print("Testing models")
             print("Testing the known_known samples...")
-            save_probs_and_features(test_loader=test_known_known_loader_p0,
-                                model=model,
-                                test_type="known_known",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path,
-                                part_index=0)
+            # save_probs_and_features(test_loader=test_known_known_loader_p0,
+            #                     model=model,
+            #                     test_type="known_known",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_test_results_path,
+            #                     part_index=0)
 
-            save_probs_and_features(test_loader=test_known_known_loader_p1,
-                                    model=model,
-                                    test_type="known_known",
-                                    use_msd_net=True,
-                                    epoch_index=best_epoch,
-                                    npy_save_dir=save_test_results_path,
-                                    part_index=1)
-
-            save_probs_and_features(test_loader=test_known_known_loader_p2,
-                                    model=model,
-                                    test_type="known_known",
-                                    use_msd_net=True,
-                                    epoch_index=best_epoch,
-                                    npy_save_dir=save_test_results_path,
-                                    part_index=2)
-
+            # save_probs_and_features(test_loader=test_known_known_loader_p1,
+            #                         model=model,
+            #                         test_type="known_known",
+            #                         use_msd_net=True,
+            #                         epoch_index=best_epoch,
+            #                         npy_save_dir=save_test_results_path,
+            #                         part_index=1)
+            #
+            # save_probs_and_features(test_loader=test_known_known_loader_p2,
+            #                         model=model,
+            #                         test_type="known_known",
+            #                         use_msd_net=True,
+            #                         epoch_index=best_epoch,
+            #                         npy_save_dir=save_test_results_path,
+            #                         part_index=2)
+            #
             save_probs_and_features(test_loader=test_known_known_loader_p3,
                                     model=model,
                                     test_type="known_known",
@@ -588,21 +657,13 @@ if __name__ == '__main__':
                                     npy_save_dir=save_test_results_path,
                                     part_index=3)
 
-            print("Testing the known_unknown samples...")
-            save_probs_and_features(test_loader=test_known_unknown_loader,
-                                model=model,
-                                test_type="known_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
-
-            print("testing the unknown samples...")
-            save_probs_and_features(test_loader=test_unknown_unknown_loader,
-                                model=model,
-                                test_type="unknown_unknown",
-                                use_msd_net=True,
-                                epoch_index=best_epoch,
-                                npy_save_dir=save_test_results_path)
+            # print("testing the unknown samples...")
+            # save_probs_and_features(test_loader=test_unknown_unknown_loader,
+            #                     model=model,
+            #                     test_type="unknown_unknown",
+            #                     use_msd_net=True,
+            #                     epoch_index=best_epoch,
+            #                     npy_save_dir=save_test_results_path)
 
         else:
             pass

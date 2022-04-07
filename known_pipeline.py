@@ -29,19 +29,21 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-use_performance_loss = True
+use_performance_loss = False
 use_exit_loss = True
-cross_entropy_weight = 1.0
-perform_loss_weight = 3.0
-exit_loss_weight = 3.0
-random_seed = 0
 
-use_modified_loss = True
+cross_entropy_weight = 1.0
+perform_loss_weight = 1.0
+exit_loss_weight = 1.0
+
+random_seed = 4
+
+use_modified_loss = False
 
 ###################################################################
                     # Training options #
 ###################################################################
-run_test = True
+run_test = False
 
 ##########################
 model_name = "msd_net"
@@ -113,7 +115,7 @@ run_one_sample = False
 save_one_sample_rt_folder = None
 
 # TODO: May need to change this in the future
-save_path_base = "/scratch365/jhuang24/sail-on/models/msd_net"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
 
 if run_test:
     test_model_path = save_path_base + "/" + test_model_dir
@@ -135,7 +137,8 @@ elif (use_performance_loss == True) and (use_exit_loss == True):
                     "_exit_" + str(exit_loss_weight)
 
 else:
-    save_path_sub = None
+    save_path_sub = "known_only_cross_entropy_" + str(cross_entropy_weight) + \
+                    "_exit_" + str(exit_loss_weight)
 
 
 ####################################################################
