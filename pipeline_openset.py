@@ -28,6 +28,8 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
+train_model = False
+
 use_performance_loss = False
 use_exit_loss = True
 
@@ -44,7 +46,8 @@ update_threshold_freq = 5
 ###################################################################
                     # Training options #
 ###################################################################
-run_test = True
+run_test = False
+generate_training_features = True
 
 ##########################
 model_name = "msd_net"
@@ -266,7 +269,6 @@ if __name__ == '__main__':
     growth_rate=12
     efficient=True
 
-    # global args
 
     # Get densenet configuration
     if (depth - 4) % 3:
@@ -450,7 +452,7 @@ if __name__ == '__main__':
     ########################################################################
     # Training + validation
     ########################################################################
-    if not run_test:
+    if train_model:
         # Make save directory
         if not os.path.exists(save_path):
             os.makedirs(save_path)
@@ -580,7 +582,7 @@ if __name__ == '__main__':
     ########################################################################
     # Testing trained model
     ########################################################################
-    else:
+    if run_test:
         if model_name == "msd_net":
             # TODO: find the best model in the given directory
             best_epoch, best_model_path = find_best_model(test_model_path)
@@ -604,51 +606,51 @@ if __name__ == '__main__':
             # Run training and validation data
             #################################################################
             # Run process for testing and generating features
-            # print("Generating featrures and probabilities")
+            print("Generating featrures and probabilities")
 
-            # save_probs_and_features(test_loader=valid_known_known_loader,
-            #                     model=model,
-            #                     test_type="valid_known_known",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
-            #
-            # save_probs_and_features(test_loader=valid_known_unknown_loader,
-            #                     model=model,
-            #                     test_type="valid_known_unknown",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
+            save_probs_and_features(test_loader=valid_known_known_loader,
+                                model=model,
+                                test_type="valid_known_known",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
+
+            save_probs_and_features(test_loader=valid_known_unknown_loader,
+                                model=model,
+                                test_type="valid_known_unknown",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
 
             ########################################################################
             # Testing data
             ########################################################################
             print("Testing models")
             print("Testing the known_known samples...")
-            # save_probs_and_features(test_loader=test_known_known_loader_p0,
-            #                     model=model,
-            #                     test_type="known_known",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_test_results_path,
-            #                     part_index=0)
+            save_probs_and_features(test_loader=test_known_known_loader_p0,
+                                model=model,
+                                test_type="known_known",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_test_results_path,
+                                part_index=0)
 
-            # save_probs_and_features(test_loader=test_known_known_loader_p1,
-            #                         model=model,
-            #                         test_type="known_known",
-            #                         use_msd_net=True,
-            #                         epoch_index=best_epoch,
-            #                         npy_save_dir=save_test_results_path,
-            #                         part_index=1)
-            #
-            # save_probs_and_features(test_loader=test_known_known_loader_p2,
-            #                         model=model,
-            #                         test_type="known_known",
-            #                         use_msd_net=True,
-            #                         epoch_index=best_epoch,
-            #                         npy_save_dir=save_test_results_path,
-            #                         part_index=2)
-            #
+            save_probs_and_features(test_loader=test_known_known_loader_p1,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=best_epoch,
+                                    npy_save_dir=save_test_results_path,
+                                    part_index=1)
+
+            save_probs_and_features(test_loader=test_known_known_loader_p2,
+                                    model=model,
+                                    test_type="known_known",
+                                    use_msd_net=True,
+                                    epoch_index=best_epoch,
+                                    npy_save_dir=save_test_results_path,
+                                    part_index=2)
+
             save_probs_and_features(test_loader=test_known_known_loader_p3,
                                     model=model,
                                     test_type="known_known",
@@ -657,13 +659,13 @@ if __name__ == '__main__':
                                     npy_save_dir=save_test_results_path,
                                     part_index=3)
 
-            # print("testing the unknown samples...")
-            # save_probs_and_features(test_loader=test_unknown_unknown_loader,
-            #                     model=model,
-            #                     test_type="unknown_unknown",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_test_results_path)
+            print("testing the unknown samples...")
+            save_probs_and_features(test_loader=test_unknown_unknown_loader,
+                                model=model,
+                                test_type="unknown_unknown",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_test_results_path)
 
         else:
             pass
