@@ -857,7 +857,7 @@ def save_probs_and_features(test_loader,
             input_var = torch.autograd.Variable(input)
 
             # Get the model outputs and RTs
-            start =timer()
+            start = timer()
             output, feature, end_time = model(input_var)
 
             # Handle the features
@@ -885,10 +885,13 @@ def save_probs_and_features(test_loader,
             for one_prob in prob_list.tolist():
                 full_prob_list.append(one_prob)
 
+            print(np.asarray(full_feature_list).shape)
+
         # Save all results to npy
         full_original_label_list_np = np.array(full_original_label_list)
         full_prob_list_np = np.array(full_prob_list)
         full_rt_list_np = np.array(full_rt_list)
+        full_feature_list_np = np.array(full_feature_list)
 
         if part_index is not None:
             save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_probs.npy"
@@ -909,7 +912,7 @@ def save_probs_and_features(test_loader,
         print("Saving RTs to %s" % save_rt_path)
         np.save(save_rt_path, full_rt_list_np)
         print("Saving features to %s" % save_feature_path)
-        np.save(save_feature_path, full_feature_list)
+        np.save(save_feature_path, full_feature_list_np)
 
 
     # TODO: Test process for other networks - is it different??

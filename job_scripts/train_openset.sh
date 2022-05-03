@@ -5,14 +5,14 @@
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
 #$ -e errors/
-#$ -N test_101_s3
+#$ -N ce_seed_4
 
 # Required modules
 module load conda
 conda init bash
 source activate new_msd_net
 
-python pipeline.py --arch msdnet \
+python pipeline_openset.py --arch msdnet \
                --batch-size 16 \
                --nb_training_classes 293 \
                --optimizer sgd \
