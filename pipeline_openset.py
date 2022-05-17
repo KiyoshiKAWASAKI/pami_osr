@@ -4,6 +4,7 @@ from torchvision import datasets, transforms
 from models import efficient_dense_net
 from utils import customized_dataloader
 from utils.customized_dataloader import msd_net_dataset
+from torchsummary import summary
 import warnings
 warnings.filterwarnings("ignore")
 from args import arg_parser
@@ -11,7 +12,8 @@ import torch.nn as nn
 import models
 from datetime import datetime
 from utils.pipeline_util import train_valid_test_one_epoch, \
-    save_probs_and_features, find_best_model, update_thresholds
+    save_probs_and_features, find_best_model, update_thresholds, \
+    save_openmax_feature
 
 args = arg_parser.parse_args()
 
@@ -46,7 +48,9 @@ update_threshold_freq = 5
 ###################################################################
                     # Training options #
 ###################################################################
-run_test = True
+run_msd_test = False
+generate_openmax_feature = True
+
 # generate_training_features = True
 
 ##########################
@@ -65,11 +69,11 @@ run_test: testing with psyphy and exits
 """
 
 # TODO: Cross-entropy seed 0 -- test_ce_00
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
+test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
 
 # TODO: Cross-entropy seed 1 -- test_ce_01
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_1"
-
+#
 # TODO: Cross-entropy seed 2 -- test_ce_02
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_2"
 
@@ -77,7 +81,7 @@ run_test: testing with psyphy and exits
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
 
 # TODO: Cross-entropy seed 4 -- test_ce_04
-test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
 
 #*******************************************************************#
 # TODO: Cross-entropy + sam seed 0 -- test_sam_00
@@ -138,6 +142,7 @@ test_model_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/m
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/msd_net"
 
 test_model_path = test_model_base + "/" + test_model_dir
+save_feat_path = save_path_base + "/" + test_model_dir
 
 if test_model_path is not None:
     test_date = test_model_path.split("/")[-4]
@@ -186,7 +191,7 @@ if debug:
 else:
     n_epochs = 200
 
-if run_test:
+if run_msd_test:
     batch_size = 1
 else:
     batch_size = 16
@@ -218,10 +223,10 @@ json_data_base_debug = "/afs/crc.nd.edu/user/j/jhuang24/scratch_22/open_set/" \
 json_data_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_51/open_set/data/" \
                  "dataset_v1_3_partition/npy_json_files_shuffled/"
 
-if not run_test:
+if not run_msd_test:
     save_path_with_date = save_path_base + "/" + date
 else:
-    save_path_with_date = test_model_path
+    save_path_with_date = save_path_base
 
 if not save_path_with_date:
     os.mkdir(save_path_with_date)
@@ -269,7 +274,6 @@ if __name__ == '__main__':
     depth=100
     growth_rate=12
     efficient=True
-
 
     # Get densenet configuration
     if (depth - 4) % 3:
@@ -583,19 +587,20 @@ if __name__ == '__main__':
     ########################################################################
     # Testing trained model
     ########################################################################
-    if run_test:
-        if model_name == "msd_net":
-            # TODO: find the best model in the given directory
-            best_epoch, best_model_path = find_best_model(test_model_path)
+    if model_name == "msd_net":
+        # TODO: find the best model in the given directory
+        best_epoch, best_model_path = find_best_model(test_model_path)
 
-            print("Best epoch:", best_epoch)
-            print("Best model path:", best_model_path)
+        print("Best epoch:", best_epoch)
+        print("Best model path:", best_model_path)
 
-            model.load_state_dict(torch.load(best_model_path))
-            print("Loading MSD-Net model: %s" % test_model_path)
+        model.load_state_dict(torch.load(best_model_path))
+        print("Loading MSD-Net model: %s" % test_model_path)
+        # print(model)
 
+        if run_msd_test:
             # Create directories
-            save_test_results_path = test_model_path + "/test_results"
+            save_test_results_path = save_feat_path + "/test_results"
             if not os.path.exists(save_test_results_path):
                 os.mkdir(save_test_results_path)
 
@@ -607,21 +612,21 @@ if __name__ == '__main__':
             # Run training and validation data
             #################################################################
             # Run process for testing and generating features
-            # print("Generating featrures and probabilities")
-            #
-            # save_probs_and_features(test_loader=valid_known_known_loader,
-            #                     model=model,
-            #                     test_type="valid_known_known",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
-            #
-            # save_probs_and_features(test_loader=valid_known_unknown_loader,
-            #                     model=model,
-            #                     test_type="valid_known_unknown",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_all_feature_path)
+            print("Generating featrures and probabilities")
+
+            save_probs_and_features(test_loader=valid_known_known_loader,
+                                model=model,
+                                test_type="valid_known_known",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
+
+            save_probs_and_features(test_loader=valid_known_unknown_loader,
+                                model=model,
+                                test_type="valid_known_unknown",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_all_feature_path)
 
             ########################################################################
             # Testing data
@@ -660,13 +665,50 @@ if __name__ == '__main__':
                                     npy_save_dir=save_test_results_path,
                                     part_index=3)
 
-            # print("testing the unknown samples...")
-            # save_probs_and_features(test_loader=test_unknown_unknown_loader,
-            #                     model=model,
-            #                     test_type="unknown_unknown",
-            #                     use_msd_net=True,
-            #                     epoch_index=best_epoch,
-            #                     npy_save_dir=save_test_results_path)
+            print("testing the unknown samples...")
+            save_probs_and_features(test_loader=test_unknown_unknown_loader,
+                                model=model,
+                                test_type="unknown_unknown",
+                                use_msd_net=True,
+                                epoch_index=best_epoch,
+                                npy_save_dir=save_test_results_path)
+
+        elif generate_openmax_feature:
+            # Train known known
+            print("Train known known")
+            save_openmax_feature(test_loader=train_known_known_loader,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/train_features")
+
+            # Valid known known
+            print("Valid known known")
+            save_openmax_feature(test_loader=valid_known_known_loader,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/train_features")
+
+            # Test known known
+            print("Test known known")
+            save_openmax_feature(test_loader=test_known_known_loader_p0,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/test_known_features")
+
+            save_openmax_feature(test_loader=test_known_known_loader_p1,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/test_known_features")
+
+            save_openmax_feature(test_loader=test_known_known_loader_p2,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/test_known_features")
+
+            save_openmax_feature(test_loader=test_known_known_loader_p3,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/test_known_features")
+
+            # Test unknown unknown
+            print("Test unknown unknown")
+            save_openmax_feature(test_loader=test_unknown_unknown_loader,
+                                 model=model,
+                                 mat_save_dir=save_feat_path + "/test_unknown_features")
 
         else:
             pass

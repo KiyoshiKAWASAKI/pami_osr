@@ -11,6 +11,251 @@ warnings.filterwarnings("ignore")
 import random
 import math
 from tqdm import tqdm
+import scipy
+from scipy.io import savemat
+
+
+
+
+def save_openmax_feature(test_loader,
+                         model,
+                         mat_save_dir):
+    """
+
+    :param test_loader:
+    :param model:
+    :param use_msd_net:
+    :param count_index:
+    :param mat_save_dir:
+    :return:
+    """
+    # Set the model to evaluation mode
+    model.cuda()
+    model.eval()
+
+    sm = torch.nn.Softmax(dim=2)
+
+    # for i in tqdm(range(len(test_loader))):
+    for i in tqdm(range(5)):
+        try:
+            batch = next(iter(test_loader))
+        except:
+            continue
+
+        input = batch["imgs"]
+        target = batch["labels"]
+
+        input = input.cuda()
+        target = target.cuda(async=True)
+
+        input_var = torch.autograd.Variable(input)
+
+        # Get the model outputs and RTs
+        output, feature, end_time = model(input_var)
+        output = np.asarray(list(output)[-1])
+        output = np.reshape(output, (output.shape[1], output.shape[2]))
+        print(output.shape)
+
+        # extract the probability and apply our threshold
+        prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+        prob_list = np.array(prob.cpu().tolist())
+        prob_list = prob_list[-1, : , :]
+        prob_list = np.reshape(prob_list, (prob_list.shape[1], prob_list.shape[2]))
+
+        # TODO: check whether save path exists
+        if not os.path.exists(mat_save_dir):
+            os.makedirs(mat_save_dir)
+            print("created dir: ", mat_save_dir)
+
+        # TODO: Save each sample separately
+        for j in range(target.shape[0]):
+            # TODO: step 1 - check whether class folder exists, if not, make dir
+            class_index = target.zfill(4)
+            save_mat_dir_with_class = os.path.join(mat_save_dir, class_index)
+
+            if not os.path.exists(save_mat_dir_with_class):
+                os.makedirs(save_mat_dir_with_class)
+                print("created dir: ", save_mat_dir_with_class)
+
+            # TODO: step 2 - check nb of images in that folder, assign an img name
+            nb_file = len([name for name in os.listdir(save_mat_dir_with_class) if os.path.isfile(name)])
+            img_name = str(nb_file).zfill(5)
+
+            print("Number of files: ", nb_file)
+            print("image name: ", img_name)
+
+            # TODO: step 3 - create mat file for this sample
+            one_img_dict = {"fc8" : output[j, :],
+                            "probs": prob_list[j, :],
+                            "IMG_NAME": img_name,
+                            "scores":prob_list[j, :]}
+
+            # TODO: step 4 - save mat file
+            one_img_save_path = os.path.join(save_mat_dir_with_class, img_name)
+            savemat(one_img_save_path, one_img_dict)
+
+
+
+
+
+def train_valid_one_epoch(args, known_loader, model, criterion,
+                          optimizer, nb_epoch, train_phase,
+                          save_path, debug, nb_classes=293,
+                          nb_sample_per_batch=16):
+    """
+    Train normal network, like VGG and AlexNet etc
+    No threshold, RT or known unknown. Vanilla version.
+
+    :param args:
+    :param known_loader:
+    :param model:
+    :param criterion:
+    :param optimizer:
+    :param nb_epoch:
+    :param train_phase:
+    :param save_path:
+    :param debug:
+    :param nb_classes:
+    :param nb_sample_per_batch:
+    :return:
+    """
+
+    ##########################################
+    # Set up evaluation metrics
+    ##########################################
+    losses = AverageMeter()
+
+    # This is the usually acc
+    top1, top3, top5 = [], [], []
+
+    if train_phase:
+        model.train()
+    else:
+        model.eval()
+
+    running_lr = None
+
+    ###################################################
+    # training process setup...
+    ###################################################
+    # Count number of batches for known and unknown respectively
+    nb_batches = len(known_loader)
+    print("There are %d batches in known_known loader" % nb_batches)
+
+    # Create iterator
+    known_iter = iter(known_loader)
+
+
+    # Only train one batch for each step
+    all_top1_acc = []
+    all_top3_acc = []
+    all_top5_acc = []
+
+    # for i in tqdm(range(nb_batches)):
+    for i in range(nb_batches):
+    # for i in tqdm(range(30)):
+        top1_count = 0
+        top3_count = 0
+        top5_count = 0
+
+        ##########################################
+        # Basic setups
+        ##########################################
+        lr = adjust_learning_rate(optimizer, nb_epoch, args, batch=i,
+                                  nBatch=nb_batches, method=args.lr_type)
+        if running_lr is None:
+            running_lr = lr
+
+        loss = 0.0
+
+        ##########################################
+        # Get a batch and prepare data
+        ##########################################
+        batch = next(known_iter)
+
+        input = batch["imgs"]
+        target = batch["labels"]
+
+        # Convert into PyTorch tensor
+        input_var = torch.autograd.Variable(input).cuda()
+        target = target.cuda(async=True)
+        target_var = torch.autograd.Variable(target).long()
+
+        output = model(input_var)
+
+        ##########################################
+        # Loss
+        ##########################################
+        loss += criterion(output, target_var)
+        losses.update(loss.item(), input.size(0))
+
+
+        ##########################################
+        # Batch wise accuracy
+        ##########################################
+        sm = torch.nn.Softmax(dim=0)
+
+        for j in range(len(output)):
+
+            logits = output[j].data
+            probs = sm(logits)
+
+            _, pred_top1 = torch.topk(probs, 1)
+            _, pred_top3 = torch.topk(probs, 3)
+            _, pred_top5 = torch.topk(probs, 5)
+
+            pred_top1 = pred_top1.cpu().tolist()
+            pred_top3 = pred_top3.cpu().tolist()
+            pred_top5 = pred_top5.cpu().tolist()
+
+            if target[j].item() == pred_top1[0]:
+                top1_count += 1
+                top3_count += 1
+                top5_count += 1
+
+            elif target[j].item() in pred_top3:
+                top3_count += 1
+                top5_count += 1
+
+            elif target[j].item() in pred_top3:
+                top5_count += 1
+
+        # print(top1_count, top3_count, top5_count)
+
+        batch_acc_top1 = float(top1_count/nb_sample_per_batch)
+        batch_acc_top3 = float(top3_count)/float(nb_sample_per_batch)
+        batch_acc_top5 = float(top5_count)/float(nb_sample_per_batch)
+
+        # print(batch_acc_top1)
+
+        all_top1_acc.append(batch_acc_top1)
+        all_top3_acc.append(batch_acc_top3)
+        all_top5_acc.append(batch_acc_top5)
+
+        if train_phase:
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        print('Epoch: [{0}][{1}/{2}]\t'
+                'Loss {loss.val:.4f}\t'
+                'Acc@1 {top1:.4f}\t'
+                'Acc@3 {top3:.4f}\t'
+                'Acc@5 {top5:.4f}\t'.format(nb_epoch, i + 1, nb_batches,
+                                            loss=losses, top1=batch_acc_top1,
+                                            top3=batch_acc_top3, top5=batch_acc_top5))
+
+    ##########################################
+    # Epoch wise
+    ##########################################
+    top1 = np.sum(all_top1_acc)/len(all_top1_acc)
+    top3 = np.sum(all_top3_acc)/len(all_top3_acc)
+    top5 = np.sum(all_top5_acc)/len(all_top5_acc)
+
+    # print(top1, top3, top5)
+
+    return losses.avg, top1, top3, top5
 
 
 
@@ -845,6 +1090,8 @@ def save_probs_and_features(test_loader,
             input = batch["imgs"]
             target = batch["labels"]
 
+            # print(input.shape)
+
             rts = []
             input = input.cuda()
             target = target.cuda(async=True)
@@ -860,8 +1107,12 @@ def save_probs_and_features(test_loader,
             start = timer()
             output, feature, end_time = model(input_var)
 
+            print(feature[0].cpu().detach().numpy().shape)
+
             # Handle the features
             feature = feature[0][0].cpu().detach().numpy()
+
+            print(feature.shape)
             feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
 
             for one_feature in feature.tolist():
@@ -885,7 +1136,7 @@ def save_probs_and_features(test_loader,
             for one_prob in prob_list.tolist():
                 full_prob_list.append(one_prob)
 
-            print(np.asarray(full_feature_list).shape)
+            # print(np.asarray(full_feature_list).shape)
 
         # Save all results to npy
         full_original_label_list_np = np.array(full_original_label_list)
@@ -1042,6 +1293,8 @@ def accuracy(output, target, topk=(1,)):
     """
     maxk = max(topk)
     batch_size = target.size(0)
+
+    print(maxk)
 
     _, pred = output.topk(maxk, 1, True, True)
 

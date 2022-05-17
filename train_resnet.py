@@ -256,11 +256,12 @@ def train_valid_one_epoch(known_loader,
             ##########################################
             losses.update(loss.item(), input.size(0))
 
+            # TODO: re-implement top-k
             for j in range(len(output)):
-                prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
-                top1[j].update(prec1.item(), input.size(0))
-                top3[j].update(prec3.item(), input.size(0))
-                top5[j].update(prec5.item(), input.size(0))
+                # prec1, prec3, prec5 = accuracy(output[j].data, target_var, topk=(1, 3, 5))
+                # top1[j].update(prec1.item(), input.size(0))
+                # top3[j].update(prec3.item(), input.size(0))
+                # top5[j].update(prec5.item(), input.size(0))
 
             if train_phase:
                 # compute gradient and do SGD step
