@@ -33,66 +33,65 @@ def save_openmax_feature(test_loader,
     model.cuda()
     model.eval()
 
-    sm = torch.nn.Softmax(dim=2)
+    sm = torch.nn.Softmax(dim=1)
 
-    # for i in tqdm(range(len(test_loader))):
-    for i in tqdm(range(5)):
+    for i in tqdm(range(len(test_loader))):
+    # for i in range(5):
         try:
             batch = next(iter(test_loader))
         except:
             continue
 
         input = batch["imgs"]
-        target = batch["labels"]
-
         input = input.cuda()
-        target = target.cuda(async=True)
-
         input_var = torch.autograd.Variable(input)
+
+        target = batch["labels"]
+        target = target.cuda(async=True)
 
         # Get the model outputs and RTs
         output, feature, end_time = model(input_var)
-        output = np.asarray(list(output)[-1])
-        output = np.reshape(output, (output.shape[1], output.shape[2]))
-        print(output.shape)
+        output_np = output[-1].detach().cpu().numpy() # [batch, class]
 
         # extract the probability and apply our threshold
-        prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-        prob_list = np.array(prob.cpu().tolist())
-        prob_list = prob_list[-1, : , :]
-        prob_list = np.reshape(prob_list, (prob_list.shape[1], prob_list.shape[2]))
+        prob = sm(output[-1]) # Shape is [batch, class], prob is still a tensor
+        prob_np = prob.detach().cpu().numpy()
 
-        # TODO: check whether save path exists
+        # check whether save path exists
         if not os.path.exists(mat_save_dir):
             os.makedirs(mat_save_dir)
             print("created dir: ", mat_save_dir)
 
-        # TODO: Save each sample separately
-        for j in range(target.shape[0]):
-            # TODO: step 1 - check whether class folder exists, if not, make dir
-            class_index = target.zfill(4)
+        # Save each sample separately
+        target_np = target.detach().cpu().numpy()
+
+        for j in range(target_np.shape[0]):
+            # step 1 - check whether class folder exists, if not, make dir
+            class_index = str(target_np[0]).zfill(4)
             save_mat_dir_with_class = os.path.join(mat_save_dir, class_index)
 
             if not os.path.exists(save_mat_dir_with_class):
                 os.makedirs(save_mat_dir_with_class)
                 print("created dir: ", save_mat_dir_with_class)
 
-            # TODO: step 2 - check nb of images in that folder, assign an img name
-            nb_file = len([name for name in os.listdir(save_mat_dir_with_class) if os.path.isfile(name)])
+            # step 2 - check nb of images in that folder, assign an img name
+            nb_file = len([name for name in os.listdir(save_mat_dir_with_class)
+                           if os.path.isfile(os.path.join(save_mat_dir_with_class, name))])
             img_name = str(nb_file).zfill(5)
 
             print("Number of files: ", nb_file)
-            print("image name: ", img_name)
+            print("image index: ", img_name)
 
-            # TODO: step 3 - create mat file for this sample
-            one_img_dict = {"fc8" : output[j, :],
-                            "probs": prob_list[j, :],
+            # step 3 - create mat file for this sample
+            one_img_dict = {"fc8" : output_np[j, :],
+                            "probs": prob_np[j, :],
                             "IMG_NAME": img_name,
-                            "scores":prob_list[j, :]}
+                            "scores":prob_np[j, :]}
 
-            # TODO: step 4 - save mat file
+            # step 4 - save mat file
             one_img_save_path = os.path.join(save_mat_dir_with_class, img_name)
             savemat(one_img_save_path, one_img_dict)
+            print("Saving on mat file: ", one_img_save_path)
 
 
 

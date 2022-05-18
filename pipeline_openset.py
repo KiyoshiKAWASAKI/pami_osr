@@ -678,37 +678,37 @@ if __name__ == '__main__':
             print("Train known known")
             save_openmax_feature(test_loader=train_known_known_loader,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/train_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/train_features")
 
             # Valid known known
             print("Valid known known")
             save_openmax_feature(test_loader=valid_known_known_loader,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/train_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/valid_features")
 
             # Test known known
             print("Test known known")
             save_openmax_feature(test_loader=test_known_known_loader_p0,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/test_known_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/test_known_features")
 
             save_openmax_feature(test_loader=test_known_known_loader_p1,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/test_known_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/test_known_features")
 
             save_openmax_feature(test_loader=test_known_known_loader_p2,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/test_known_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/test_known_features")
 
             save_openmax_feature(test_loader=test_known_known_loader_p3,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/test_known_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/test_known_features")
 
             # Test unknown unknown
             print("Test unknown unknown")
             save_openmax_feature(test_loader=test_unknown_unknown_loader,
                                  model=model,
-                                 mat_save_dir=save_feat_path + "/test_unknown_features")
+                                 mat_save_dir=save_feat_path + "/openmax_feature/test_unknown_features")
 
         else:
             pass
