@@ -69,7 +69,7 @@ run_test: testing with psyphy and exits
 """
 
 # TODO: Cross-entropy seed 0 -- test_ce_00
-test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
 
 # TODO: Cross-entropy seed 1 -- test_ce_01
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_1"
@@ -81,7 +81,7 @@ test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
 # test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
 
 # TODO: Cross-entropy seed 4 -- test_ce_04
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
+test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
 
 #*******************************************************************#
 # TODO: Cross-entropy + sam seed 0 -- test_sam_00

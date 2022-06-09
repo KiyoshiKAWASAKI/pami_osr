@@ -8,6 +8,7 @@ import sys
 # import pandas as pd
 # import matplotlib.pyplot as plt
 import statistics
+from scipy.special import softmax
 
 
 
@@ -63,16 +64,16 @@ import statistics
 # epoch = 194
 
 # TODO: All 3 losses seed 2 -- test_all_loss_02
-test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
-epoch = 192
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+# epoch = 192
 
 # TODO: All 3 losses seed 3 -- test_all_loss_03
 # test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
 # epoch = 141
 
 # TODO: All 3 losses seed 4 -- test_all_loss_04
-# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
-# epoch = 160
+test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
+epoch = 160
 
 #*******************************************************************#
 # TODO: CE + pp seed 0 -- test_ce_pp_00
@@ -105,7 +106,7 @@ save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/ms
 
 valid_prob_dir = save_path_base + "/" + test_model_dir + "/features"
 test_result_dir = save_path_base + "/" + test_model_dir + "/test_results"
-
+print(test_result_dir)
 
 ####################################################################
 # functions
@@ -301,6 +302,128 @@ def get_thresholds(npy_file_path,
 
 
 
+def calculate_mcc(true_pos,
+                  true_neg,
+                  false_pos,
+                  false_neg):
+    """
+
+    :param true_pos:
+    :param true_neg:
+    :param false_pos:
+    :param false_negtive:
+    :return:
+    """
+
+    return (true_neg*true_pos-false_pos*false_neg)/np.sqrt((true_pos+false_pos)*(true_pos+false_neg)*
+                                                           (true_neg+false_pos)*(true_neg+false_neg))
+
+
+
+
+def get_binary_results(known_feature,
+                       known_label,
+                       unknown_feature,
+                       threshold,
+                       nb_clfs=5):
+    """
+
+    :param original_feature:
+    :param aug_feature:
+    :param labels:
+    :return:
+    """
+    true_positive = 0
+    true_negative = 0
+    false_positive = 0
+    false_negative = 0
+
+    correct = 0
+    wrong = 0
+
+    # Process known samples
+    for i in range(len(known_label)):
+        target_label = known_label[i]
+        prob = known_feature[i]
+
+        # check each classifier in order and decide when to exit
+        for j in range(nb_clfs):
+            one_prob = prob[j]
+            one_target = target_label
+            top_1 = np.argmax(one_prob)
+
+            # If this is not the first classifier
+            if j != nb_clfs - 1:
+                if (top_1 > threshold[j]):
+                    if top_1 == one_target:
+                        correct += 1
+                        true_positive += 1
+                        break
+                    else:
+                        continue
+
+                elif (top_1 < threshold[j]):
+                    continue
+
+            # If this is the last classifier
+            else:
+                if (top_1 > threshold[j]):
+                    if top_1 == one_target:
+                        correct += 1
+                        true_positive += 1
+
+                    else:
+                        true_positive += 1
+
+                elif (top_1 < threshold[j]):
+                    wrong += 1
+                    false_negative += 1
+
+    # Process unknown
+    for i in range(len(unknown_feature)):
+        prob = unknown_feature[i]
+
+        # check each classifier in order and decide when to exit
+        for j in range(nb_clfs):
+            one_prob = prob[j]
+            max_prob = np.sort(one_prob)[-1]
+
+            # If this is not the last classifier
+            if j != nb_clfs - 1:
+                if max_prob > threshold[j]:
+                    false_positive += 1
+                    break
+                else:
+                    continue
+
+            # If this is the last classifier
+            else:
+                if max_prob > threshold[j]:
+                    false_positive += 1
+                else:
+                    true_negative += 1
+
+    # Calculate all metrics
+    precision = float(true_positive) / float(true_positive + false_positive)
+    recall = float(true_positive) / float(true_positive + false_negative)
+    f1 = (2 * precision * recall) / (precision + recall)
+    mcc = calculate_mcc(true_pos=float(true_positive),
+                        true_neg=float(true_negative),
+                        false_pos=float(false_positive),
+                        false_neg=float(false_negative))
+    unknown_acc = float(true_negative)/float(true_negative+false_positive)
+    known_acc = float(correct)/float(correct+wrong)
+
+    print("True positive: ", true_positive)
+    print("True negative: ", true_negative)
+    print("False postive: ", false_positive)
+    print("False negative: ", false_negative)
+    print("known accuracy: ", known_acc)
+    print("Unknown accuracy: ", unknown_acc)
+    print("F-1 score: ", f1)
+    print("MCC score: ", mcc)
+
+
 
 if __name__ == '__main__':
     ################################################################
@@ -351,6 +474,9 @@ if __name__ == '__main__':
     test_known_known_rts = np.concatenate((test_known_known_rts_p0, test_known_known_rts_p1,
                                           test_known_known_rts_p2, test_known_known_rts_p3),axis=0)
 
+    print(test_known_known_probs.shape)
+    print(test_known_known_labels.shape)
+
 
     ################################################################
     # Load known unknown and unknown unknown
@@ -392,23 +518,30 @@ if __name__ == '__main__':
         # Run test process
         ################################################################
         # known_known
-        print("@" * 40)
-        print("Processing known_known samples")
-        get_known_exit_stats(labels=test_known_known_labels,
-                             probs=test_known_known_probs,
-                             rts=test_known_known_rts,
-                             class_threshold=known_known_thresh,
-                             novelty_threshold=known_unknown_thresh)
+        # print("@" * 40)
+        # print("Processing known_known samples")
+        # get_known_exit_stats(labels=test_known_known_labels,
+        #                      probs=test_known_known_probs,
+        #                      rts=test_known_known_rts,
+        #                      class_threshold=known_known_thresh,
+        #                      novelty_threshold=known_unknown_thresh)
+        #
+        # # unknown_unknown
+        # print("@" * 40)
+        # print("Processing unknown_unknown samples")
+        # get_unknown_exit_stats(labels=test_unknown_unknown_labels,
+        #                        probs=test_unknown_unknown_probs,
+        #                        novelty_threshold=known_unknown_thresh)
+        #
+        # get_unknown_exit_stats(labels=test_unknown_unknown_labels,
+        #                        probs=test_unknown_unknown_probs,
+        #                        novelty_threshold=known_known_thresh)
 
-        # unknown_unknown
-        print("@" * 40)
-        print("Processing unknown_unknown samples")
-        get_unknown_exit_stats(labels=test_unknown_unknown_labels,
-                               probs=test_unknown_unknown_probs,
-                               novelty_threshold=known_unknown_thresh)
+        get_binary_results(known_feature=test_known_known_probs,
+                           known_label=test_known_known_labels,
+                           unknown_feature=test_unknown_unknown_probs,
+                           threshold=known_known_thresh)
 
-        get_unknown_exit_stats(labels=test_unknown_unknown_labels,
-                               probs=test_unknown_unknown_probs,
-                               novelty_threshold=known_known_thresh)
+
 
 
