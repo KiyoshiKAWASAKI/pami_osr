@@ -175,6 +175,7 @@ def train_valid_test_one_epoch_for_resnet(args,
     # Only train one batch for each step
     with open(save_txt_path, 'w') as f:
         for i in tqdm(range(nb_total_batches)):
+        # for i in tqdm(range(10)):
             ##########################################
             # Basic setups
             ##########################################
@@ -215,8 +216,18 @@ def train_valid_test_one_epoch_for_resnet(args,
             # start = timer()
             output, feat_1, feat_2, feat_3, feat_4 = model(input_var)
 
+            # print(output.shape)
+            # print(feat_1.shape)
+            # print(feat_2.shape)
+            # print(feat_3.shape)
+            # print(feat_4.shape)
+
             if not isinstance(output, list):
-                output = [output]
+                output = [feat_1, feat_2, feat_3, feat_4, output]
+
+            # print(len(output))
+            # sys.exit()
+
 
             if use_exit_loss == True:
                 ##########################################
@@ -336,11 +347,6 @@ def train_valid_test_one_epoch_for_resnet(args,
 
                         # If this is not the last classifier
                         if j != nb_clfs - 1:
-                            # Updated - use different threshold for each exit
-                            # print(top_3_prob)
-                            # print(top_1_threshold[j])
-                            # print(gt_label)
-                            # print(pred_top_3)
 
                             if (top_3_prob > top_1_threshold[j]) and (gt_label.detach().cpu().numpy() in pred_top_3):
                                 # Case 1
@@ -395,9 +401,6 @@ def train_valid_test_one_epoch_for_resnet(args,
                 for j in range(len(output)):
                     # Part 1: Cross-entropy loss
                     ce_loss = criterion(output[j], target_var)
-
-                    if batch_type == "unknown":
-                        ce_loss = ce_loss * unknown_loss_weight
 
                     # Part 2: Performance psyphy loss
                     try:
@@ -1358,38 +1361,41 @@ def update_thresholds(loader,
     model.cuda()
     model.eval()
 
-    if use_msd_net:
-        sm = torch.nn.Softmax(dim=2)
+    sm = torch.nn.Softmax(dim=2)
 
-        # For MSD-Net, save everything into npy files
-        full_prob_list = []
+    # For MSD-Net, save everything into npy files
+    full_prob_list = []
 
-        for i in tqdm(range(len(loader))):
-            try:
-                batch = next(iter(loader))
-            except:
-                continue
+    for i in tqdm(range(len(loader))):
+        try:
+            batch = next(iter(loader))
+        except:
+            continue
 
-            input = batch["imgs"]
+        input = batch["imgs"]
 
-            input = input.cuda()
-            input_var = torch.autograd.Variable(input)
+        input = input.cuda()
+        input_var = torch.autograd.Variable(input)
 
-            # Get the model outputs and RTs
+        # Get the model outputs and RTs
+        if use_msd_net:
             output, feature, _ = model(input_var)
+        else:
+            output, feat_1, feat_2, feat_3, feat_4 = model(input_var)
+            output = [feat_1, feat_2, feat_3, feat_4, output]
 
-            # extract the probability and apply our threshold
-            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-            prob_list = np.array(prob.cpu().tolist())
+        # extract the probability and apply our threshold
+        prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+        prob_list = np.array(prob.cpu().tolist())
 
-            # Reshape it into [batch, block, class]
-            prob_list = np.reshape(prob_list,
-                                    (prob_list.shape[1],
-                                     prob_list.shape[0],
-                                     prob_list.shape[2]))
+        # Reshape it into [batch, block, class]
+        prob_list = np.reshape(prob_list,
+                                (prob_list.shape[1],
+                                 prob_list.shape[0],
+                                 prob_list.shape[2]))
 
-            for one_prob in prob_list.tolist():
-                full_prob_list.append(one_prob)
+        for one_prob in prob_list.tolist():
+            full_prob_list.append(one_prob)
 
         # Save all results to npy
         full_prob = np.array(full_prob_list)

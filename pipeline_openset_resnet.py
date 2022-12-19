@@ -33,8 +33,8 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
 train_model = True
 
-use_performance_loss = False
-use_exit_loss = False
+use_performance_loss = True
+use_exit_loss = True
 
 random_seed = 0
 
@@ -234,10 +234,7 @@ if debug:
 else:
     train_known_known_path = os.path.join(json_data_base, "train_known_known.json")
 
-    if unknown_ratio == 1.0:
-        train_known_unknown_path = os.path.join(json_data_base, "train_known_unknown.json")
-    else:
-        train_known_unknown_path = json_data_base + "/train_known_unknown_" + str(unknown_ratio) + ".json"
+    train_known_unknown_path = os.path.join(json_data_base, "train_known_unknown.json")
 
     valid_known_known_path = os.path.join(json_data_base, "valid_known_known.json")
     valid_known_unknown_path = os.path.join(json_data_base, "valid_known_unknown.json")
@@ -517,7 +514,7 @@ if __name__ == '__main__':
                 print("Updating known known thresholds")
                 updated_known_thresholds = update_thresholds(loader=valid_known_known_loader,
                                                       model=model_wrapper,
-                                                      use_msd_net=True,
+                                                      use_msd_net=False,
                                                       percentile=50)
 
                 known_thresholds = updated_known_thresholds

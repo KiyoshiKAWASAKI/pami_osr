@@ -5,7 +5,7 @@
 #$ -q gpu -l gpu=1
 #$ -l h=!qa-rtx6k-044
 #$ -e errors/
-#$ -N openmax_seed_4
+#$ -N openmax_seed_2
 
 # Required modules
 module load conda
