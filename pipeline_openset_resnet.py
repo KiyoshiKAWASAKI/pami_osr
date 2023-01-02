@@ -31,15 +31,15 @@ date = datetime.today().strftime('%Y-%m-%d')
 ###################################################################
                             # Loss options #
 ###################################################################
-train_model = True
+train_model = False
 
 use_performance_loss = True
 use_exit_loss = True
 
-random_seed = 0
+random_seed = 2
 
 cross_entropy_weight = 1.0
-perform_loss_weight = 1.0
+perform_loss_weight = 3.0
 exit_loss_weight = 1.0
 
 unknown_ratio = None
@@ -49,8 +49,8 @@ update_threshold_freq = 5
 ###################################################################
                     # Training options #
 ###################################################################
-run_msd_test = False
-generate_openmax_feature = True
+run_msd_test = True
+generate_openmax_feature = False
 
 
 ##########################
@@ -68,52 +68,132 @@ test_after_valid: testing MSD Net using the only last clf's prediction
 run_test: testing with psyphy and exits
 """
 
-# TODO: Cross-entropy seed 0 -- test_ce_00
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
+# Cross-entropy seed 0 -- test_ce_00
+# test_model_dir = "2022-12-18/cross_entropy_only/seed_0"
 
-# TODO: Cross-entropy seed 1 -- test_ce_01
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_1"
+# Cross-entropy seed 1 -- test_ce_01
+# test_model_dir = "2022-12-18/cross_entropy_only/seed_1"
 #
-# TODO: Cross-entropy seed 2 -- test_ce_02
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_2"
+# Cross-entropy seed 2 -- test_ce_02
+# test_model_dir = "2022-12-18/cross_entropy_only/seed_2"
 
-# TODO: Cross-entropy seed 3 -- test_ce_03
-# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
+# Cross-entropy seed 3 -- test_ce_03
+# test_model_dir = "2022-12-18/cross_entropy_only/seed_3"
 
-# TODO: Cross-entropy seed 4 -- test_ce_04
-test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
-
-#*******************************************************************#
-# TODO: Cross-entropy + sam seed 0 -- test_sam_00
-# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_0"
-
-# TODO: Cross-entropy + sam seed 1 -- test_sam_01
-# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_1"
-
-# TODO: Cross-entropy + sam seed 2 -- test_sam_02
-# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_2"
-
-# TODO: Cross-entropy + sam seed 3 -- test_sam_03
-# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_3"
-
-# TODO: Cross-entropy + sam seed 4 -- test_sam_04
-# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_4"
+# Cross-entropy seed 4 -- test_ce_04
+# test_model_dir = "2022-12-18/cross_entropy_only/seed_4"
 
 #*******************************************************************#
-# TODO: All 3 losses seed 0 -- test_all_loss_00
-# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+# Cross-entropy + sam seed 0 -- test_sam_00
+# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_0"
 
-# TODO: All 3 losses seed 1 -- test_all_loss_01
-# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
+# Cross-entropy + sam seed 1 -- test_sam_01
+# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_1"
 
-# TODO: All 3 losses seed 2 -- test_all_loss_02
-# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+# Cross-entropy + sam seed 2 -- test_sam_02
+# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_2"
 
-# TODO: All 3 losses seed 3 -- test_all_loss_03
-# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
+# Cross-entropy + sam seed 3 -- test_sam_03
+# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_3"
 
-# TODO: All 3 losses seed 4 -- test_all_loss_04
-# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
+# Cross-entropy + sam seed 4 -- test_sam_04
+# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_4"
+
+#*******************************************************************#
+# All 3 losses seed 0 -- test_all_loss_00
+# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_0"
+
+# All 3 losses seed 1 -- test_all_loss_01
+# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_1"
+
+# All 3 losses seed 2 -- test_all_loss_02
+# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_2"
+
+# All 3 losses seed 3 -- test_all_loss_03
+# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_3"
+
+# All 3 losses seed 4 -- test_all_loss_04
+# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4"
+
+#*******************************************************************#
+# Psyphy weight 1-0-1 seed 0
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_0"
+
+# Psyphy weight 1-0-1 seed 1
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_1"
+
+# Psyphy weight 1-0-1 seed 2
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_2"
+
+# Psyphy weight 1-0-1 seed 3
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_3"
+
+# Psyphy weight 1-0-1 seed 4
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_4"
+
+#*******************************************************************#
+# Psyphy weight 1-1-2 seed 0
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_0"
+
+# Psyphy weight 1-1-2 seed 1
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_1"
+
+# TODO: Psyphy weight 1-1-2 seed 2
+# test_model_dir = None
+
+# Psyphy weight 1-1-2 seed 3
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_3"
+
+# Psyphy weight 1-1-2 seed 4
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_4"
+
+#*******************************************************************#
+# TODO: Psyphy weight 1-2-1 seed 0
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-2-1 seed 1
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-2-1 seed 2
+# test_model_dir = ""
+
+# Psyphy weight 1-2-1 seed 3
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_3"
+
+# TODO:Psyphy weight 1-2-1 seed 4
+# test_model_dir = ""
+
+#*******************************************************************#
+# Psyphy weight 1-2-2 seed 0
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_0"
+
+# TODO: Psyphy weight 1-2-2 seed 1
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-2-2 seed 2
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-2-2 seed 3
+# test_model_dir = ""
+
+# Psyphy weight 1-2-1 seed 4
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_4"
+
+#*******************************************************************#
+# Psyphy weight 1-3-1 seed 0
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_0"
+
+# Psyphy weight 1-3-1 seed 1
+test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_1"
+
+# TODO: Psyphy weight 1-3-1 seed 2
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-3-1 seed 3
+# test_model_dir = ""
+
+# TODO: Psyphy weight 1-3-1 seed 4
+# test_model_dir = ""
 
 
 ##################################################
@@ -122,7 +202,7 @@ run_one_sample = False
 save_one_sample_rt_folder = None
 
 # TODO: May need to change this in the future
-test_model_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
+test_model_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
 save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
 
 test_model_path = test_model_base + "/" + test_model_dir
@@ -542,7 +622,7 @@ if __name__ == '__main__':
     ########################################################################
     # Testing trained model
     ########################################################################
-    if model_name == "msd_net":
+    else:
         # TODO: find the best model in the given directory
         best_epoch, best_model_path = find_best_model(test_model_path)
 
@@ -551,7 +631,6 @@ if __name__ == '__main__':
 
         model.load_state_dict(torch.load(best_model_path))
         print("Loading MSD-Net model: %s" % test_model_path)
-        # print(model)
 
         if run_msd_test:
             # Create directories
@@ -572,14 +651,14 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=valid_known_known_loader,
                                 model=model,
                                 test_type="valid_known_known",
-                                use_msd_net=True,
+                                use_msd_net=False,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_all_feature_path)
 
             save_probs_and_features(test_loader=valid_known_unknown_loader,
                                 model=model,
                                 test_type="valid_known_unknown",
-                                use_msd_net=True,
+                                use_msd_net=False,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_all_feature_path)
 
@@ -591,7 +670,7 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=test_known_known_loader_p0,
                                 model=model,
                                 test_type="test_known_known",
-                                use_msd_net=True,
+                                use_msd_net=False,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_test_results_path,
                                 part_index=0)
@@ -599,7 +678,7 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=test_known_known_loader_p1,
                                     model=model,
                                     test_type="test_known_known",
-                                    use_msd_net=True,
+                                    use_msd_net=False,
                                     epoch_index=best_epoch,
                                     npy_save_dir=save_test_results_path,
                                     part_index=1)
@@ -607,7 +686,7 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=test_known_known_loader_p2,
                                     model=model,
                                     test_type="test_known_known",
-                                    use_msd_net=True,
+                                    use_msd_net=False,
                                     epoch_index=best_epoch,
                                     npy_save_dir=save_test_results_path,
                                     part_index=2)
@@ -615,7 +694,7 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=test_known_known_loader_p3,
                                     model=model,
                                     test_type="test_known_known",
-                                    use_msd_net=True,
+                                    use_msd_net=False,
                                     epoch_index=best_epoch,
                                     npy_save_dir=save_test_results_path,
                                     part_index=3)
@@ -624,7 +703,7 @@ if __name__ == '__main__':
             save_probs_and_features(test_loader=test_unknown_unknown_loader,
                                 model=model,
                                 test_type="unknown_unknown",
-                                use_msd_net=True,
+                                use_msd_net=False,
                                 epoch_index=best_epoch,
                                 npy_save_dir=save_test_results_path)
 

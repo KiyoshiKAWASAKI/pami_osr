@@ -1463,104 +1463,110 @@ def save_probs_and_features(test_loader,
     model.cuda()
     model.eval()
 
-    if use_msd_net:
-        sm = torch.nn.Softmax(dim=2)
+    # if use_msd_net:
+    sm = torch.nn.Softmax(dim=2)
 
-        # For MSD-Net, save everything into npy files
-        full_original_label_list = []
-        full_prob_list = []
-        full_rt_list = []
-        full_feature_list = []
+    # For MSD-Net, save everything into npy files
+    full_original_label_list = []
+    full_prob_list = []
+    # full_rt_list = []
+    full_feature_list = []
 
 
-        for i in tqdm(range(len(test_loader))):
-            try:
-                batch = next(iter(test_loader))
-            except:
-                continue
+    for i in tqdm(range(len(test_loader))):
+        try:
+            batch = next(iter(test_loader))
+        except:
+            continue
 
-            input = batch["imgs"]
-            target = batch["labels"]
+        input = batch["imgs"]
+        target = batch["labels"]
 
-            # print(input.shape)
+        # print(input.shape)
 
-            rts = []
-            input = input.cuda()
-            target = target.cuda(async=True)
+        rts = []
+        input = input.cuda()
+        target = target.cuda(async=True)
 
-            # Save original labels to the list
-            original_label_list = np.array(target.cpu().tolist())
-            for label in original_label_list:
-                full_original_label_list.append(label)
+        # Save original labels to the list
+        original_label_list = np.array(target.cpu().tolist())
+        for label in original_label_list:
+            full_original_label_list.append(label)
 
-            input_var = torch.autograd.Variable(input)
+        input_var = torch.autograd.Variable(input)
 
-            # Get the model outputs and RTs
-            start = timer()
-            output, feature, end_time = model(input_var)
+        # Get the model outputs and RTs
+        start = timer()
+        # output, feature, end_time = model(input_var)
 
-            print(feature[0].cpu().detach().numpy().shape)
-
-            # Handle the features
-            feature = feature[0][0].cpu().detach().numpy()
-
-            print(feature.shape)
-            feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
-
-            for one_feature in feature.tolist():
-                full_feature_list.append(one_feature)
-
-            # Save the RTs
-            for end in end_time[0]:
-                rts.append(end-start)
-            full_rt_list.append(rts)
-
-            # extract the probability and apply our threshold
-            prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
-            prob_list = np.array(prob.cpu().tolist())
-
-            # Reshape it into [batch, block, class]
-            prob_list = np.reshape(prob_list,
-                                    (prob_list.shape[1],
-                                     prob_list.shape[0],
-                                     prob_list.shape[2]))
-
-            for one_prob in prob_list.tolist():
-                full_prob_list.append(one_prob)
-
-            # print(np.asarray(full_feature_list).shape)
-
-        # Save all results to npy
-        full_original_label_list_np = np.array(full_original_label_list)
-        full_prob_list_np = np.array(full_prob_list)
-        full_rt_list_np = np.array(full_rt_list)
-        full_feature_list_np = np.array(full_feature_list)
-
-        if part_index is not None:
-            save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_probs.npy"
-            save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_labels.npy"
-            save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_rts.npy"
-            save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_features.npy"
-
+        if use_msd_net:
+            output, feature, _ = model(input_var)
         else:
-            save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
-            save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
-            save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
-            save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_features.npy"
+            output, feat_1, feat_2, feat_3, feat_4 = model(input_var)
+            output = [feat_1, feat_2, feat_3, feat_4, output]
 
-        print("Saving probabilities to %s" % save_prob_path)
-        np.save(save_prob_path, full_prob_list_np)
-        print("Saving original labels to %s" % save_label_path)
-        np.save(save_label_path, full_original_label_list_np)
-        print("Saving RTs to %s" % save_rt_path)
-        np.save(save_rt_path, full_rt_list_np)
-        print("Saving features to %s" % save_feature_path)
-        np.save(save_feature_path, full_feature_list_np)
+        # print(feature[0].cpu().detach().numpy().shape)
 
+        # Handle the features
+        # feature = feature[0][0].cpu().detach().numpy()
 
-    # TODO: Test process for other networks - is it different??
+        # print(feature.shape)
+        # feature = np.reshape(feature, (1, feature.shape[0] * feature.shape[1] * feature.shape[2]))
+        #
+        # for one_feature in feature.tolist():
+        #     full_feature_list.append(one_feature)
+
+        # Save the RTs
+        # for end in end_time[0]:
+        #     rts.append(end-start)
+        # full_rt_list.append(rts)
+
+        # extract the probability and apply our threshold
+        prob = sm(torch.stack(output).to()) # Shape is [block, batch, class]
+        prob_list = np.array(prob.cpu().tolist())
+
+        # Reshape it into [batch, block, class]
+        prob_list = np.reshape(prob_list,
+                                (prob_list.shape[1],
+                                 prob_list.shape[0],
+                                 prob_list.shape[2]))
+
+        for one_prob in prob_list.tolist():
+            full_prob_list.append(one_prob)
+
+        # print(np.asarray(full_feature_list).shape)
+
+    # Save all results to npy
+    full_original_label_list_np = np.array(full_original_label_list)
+    full_prob_list_np = np.array(full_prob_list)
+    # full_rt_list_np = np.array(full_rt_list)
+    # full_feature_list_np = np.array(full_feature_list)
+
+    if part_index is not None:
+        save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_probs.npy"
+        save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_labels.npy"
+        # save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_rts.npy"
+        # save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_part_" + str(part_index) + "_features.npy"
+
     else:
-        pass
+        save_prob_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_probs.npy"
+        save_label_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_labels.npy"
+        # save_rt_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_rts.npy"
+        # save_feature_path = npy_save_dir + "/" + test_type + "_epoch_" + str(epoch_index) + "_features.npy"
+
+    print("Saving probabilities to %s" % save_prob_path)
+    np.save(save_prob_path, full_prob_list_np)
+    print("Saving original labels to %s" % save_label_path)
+    np.save(save_label_path, full_original_label_list_np)
+    # print("Saving RTs to %s" % save_rt_path)
+    # np.save(save_rt_path, full_rt_list_np)
+    # print("Saving features to %s" % save_feature_path)
+    # np.save(save_feature_path, full_feature_list_np)
+
+
+    # # TODO: Test process for other networks - is it different??
+    # else:
+    #     pass
 
 
 
