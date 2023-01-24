@@ -138,8 +138,8 @@ run_test: testing with psyphy and exits
 # Psyphy weight 1-1-2 seed 1
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_1"
 
-# TODO: Psyphy weight 1-1-2 seed 2
-# test_model_dir = None
+# Psyphy weight 1-1-2 seed 2
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_2"
 
 # Psyphy weight 1-1-2 seed 3
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_3"
@@ -148,33 +148,33 @@ run_test: testing with psyphy and exits
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_4"
 
 #*******************************************************************#
-# TODO: Psyphy weight 1-2-1 seed 0
-# test_model_dir = ""
+# Psyphy weight 1-2-1 seed 0
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_0"
 
-# TODO: Psyphy weight 1-2-1 seed 1
-# test_model_dir = ""
+# Psyphy weight 1-2-1 seed 1
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_1"
 
-# TODO: Psyphy weight 1-2-1 seed 2
-# test_model_dir = ""
+# Psyphy weight 1-2-1 seed 2
+test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_2"
 
 # Psyphy weight 1-2-1 seed 3
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_3"
-
-# TODO:Psyphy weight 1-2-1 seed 4
 # test_model_dir = ""
+
+# Psyphy weight 1-2-1 seed 4
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_4"
 
 #*******************************************************************#
 # Psyphy weight 1-2-2 seed 0
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_0"
 
-# TODO: Psyphy weight 1-2-2 seed 1
-# test_model_dir = ""
+# Psyphy weight 1-2-2 seed 1
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_1"
 
-# TODO: Psyphy weight 1-2-2 seed 2
-# test_model_dir = ""
+# Psyphy weight 1-2-2 seed 2
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_2"
 
-# TODO: Psyphy weight 1-2-2 seed 3
-# test_model_dir = ""
+# Psyphy weight 1-2-2 seed 3
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_3"
 
 # Psyphy weight 1-2-1 seed 4
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_2.0/seed_4"
@@ -184,16 +184,16 @@ run_test: testing with psyphy and exits
 # test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_0"
 
 # Psyphy weight 1-3-1 seed 1
-test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_1"
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_1"
 
-# TODO: Psyphy weight 1-3-1 seed 2
-# test_model_dir = ""
+# Psyphy weight 1-3-1 seed 2
+# test_model_dir = "2023-01-01/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_2"
 
-# TODO: Psyphy weight 1-3-1 seed 3
-# test_model_dir = ""
+# Psyphy weight 1-3-1 seed 3
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_3"
 
-# TODO: Psyphy weight 1-3-1 seed 4
-# test_model_dir = ""
+# Psyphy weight 1-3-1 seed 4
+# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_3.0_exit_1.0/seed_4"
 
 
 ##################################################

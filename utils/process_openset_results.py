@@ -12,126 +12,93 @@ from scipy.special import softmax
 
 
 
-
+# TODO: Cross Entropy Only
 # Cross-entropy seed 0 -- test_ce_00
-# test_model_dir = "2022-12-18/cross_entropy_only/seed_0"
-# epoch = 174
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_0"
+# epoch = 147
 
 # Cross-entropy seed 1 -- test_ce_01
-# test_model_dir = "2022-12-18/cross_entropy_only/seed_1"
-# epoch = 199
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_1"
+# epoch = 181
 
 # Cross-entropy seed 2 -- test_ce_02
-# test_model_dir = "2022-12-18/cross_entropy_only/seed_2"
-# epoch = 168
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_2"
+# epoch = 195
 
 # Cross-entropy seed 3 -- test_ce_03
-# test_model_dir = "2022-12-18/cross_entropy_only/seed_3"
-# epoch = 182
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_3"
+# epoch = 142
 
 # Cross-entropy seed 4 -- test_ce_04
-# test_model_dir = "2022-12-18/cross_entropy_only/seed_4"
-# epoch = 174
+# test_model_dir = "2022-02-13/known_only_cross_entropy/seed_4"
+# epoch = 120
 
 #*******************************************************************#
+# TODO: Cross Entropy + Sam
 # Cross-entropy + sam seed 0 -- test_sam_00
-# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_0"
-# epoch = 136
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_0"
+# epoch = 175
 
 # Cross-entropy + sam seed 1 -- test_sam_01
-# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_1"
-# epoch = 138
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_1"
+# epoch = 105
 
 # Cross-entropy + sam seed 2 -- test_sam_02
-# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_2"
-# epoch = 191
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_2"
+# epoch = 159
 
 # Cross-entropy + sam seed 3 -- test_sam_03
-# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_3"
-# epoch = 136
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_3"
+# epoch = 103
 
 # Cross-entropy + sam seed 4 -- test_sam_04
-# test_model_dir = "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_4"
-# epoch = 136
+# test_model_dir = "2022-02-14/known_only_cross_entropy_1.0_pfm_1.0/seed_4"
+# epoch = 193
 
 #*******************************************************************#
+# TODO: Psyphy
 # All 3 losses seed 0 -- test_all_loss_00
-# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_0"
-# epoch = 131
+test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+epoch = 156
 
 # All 3 losses seed 1 -- test_all_loss_01
-# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_1"
-# epoch = 146
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
+# epoch = 194
 
 # All 3 losses seed 2 -- test_all_loss_02
-# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_2"
-# epoch = 121
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+# epoch = 192
 
 # All 3 losses seed 3 -- test_all_loss_03
-# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_3"
-# epoch = 185
+# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
+# epoch = 141
 
 # All 3 losses seed 4 -- test_all_loss_04
-# test_model_dir = "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4"
+# test_model_dir = "2022-03-25/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
 # epoch = 160
 
 
 #*******************************************************************#
-# TODO: Psyphy weight 1-0-1 seed 0
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_0"
-# epoch =
+# TODO: CrossEntropy + Exit loss
+# Psyphy weight 1-0-1 seed 0
+# test_model_dir = "2022-03-25/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+# epoch = 173
 
-# TODO: Psyphy weight 1-0-1 seed 1
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_1"
-# epoch =
+# Psyphy weight 1-0-1 seed 1
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
+# epoch = 130
 
 # Psyphy weight 1-0-1 seed 2
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_2"
-# epoch = 124
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_2"
+# epoch = 166
 
 # Psyphy weight 1-0-1 seed 3
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_3"
-# epoch = 190
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_3"
+# epoch = 128
 
 # Psyphy weight 1-0-1 seed 4
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_4"
-# epoch = 184
-
-#*******************************************************************#
-# Psyphy weight 1-1-2 seed 0
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_0"
-# epoch = 175
-
-# Psyphy weight 1-1-2 seed 1
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_1"
-# epoch = 159
-
-# TODO: Psyphy weight 1-1-2 seed 2
-# test_model_dir = None
-
-# Psyphy weight 1-1-2 seed 3
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_3"
-# epoch = 182
-
-# TODO:Psyphy weight 1-1-2 seed 4
-test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_1.0_exit_2.0/seed_4"
-epoch = 117
-
-#*******************************************************************#
-# TODO: Psyphy weight 1-2-1 seed 0
-# test_model_dir = ""
-
-# TODO: Psyphy weight 1-2-1 seed 1
-# test_model_dir = ""
-
-# TODO: Psyphy weight 1-2-1 seed 2
-# test_model_dir = ""
-
-# TODO: Psyphy weight 1-2-1 seed 3
-# test_model_dir = "2022-12-28/cross_entropy_1.0_pfm_2.0_exit_1.0/seed_3"
-
-# TODO:Psyphy weight 1-2-1 seed 4
-# test_model_dir = ""
+# test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
+# epoch = 110
 
 ####################################################################
 # Parameters (usually, no need to change these)
@@ -139,12 +106,13 @@ epoch = 117
 percentile = [50]
 test_binary = False
 nb_training_classes = 293
-# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
+# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
 
 valid_prob_dir = save_path_base + "/" + test_model_dir + "/features"
 test_result_dir = save_path_base + "/" + test_model_dir + "/test_results"
 
+print(test_model_dir)
 
 ####################################################################
 # functions
@@ -155,11 +123,21 @@ def get_known_exit_stats(labels,
                          class_threshold,
                          novelty_threshold,
                          nb_clfs=5):
+    """
+
+    :param labels:
+    :param probs:
+    :param class_threshold:
+    :param novelty_threshold:
+    :param nb_clfs:
+    :return:
+    """
     nb_correct_top_1 = 0
     nb_correct_top_3 = 0
     nb_correct_top_5 = 0
 
     known_as_unknown_count = 0
+    exit_counts = [0, 0, 0, 0, 0, 0, 0]
 
     for i in range(len(labels)):
         target_label = labels[i]
@@ -170,6 +148,8 @@ def get_known_exit_stats(labels,
             one_prob = prob[j]
 
             # TODO: Adding top3 and top5
+            max_prob = np.sort(one_prob)[-1]
+
             top_1 = np.argmax(one_prob)
             top_3 = np.argpartition(one_prob, -3)[-3:]
             top_5 = np.argpartition(one_prob, -5)[-5:]
@@ -178,12 +158,14 @@ def get_known_exit_stats(labels,
             if j != nb_clfs - 1:
                 # Case 1: At a certain exit, max prob is larger than both
                 #         classification threshold and novelty threshold
-                if (top_1 > novelty_threshold[j]) and (top_1 > class_threshold[j]):
+                if (max_prob > novelty_threshold[j]) and (max_prob > class_threshold[j]):
 
                     if top_1 == target_label:
                         nb_correct_top_1 += 1
                         nb_correct_top_3 += 1
                         nb_correct_top_5 += 1
+
+                        exit_counts[j] += 1
                         break
 
                     elif target_label in top_3:
@@ -200,16 +182,18 @@ def get_known_exit_stats(labels,
 
                 # Case 2: max prob is smaller than novelty threshold or
                 #         is smaller than classification threshold, go check next exit
-                elif (top_1 < novelty_threshold[j]) or (top_1 < class_threshold[j]):
+                elif (max_prob < novelty_threshold[j]) or (max_prob< class_threshold[j]):
                     continue
 
             # If this is the last classifier
             else:
-                if (top_1 > novelty_threshold[j]) and (top_1 > class_threshold[j]):
+                if (max_prob > novelty_threshold[j]) and (max_prob > class_threshold[j]):
                     if top_1 == target_label:
                         nb_correct_top_1 += 1
                         nb_correct_top_3 += 1
                         nb_correct_top_5 += 1
+
+                        exit_counts[j] += 1
 
                     elif target_label in top_3:
                         nb_correct_top_3 += 1
@@ -218,12 +202,16 @@ def get_known_exit_stats(labels,
                     elif target_label in top_5:
                         nb_correct_top_5 += 1
 
+                    if top_1 != target_label:
+                        exit_counts[j + 1] += 1
+
                     else:
-                        pass
+                        continue
 
-                elif (top_1 < novelty_threshold[j]):
+
+                elif (max_prob < novelty_threshold[j]):
                     known_as_unknown_count += 1
-
+                    exit_counts[j+2] += 1
 
     acc_top_1 = float(nb_correct_top_1) / (float(len(labels)))
     acc_top_3 = float(nb_correct_top_3) / (float(len(labels)))
@@ -236,6 +224,7 @@ def get_known_exit_stats(labels,
     print("Accuracy top-3:", acc_top_3)
     print("Accuracy top-5:", acc_top_5)
     print("Known as unknown:", unknown_rate)
+    print("Counts at all exits: ", exit_counts)
 
 
 
@@ -246,6 +235,7 @@ def get_unknown_exit_stats(labels,
                            nb_clfs=5):
 
     unknown_as_known_count = 0
+    exit_counts = [0, 0, 0, 0, 0, 0]
 
     for i in range(len(labels)):
         # Loop thru each sample
@@ -256,14 +246,12 @@ def get_unknown_exit_stats(labels,
             one_prob = prob[j]
             max_prob = np.sort(one_prob)[-1]
 
-            # print(max_prob)
-
             # If this is not the last classifier
             if j != nb_clfs - 1:
                 # Only consider top-1 if it is not the last classifier
                 if max_prob > novelty_threshold[j]:
                     unknown_as_known_count += 1
-
+                    exit_counts[j] += 1
                     break
 
                 else:
@@ -274,6 +262,9 @@ def get_unknown_exit_stats(labels,
             else:
                 if max_prob > novelty_threshold[j]:
                     unknown_as_known_count += 1
+                    exit_counts[j] += 1
+
+    exit_counts[-1] = len(labels) - unknown_as_known_count
 
     print(unknown_as_known_count)
     print(len(labels))
@@ -281,6 +272,7 @@ def get_unknown_exit_stats(labels,
     acc = 1.0 - float(unknown_as_known_count)/(float(len(labels)))
 
     print("unknown acc:", acc)
+    print("Counts at all exits: ", exit_counts)
 
 
 
@@ -388,10 +380,11 @@ def get_binary_results(known_feature,
             one_prob = prob[j]
             one_target = target_label
             top_1 = np.argmax(one_prob)
+            max_prob = np.sort(one_prob)[-1]
 
             # If this is not the first classifier
             if j != nb_clfs - 1:
-                if (top_1 > threshold[j]):
+                if (max_prob > threshold[j]):
                     if top_1 == one_target:
                         correct += 1
                         true_positive += 1
@@ -399,12 +392,12 @@ def get_binary_results(known_feature,
                     else:
                         continue
 
-                elif (top_1 < threshold[j]):
+                elif (max_prob < threshold[j]):
                     continue
 
             # If this is the last classifier
             else:
-                if (top_1 > threshold[j]):
+                if (max_prob > threshold[j]):
                     if top_1 == one_target:
                         correct += 1
                         true_positive += 1
@@ -412,7 +405,7 @@ def get_binary_results(known_feature,
                     else:
                         true_positive += 1
 
-                elif (top_1 < threshold[j]):
+                elif (max_prob < threshold[j]):
                     wrong += 1
                     false_negative += 1
 
@@ -476,29 +469,29 @@ if __name__ == '__main__':
     # known known is split into 4 parts
     ################################################################
     # known_known (test)
-    test_known_known_probs_path_p0 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_probs.npy"
-    test_known_known_label_path_p0  = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_labels.npy"
+    test_known_known_probs_path_p0 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_0_probs.npy"
+    test_known_known_label_path_p0  = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_0_labels.npy"
     # test_known_known_rt_path_p0  = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_rts.npy"
     test_known_known_labels_p0  = np.load(test_known_known_label_path_p0)
     test_known_known_probs_p0  = np.load(test_known_known_probs_path_p0)
     # test_known_known_rts_p0  = np.load(test_known_known_rt_path_p0)
 
-    test_known_known_probs_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_probs.npy"
-    test_known_known_label_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_labels.npy"
+    test_known_known_probs_path_p1 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_1_probs.npy"
+    test_known_known_label_path_p1 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_1_labels.npy"
     # test_known_known_rt_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_rts.npy"
     test_known_known_labels_p1 = np.load(test_known_known_label_path_p1)
     test_known_known_probs_p1 = np.load(test_known_known_probs_path_p1)
     # test_known_known_rts_p1 = np.load(test_known_known_rt_path_p1)
 
-    test_known_known_probs_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_probs.npy"
-    test_known_known_label_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_labels.npy"
+    test_known_known_probs_path_p2 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_2_probs.npy"
+    test_known_known_label_path_p2 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_2_labels.npy"
     # test_known_known_rt_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_rts.npy"
     test_known_known_labels_p2 = np.load(test_known_known_label_path_p2)
     test_known_known_probs_p2 = np.load(test_known_known_probs_path_p2)
     # test_known_known_rts_p2 = np.load(test_known_known_rt_path_p2)
 
-    test_known_known_probs_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_probs.npy"
-    test_known_known_label_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_labels.npy"
+    test_known_known_probs_path_p3 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_3_probs.npy"
+    test_known_known_label_path_p3 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_3_labels.npy"
     # test_known_known_rt_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_rts.npy"
     test_known_known_labels_p3 = np.load(test_known_known_label_path_p3)
     test_known_known_probs_p3 = np.load(test_known_known_probs_path_p3)
@@ -565,10 +558,6 @@ if __name__ == '__main__':
         # unknown_unknown
         print("@" * 40)
         print("Processing unknown_unknown samples")
-        # get_unknown_exit_stats(labels=test_unknown_unknown_labels,
-        #                        probs=test_unknown_unknown_probs,
-        #                        novelty_threshold=known_unknown_thresh)
-
         get_unknown_exit_stats(labels=test_unknown_unknown_labels,
                                probs=test_unknown_unknown_probs,
                                novelty_threshold=known_known_thresh)
