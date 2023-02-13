@@ -58,8 +58,8 @@ from scipy.special import softmax
 #*******************************************************************#
 # TODO: Psyphy
 # All 3 losses seed 0 -- test_all_loss_00
-test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
-epoch = 156
+# test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_0"
+# epoch = 156
 
 # All 3 losses seed 1 -- test_all_loss_01
 # test_model_dir = "2022-03-30/cross_entropy_1.0_pfm_1.0_exit_1.0_unknown_ratio_1.0/seed_1"
@@ -100,19 +100,41 @@ epoch = 156
 # test_model_dir = "2022-03-30/cross_entropy_1.0_exit_1.0_unknown_ratio_1.0/seed_4"
 # epoch = 110
 
+
+# TODO: Every model for MSD-Net. CE, sam, pp, CE+exit
+all_test_model_dir =["2022-12-18/cross_entropy_only/seed_0",
+                     "2022-12-18/cross_entropy_only/seed_1",
+                     "2022-12-18/cross_entropy_only/seed_2",
+                     "2022-12-18/cross_entropy_only/seed_3",
+                     "2022-12-18/cross_entropy_only/seed_4",
+                     "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_0",
+                     "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_1",
+                     "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_2",
+                     "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_3",
+                     "2022-12-18/cross_entropy_1.0_pfm_1.0/seed_4",
+                     "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_0",
+                     "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_1",
+                     "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_2",
+                     "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_3",
+                     "2022-12-19/cross_entropy_1.0_pfm_1.0_exit_1.0/seed_4",
+                     "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_0",
+                     "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_1",
+                     "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_2",
+                     "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_3",
+                     "2022-12-28/cross_entropy_1.0_pfm_0.0_exit_1.0/seed_4"]
+all_epoch = [174, 199, 168, 182, 174,
+            136, 138, 191, 136, 136,
+            131, 146, 121, 185, 160,
+            185, 141, 124, 190, 184]
+
 ####################################################################
 # Parameters (usually, no need to change these)
 ####################################################################
 percentile = [50]
 test_binary = False
 nb_training_classes = 293
-save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
-# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
-
-valid_prob_dir = save_path_base + "/" + test_model_dir + "/features"
-test_result_dir = save_path_base + "/" + test_model_dir + "/test_results"
-
-print(test_model_dir)
+# save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/Public/darpa_sail_on/models/msd_net"
+save_path_base = "/afs/crc.nd.edu/user/j/jhuang24/scratch_50/jhuang24/models/openset_resnet"
 
 ####################################################################
 # functions
@@ -456,116 +478,126 @@ def get_binary_results(known_feature,
 
 
 if __name__ == '__main__':
-    ################################################################
-    # Find valid probs
-    ################################################################
-    valid_known_known_probs_path = valid_prob_dir + "/valid_known_known_epoch_" + str(epoch) + "_probs.npy"
-    valid_known_unknown_probs_path = valid_prob_dir + "/valid_known_unknown_epoch_" + str(epoch) + "_probs.npy"
+    for i in range(len(all_test_model_dir)):
+        test_model_dir = all_test_model_dir[i]
+        epoch = all_epoch[i]
 
-    valid_known_known_probs = np.load(valid_known_known_probs_path)
-    valid_known_unknown_probs = np.load(valid_known_unknown_probs_path)
+        valid_prob_dir = save_path_base + "/" + test_model_dir + "/features"
+        test_result_dir = save_path_base + "/" + test_model_dir + "/test_results"
 
-    ################################################################
-    # known known is split into 4 parts
-    ################################################################
-    # known_known (test)
-    test_known_known_probs_path_p0 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_0_probs.npy"
-    test_known_known_label_path_p0  = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_0_labels.npy"
-    # test_known_known_rt_path_p0  = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_rts.npy"
-    test_known_known_labels_p0  = np.load(test_known_known_label_path_p0)
-    test_known_known_probs_p0  = np.load(test_known_known_probs_path_p0)
-    # test_known_known_rts_p0  = np.load(test_known_known_rt_path_p0)
-
-    test_known_known_probs_path_p1 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_1_probs.npy"
-    test_known_known_label_path_p1 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_1_labels.npy"
-    # test_known_known_rt_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_rts.npy"
-    test_known_known_labels_p1 = np.load(test_known_known_label_path_p1)
-    test_known_known_probs_p1 = np.load(test_known_known_probs_path_p1)
-    # test_known_known_rts_p1 = np.load(test_known_known_rt_path_p1)
-
-    test_known_known_probs_path_p2 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_2_probs.npy"
-    test_known_known_label_path_p2 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_2_labels.npy"
-    # test_known_known_rt_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_rts.npy"
-    test_known_known_labels_p2 = np.load(test_known_known_label_path_p2)
-    test_known_known_probs_p2 = np.load(test_known_known_probs_path_p2)
-    # test_known_known_rts_p2 = np.load(test_known_known_rt_path_p2)
-
-    test_known_known_probs_path_p3 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_3_probs.npy"
-    test_known_known_label_path_p3 = test_result_dir + "/known_known_epoch_" + str(epoch) + "_part_3_labels.npy"
-    # test_known_known_rt_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_rts.npy"
-    test_known_known_labels_p3 = np.load(test_known_known_label_path_p3)
-    test_known_known_probs_p3 = np.load(test_known_known_probs_path_p3)
-    # test_known_known_rts_p3 = np.load(test_known_known_rt_path_p3)
-
-    test_known_known_probs = np.concatenate((test_known_known_probs_p0, test_known_known_probs_p1,
-                                             test_known_known_probs_p2, test_known_known_probs_p3), axis=0)
-    test_known_known_labels = np.concatenate((test_known_known_labels_p0,test_known_known_labels_p1,
-                                             test_known_known_labels_p2,test_known_known_labels_p3),axis=0)
-    # test_known_known_rts = np.concatenate((test_known_known_rts_p0, test_known_known_rts_p1,
-    #                                       test_known_known_rts_p2, test_known_known_rts_p3),axis=0)
-
-    print(test_known_known_probs.shape)
-    print(test_known_known_labels.shape)
-
-
-    ################################################################
-    # Load known unknown and unknown unknown
-    ################################################################
-    # known_unknown (test)
-    # test_known_unknown_probs_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_probs.npy"
-    # test_known_unknown_label_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_labels.npy"
-    # test_known_unknown_rt_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_rts.npy"
-    #
-    # test_known_unknown_labels = np.load(test_known_unknown_label_path)
-    # test_known_unknown_probs = np.load(test_known_unknown_probs_path)
-    # test_known_unknown_rts = np.load(test_known_unknown_rt_path)
-
-    # unknown_unknown (test)
-    test_unknown_unknown_probs_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_probs.npy"
-    test_unknown_unknown_label_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_labels.npy"
-    # test_unknown_unknown_rt_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_rts.npy"
-
-    test_unknown_unknown_labels = np.load(test_unknown_unknown_label_path)
-    test_unknown_unknown_probs = np.load(test_unknown_unknown_probs_path)
-    # test_unknown_unknown_rts = np.load(test_unknown_unknown_rt_path)
-
-
-    for one_perct in percentile:
-        print("#" * 50)
-        print("Current percentile:", one_perct)
-        ################################################################
-        # TODO: Get the thresholds for all 3 categories
-        ################################################################
-        known_known_thresh = get_thresholds(npy_file_path=valid_known_known_probs_path,
-                                            percentile=one_perct)
-        known_unknown_thresh = get_thresholds(npy_file_path=valid_known_unknown_probs_path,
-                                              percentile=one_perct)
-
-        print("known thresholds:", known_known_thresh)
-        print("unknown thresholds", known_unknown_thresh)
-
-        ################################################################
-        # Run test process
-        ################################################################
-        # known_known
         print("@" * 40)
-        print("Processing known_known samples")
-        get_known_exit_stats(labels=test_known_known_labels,
-                             probs=test_known_known_probs,
-                             class_threshold=known_known_thresh,
-                             novelty_threshold=known_unknown_thresh)
+        print(test_model_dir)
 
-        # unknown_unknown
-        print("@" * 40)
-        print("Processing unknown_unknown samples")
-        get_unknown_exit_stats(labels=test_unknown_unknown_labels,
-                               probs=test_unknown_unknown_probs,
-                               novelty_threshold=known_known_thresh)
+        ################################################################
+        # Find valid probs
+        ################################################################
+        valid_known_known_probs_path = valid_prob_dir + "/valid_known_known_epoch_" + str(epoch) + "_probs.npy"
+        valid_known_unknown_probs_path = valid_prob_dir + "/valid_known_unknown_epoch_" + str(epoch) + "_probs.npy"
 
-        get_binary_results(known_feature=test_known_known_probs,
-                           known_label=test_known_known_labels,
-                           unknown_feature=test_unknown_unknown_probs,
-                           threshold=known_known_thresh)
+        valid_known_known_probs = np.load(valid_known_known_probs_path)
+        valid_known_unknown_probs = np.load(valid_known_unknown_probs_path)
+
+        ################################################################
+        # known known is split into 4 parts
+        ################################################################
+        # known_known (test)
+        test_known_known_probs_path_p0 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_probs.npy"
+        test_known_known_label_path_p0  = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_labels.npy"
+        # test_known_known_rt_path_p0  = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_0_rts.npy"
+        test_known_known_labels_p0  = np.load(test_known_known_label_path_p0)
+        test_known_known_probs_p0  = np.load(test_known_known_probs_path_p0)
+        # test_known_known_rts_p0  = np.load(test_known_known_rt_path_p0)
+
+        test_known_known_probs_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_probs.npy"
+        test_known_known_label_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_labels.npy"
+        # test_known_known_rt_path_p1 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_1_rts.npy"
+        test_known_known_labels_p1 = np.load(test_known_known_label_path_p1)
+        test_known_known_probs_p1 = np.load(test_known_known_probs_path_p1)
+        # test_known_known_rts_p1 = np.load(test_known_known_rt_path_p1)
+
+        test_known_known_probs_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_probs.npy"
+        test_known_known_label_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_labels.npy"
+        # test_known_known_rt_path_p2 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_2_rts.npy"
+        test_known_known_labels_p2 = np.load(test_known_known_label_path_p2)
+        test_known_known_probs_p2 = np.load(test_known_known_probs_path_p2)
+        # test_known_known_rts_p2 = np.load(test_known_known_rt_path_p2)
+
+        test_known_known_probs_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_probs.npy"
+        test_known_known_label_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_labels.npy"
+        # test_known_known_rt_path_p3 = test_result_dir + "/test_known_known_epoch_" + str(epoch) + "_part_3_rts.npy"
+        test_known_known_labels_p3 = np.load(test_known_known_label_path_p3)
+        test_known_known_probs_p3 = np.load(test_known_known_probs_path_p3)
+        # test_known_known_rts_p3 = np.load(test_known_known_rt_path_p3)
+
+        test_known_known_probs = np.concatenate((test_known_known_probs_p0, test_known_known_probs_p1,
+                                                 test_known_known_probs_p2, test_known_known_probs_p3), axis=0)
+        test_known_known_labels = np.concatenate((test_known_known_labels_p0,test_known_known_labels_p1,
+                                                 test_known_known_labels_p2,test_known_known_labels_p3),axis=0)
+        # test_known_known_rts = np.concatenate((test_known_known_rts_p0, test_known_known_rts_p1,
+        #                                       test_known_known_rts_p2, test_known_known_rts_p3),axis=0)
+
+        print(test_known_known_probs.shape)
+        print(test_known_known_labels.shape)
+
+
+        ################################################################
+        # Load known unknown and unknown unknown
+        ################################################################
+        # known_unknown (test)
+        # test_known_unknown_probs_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_probs.npy"
+        # test_known_unknown_label_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_labels.npy"
+        # test_known_unknown_rt_path = test_result_dir + "/known_unknown_epoch_" + str(epoch) + "_rts.npy"
+        #
+        # test_known_unknown_labels = np.load(test_known_unknown_label_path)
+        # test_known_unknown_probs = np.load(test_known_unknown_probs_path)
+        # test_known_unknown_rts = np.load(test_known_unknown_rt_path)
+
+        # unknown_unknown (test)
+        test_unknown_unknown_probs_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_probs.npy"
+        test_unknown_unknown_label_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_labels.npy"
+        # test_unknown_unknown_rt_path = test_result_dir + "/unknown_unknown_epoch_" + str(epoch) + "_rts.npy"
+
+        test_unknown_unknown_labels = np.load(test_unknown_unknown_label_path)
+        test_unknown_unknown_probs = np.load(test_unknown_unknown_probs_path)
+        # test_unknown_unknown_rts = np.load(test_unknown_unknown_rt_path)
+
+
+        for one_perct in percentile:
+            print("#" * 50)
+            print("Current percentile:", one_perct)
+            ################################################################
+            # TODO: Get the thresholds for all 3 categories
+            ################################################################
+            known_known_thresh = get_thresholds(npy_file_path=valid_known_known_probs_path,
+                                                percentile=one_perct)
+            known_unknown_thresh = get_thresholds(npy_file_path=valid_known_unknown_probs_path,
+                                                  percentile=one_perct)
+
+            print("known thresholds:", known_known_thresh)
+            print("unknown thresholds", known_unknown_thresh)
+
+            ################################################################
+            # Run test process
+            ################################################################
+            # known_known
+            print("@" * 40)
+            print("Processing known_known samples")
+            get_known_exit_stats(labels=test_known_known_labels,
+                                 probs=test_known_known_probs,
+                                 class_threshold=known_known_thresh,
+                                 novelty_threshold=known_unknown_thresh)
+
+            # unknown_unknown
+            print("@" * 40)
+            print("Processing unknown_unknown samples")
+            get_unknown_exit_stats(labels=test_unknown_unknown_labels,
+                                   probs=test_unknown_unknown_probs,
+                                   novelty_threshold=known_known_thresh)
+
+            get_binary_results(known_feature=test_known_known_probs,
+                               known_label=test_known_known_labels,
+                               unknown_feature=test_unknown_unknown_probs,
+                               threshold=known_known_thresh)
 
 
 
