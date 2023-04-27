@@ -1,35 +1,40 @@
 # MSDNet-PyTorch
 
-This repository contains the PyTorch implementation of the paper [Multi-Scale Dense Networks for Resource Efficient Image Classification](https://arxiv.org/pdf/1703.09844.pdf)
+This is the code for paper: [Measuring Human Perception to Improve Open Set Recognition](https://arxiv.org/abs/2209.03519). 
 
-Citation:
+Please cite this paper if you find it useful. Citation:
 
-    @inproceedings{huang2018multi,
-        title={Multi-scale dense networks for resource efficient image classification},
-        author={Huang, Gao and Chen, Danlu and Li, Tianhong and Wu, Felix and van der Maaten, Laurens and Weinberger, Kilian Q},
-        journal={ICLR},
-        year={2018}
-    }
+    @misc{huang2023measuring,
+          title={Measuring Human Perception to Improve Open Set Recognition}, 
+          author={Jin Huang and Derek Prijatelj and Justin Dulay and Walter Scheirer},
+          year={2023},
+          journal={IEEE Transactions on Pattern Analysis and Machine Intelligence (T-PAMI)}
 
 # Dependencies:
 
-## Please open a new branch based on this branch if you need to modify anything or doing another task with this code.
+For the most updated method, please look at ```debug_loss``` branch.
+
+For training our loss with ResNet, please check out ```resnet``` branch.
 
 Please create a new environent using anoconda and install all required packages.
 
-`conda create -n <environment-name> --file requirement.txt`
+    `conda create -n <environment-name> --file requirement.txt`
    
 
 # Data
 
-We use Json files for the data loader. Our data preprocessing is rather complex. Please contact Jin Huang if you need our data file or want to completely reproduce our data, and she will offer more detailed instructions.
+We use Json files for the data loader. All our training and testing data are available on google drive here: https://drive.google.com/drive/folders/1f6unxlmDCHXvxtna5DIeQnIB_H_EHbBf?usp=sharing
+
+If you are interested in how the data was prepared, check out the detail code scripts under ```utils```.
 
 
 # Training and validation
 
 ## Change the parameters
 
-In either pipeline.py or known_pipeline.py, look at the following parameters at the very beginning of the scripts:
+Main changes before training: ```save_path_base``` and all paths for data on your own server.
+
+In ```pipeline_openset.py```, look at the following parameters at the very beginning of the scripts and change them as preferred:
 
 - use_performance_loss
 - use_exit_loss
@@ -37,48 +42,31 @@ In either pipeline.py or known_pipeline.py, look at the following parameters at 
 - perform_loss_weight
 - exit_loss_weight
 - random_seed
-- use_modified_loss: 2 different setups for psyphy loss, refer MSDNet-PyTorch/utils/pipeline_util.py line 565
+- use_modified_loss: 2 different setups for psyphy loss, refer utils/pipeline_util.py
 - run_test: False for training phase, True for testing phase
 
-Other changes: save_path_base and all paths for data on your own server.
 
+## Train Open Set models
 
-## Train models
+To train models that allow open set recognition, run following command under root directory:
 
-To train models with known known and known unknown data, run following command under root directory:
+    `bash ./job_scripts/train_openset.sh`
 
-`bash ./job_scripts/train.sh`
-
-To train models with only known known data, run following command under root directory:
-
-`bash ./job_scripts/train_known.sh`
-
-It will save best models during training. All results will be saved to results.csv
+It will save best models during training. And all training and validation accuracy will be saved to ```results.csv```
 
 
 # Testing
 
-1. Set run_test to False and test_model_dir in either pipeline.py or known_pipeline.py, depending on your task.
+1. Set ```run_test``` to ```False``` and ```test_model_dir``` in ```pipeline_openset.py```, depending on your task.
 
 2. Under root directory, run:
 
-`bash ./job_scripts/test_known.sh` for oepn-set models
-or 
-`bash ./job_scripts/test.sh` for close-set models
+    `bash ./job_scripts/test_openset.sh`
 
-It will save features, labels, probabilities.
+    It will save features, labels, probabilities.
 
-3. Under MSDNet-PyTorch/utils:
+3. Under utils folder:
 
 - Activate your conda environment.
-- Change save_path_sub and epoch (epoch index for the best model) in either process_known_results.py or process_results.py
-- Run:
-
-`python process_known_results.py`
-
-or
-
-`python process_results.py`
-
-
-
+- Change save_path_sub and epoch (epoch index for the best model) in process_results.py
+- Run the following file in **```resnet```** branch for the updated testing process: `python process_openset_results.py`
