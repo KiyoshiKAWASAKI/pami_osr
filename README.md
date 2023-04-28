@@ -1,4 +1,4 @@
-# MSDNet-PyTorch
+# Measuring Human Perception to Improve Open Set Recognition
 
 This is the code for paper: [Measuring Human Perception to Improve Open Set Recognition](https://arxiv.org/abs/2209.03519). 
 
